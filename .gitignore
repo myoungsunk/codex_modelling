@@ -1,0 +1,7 @@
+# Generated outputs
+outputs/
+
+# Python cache
+__pycache__/
+.pycache_local/
+*.py[cod]

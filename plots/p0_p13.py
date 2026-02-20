@@ -11,7 +11,7 @@ import numpy as np
 from scipy import stats
 
 from analysis.ctf_cir import ctf_to_cir, pdp
-from analysis.xpd_stats import gof_normal_db, make_subbands, pathwise_xpd
+from analysis.xpd_stats import gof_model_selection_db, make_subbands, model_quantiles_db, pathwise_xpd
 from plots.plot_config import PlotConfig
 from rt_core.polarization import fresnel_reflection
 from scenarios.A4_dielectric_plane import MATERIALS
@@ -770,10 +770,23 @@ def p20_xpd_fit_gof(data: dict[str, Any], out: Path, config: PlotConfig, exact_b
         ax = axs[idx]
         vals = parity_vals[key]
         vals = vals[np.isfinite(vals)]
-        gr = gof_normal_db(vals, min_n=min_n, bootstrap_B=bootstrap_B, seed=idx)
+        floor_db = np.nan
+        ant_cfg = data.get("meta", {}).get("antenna_config", {})
+        if bool(ant_cfg):
+            tx_l = float(ant_cfg.get("tx_cross_pol_leakage_db", 35.0))
+            rx_l = float(ant_cfg.get("rx_cross_pol_leakage_db", 35.0))
+            floor_db = float(20.0 * np.log10(1.0 / (10.0 ** (-tx_l / 20.0) + 10.0 ** (-rx_l / 20.0) + 1e-15)))
+        gr = gof_model_selection_db(
+            vals,
+            min_n=min_n,
+            bootstrap_B=bootstrap_B,
+            seed=idx,
+            floor_db=floor_db if np.isfinite(floor_db) else None,
+            pinned_tol_db=0.5,
+        )
         status = str(gr.get("status", "NA"))
 
-        if status != "OK":
+        if status != "OK" or str(gr.get("best_model", "NA")) == "NA":
             ax.text(0.5, 0.5, f"{key}: {status}\nn={int(gr.get('n', 0))}", ha="center", va="center", transform=ax.transAxes)
             ax.set_xlabel("theoretical quantile")
             ax.set_ylabel("sample quantile [dB]")
@@ -781,25 +794,34 @@ def p20_xpd_fit_gof(data: dict[str, Any], out: Path, config: PlotConfig, exact_b
             summary_lines.append(f"{key}: {status}(n={int(gr.get('n', 0))})")
             continue
 
-        (osm, osr), (slope, intercept, _r) = stats.probplot(vals, dist="norm", fit=True)
-        ax.plot(osm, osr, "o", ms=3, alpha=0.8, label=f"{key} samples")
-        ax.plot(osm, slope * np.asarray(osm) + intercept, "-", lw=1.2, label="fit")
+        best_model = str(gr.get("best_model", "normal_db"))
+        best = (gr.get("best_metrics", {}) or {})
+        params = dict(best.get("params", {}))
+        probs = (np.arange(1, len(vals) + 1, dtype=float) - 0.5) / max(len(vals), 1)
+        x_theory = model_quantiles_db(best_model, params, probs)
+        y_sample = np.sort(vals)
+        ax.plot(x_theory, y_sample, "o", ms=3, alpha=0.8, label=f"{key} samples")
+        if np.std(x_theory) > 0.0:
+            slope, intercept = np.polyfit(x_theory, y_sample, 1)
+            ax.plot(x_theory, slope * x_theory + intercept, "-", lw=1.2, label="fit")
         ax.set_xlabel("theoretical quantile")
         ax.set_ylabel("sample quantile [dB]")
-        warn_tag = " [WARN]" if bool(gr.get("warning", False)) else ""
+        warn_tag = " [WARN]" if bool(best.get("warning", False) or gr.get("warning", False)) else ""
         ax.set_title(
-            f"{key}{warn_tag}: n={int(gr['n'])}, mu={float(gr['mu']):.2f}, sigma={float(gr['sigma']):.2f}\n"
-            f"qq_r={float(gr['qq_r']):.3f}, ks_D={float(gr['ks_D']):.3f}, ks_p_boot={float(gr['ks_p_boot']):.3f}",
+            f"{key}{warn_tag}: model={best_model}, n={int(gr['n'])}, n_fit={int(gr.get('n_fit', 0))}\n"
+            f"qq_r={float(best.get('qq_r', np.nan)):.3f}, ks_D={float(best.get('ks_D', np.nan)):.3f}, "
+            f"ks_p_boot={float(best.get('ks_p_boot', np.nan)):.3f}",
             fontsize=9,
         )
         ax.grid(True, alpha=0.3)
         ax.legend(fontsize=8)
         summary_lines.append(
-            f"{key}: n={int(gr['n'])}, qq_r={float(gr['qq_r']):.3f}, ks_p_boot={float(gr['ks_p_boot']):.3f}"
+            f"{key}: model={best_model}, n={int(gr['n'])}, qq_r={float(best.get('qq_r', np.nan)):.3f}, "
+            f"ks_p_boot={float(best.get('ks_p_boot', np.nan)):.3f}"
         )
 
     fig.suptitle(
-        "P20 XPD fit GOF (Normal in dB, parity buckets)\n"
+        "P20 XPD fit GOF (model selection in dB, parity buckets)\n"
         + _plot_meta_line(data, config, "per-scenario map" if config.apply_exact_bounce else "None")
         + f", min_n={min_n}, bootstrap_B={bootstrap_B}",
         fontsize=9,
@@ -820,9 +842,12 @@ def p21_tap_vs_path_consistency(data: dict[str, Any], out: Path, config: PlotCon
         return
 
     x = np.asarray([float(e.get("xpd_path_strongest_db", np.nan)) for e in entries], dtype=float)
-    y = np.asarray([float(e.get("xpd_tap_peak_db", np.nan)) for e in entries], dtype=float)
+    y = np.asarray([float(e.get("xpd_tap_window_db", e.get("xpd_tap_peak_db", np.nan))) for e in entries], dtype=float)
     d = np.asarray([float(e.get("delta_xpd_db", np.nan)) for e in entries], dtype=float)
     w = np.asarray([bool(e.get("wrap_detected", False)) for e in entries], dtype=bool)
+    n_paths = np.asarray([int(e.get("n_paths", 0)) for e in entries], dtype=float)
+    overlap_count = np.asarray([int(e.get("overlap_count", 0)) for e in entries], dtype=float)
+    reasons = [str(e.get("outlier_reason", "NONE")) for e in entries]
     sids = [str(e.get("scenario_id", "NA")) for e in entries]
     cids = [str(e.get("case_id", "NA")) for e in entries]
 
@@ -831,7 +856,8 @@ def p21_tap_vs_path_consistency(data: dict[str, Any], out: Path, config: PlotCon
         _write_skip(out, "P21_tap_vs_path_consistency", "Skipped: no finite XPD points")
         return
 
-    fig, ax = plt.subplots(figsize=(8, 5))
+    fig, axs = plt.subplots(1, 3, figsize=(14, 4.5))
+    ax = axs[0]
     idx = np.where(good)[0]
     cval = np.where(w[good], 1.0, 0.0)
     sc = ax.scatter(x[good], y[good], c=cval, cmap="coolwarm", s=24, alpha=0.85)
@@ -850,15 +876,43 @@ def p21_tap_vs_path_consistency(data: dict[str, Any], out: Path, config: PlotCon
     for i in outlier_idx[:20]:
         ax.annotate(f"{sids[i]}/{cids[i]}", (x[i], y[i]), textcoords="offset points", xytext=(4, 4), fontsize=7)
 
-    ax.set_title(
-        "P21 tap-wise vs path-wise XPD consistency\n"
-        + _plot_meta_line(data, config, "None")
-        + f", outliers(ΔXPD>10dB)={len(outlier_idx)}, wraps={int(np.sum(w))}"
-    )
+    ax.set_title("Path XPD vs Tap-window XPD")
     ax.set_xlabel("XPD_path_strongest [dB]")
-    ax.set_ylabel("XPD_tap_peak [dB]")
+    ax.set_ylabel("XPD_tap_window [dB]")
     ax.grid(True, alpha=0.3)
     ax.legend(fontsize=8)
+
+    # ΔXPD vs n_paths
+    ax2 = axs[1]
+    g2 = np.isfinite(d)
+    sc2 = ax2.scatter(n_paths[g2], d[g2], c=overlap_count[g2], cmap="viridis", s=24, alpha=0.85)
+    fig.colorbar(sc2, ax=ax2, label="overlap_count")
+    ax2.set_title("ΔXPD vs n_paths")
+    ax2.set_xlabel("n_paths")
+    ax2.set_ylabel("ΔXPD [dB]")
+    ax2.grid(True, alpha=0.3)
+
+    # ΔXPD vs overlap_count
+    ax3 = axs[2]
+    sc3 = ax3.scatter(overlap_count[g2], d[g2], c=np.where(w[g2], 1.0, 0.0), cmap="coolwarm", s=24, alpha=0.85)
+    fig.colorbar(sc3, ax=ax3, label="wrap_detected (0/1)")
+    ax3.set_title("ΔXPD vs overlap_count")
+    ax3.set_xlabel("overlap_count")
+    ax3.set_ylabel("ΔXPD [dB]")
+    ax3.grid(True, alpha=0.3)
+    # annotate a few largest outliers with reason
+    if np.any(g2):
+        big = np.argsort(-np.nan_to_num(d, nan=-np.inf))[:8]
+        for i in big:
+            if not np.isfinite(d[i]):
+                continue
+            ax3.annotate(f"{sids[i]}/{cids[i]}:{reasons[i]}", (overlap_count[i], d[i]), textcoords="offset points", xytext=(3, 3), fontsize=7)
+
+    fig.suptitle(
+        "P21 tap-wise vs path-wise consistency (windowed)\n"
+        + _plot_meta_line(data, config, "None")
+        + f", outliers(ΔXPD>10dB)={len(outlier_idx)}, wraps={int(np.sum(w))}, overlap_cases={int(np.sum(overlap_count > 1))}"
+    )
     _save(fig, out, "P21_tap_vs_path_consistency")
 
 

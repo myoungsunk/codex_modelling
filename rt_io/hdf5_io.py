@@ -53,6 +53,19 @@ def _git_meta() -> tuple[str, bool]:
     return commit, dirty
 
 
+def _git_diff(max_chars: int = 200_000) -> str:
+    """Best-effort git diff text (optionally truncated)."""
+
+    try:
+        diff = subprocess.check_output(["git", "diff", "--no-color"], stderr=subprocess.DEVNULL, text=True)
+    except Exception:
+        return ""
+    if len(diff) > int(max_chars):
+        keep = max(int(max_chars) - 64, 0)
+        diff = diff[:keep] + "\n... [truncated]\n"
+    return diff
+
+
 def _write_string_array(group: h5py.Group, name: str, values: list[str]) -> None:
     dt = h5py.string_dtype(encoding="utf-8")
     group.create_dataset(name, data=np.asarray(values, dtype=object), dtype=dt)
@@ -140,6 +153,20 @@ def save_rt_dataset(path: str | Path, data: dict[str, Any]) -> Path:
         meta.attrs["schema_version"] = src_meta.get("schema_version", SCHEMA_VERSION)
         meta.attrs["git_commit"] = src_meta.get("git_commit", git_commit)
         meta.attrs["git_dirty"] = bool(src_meta.get("git_dirty", git_dirty))
+        meta.attrs["cmdline"] = str(src_meta.get("cmdline", ""))
+        seed_val = src_meta.get("seed", None)
+        if isinstance(seed_val, (dict, list, tuple)):
+            meta.attrs["seed"] = json.dumps(seed_val)
+        elif seed_val is None:
+            meta.attrs["seed"] = ""
+        else:
+            meta.attrs["seed"] = str(seed_val)
+        if "release_mode" in src_meta:
+            meta.attrs["release_mode"] = bool(src_meta.get("release_mode", False))
+        git_diff = src_meta.get("git_diff", None)
+        if git_diff is None:
+            git_diff = _git_diff()
+        meta.attrs["git_diff"] = str(git_diff)
 
         freq = np.asarray(data["frequency"], dtype=float)
         nf = len(freq)
@@ -244,6 +271,10 @@ def load_rt_dataset(path: str | Path) -> dict[str, Any]:
                 "schema_version": meta_g.attrs.get("schema_version", "v1"),
                 "git_commit": meta_g.attrs.get("git_commit", "unknown"),
                 "git_dirty": bool(meta_g.attrs.get("git_dirty", True)),
+                "cmdline": meta_g.attrs.get("cmdline", ""),
+                "seed": meta_g.attrs.get("seed", ""),
+                "release_mode": bool(meta_g.attrs.get("release_mode", False)),
+                "git_diff": meta_g.attrs.get("git_diff", ""),
             }
         else:
             out["meta"] = {
@@ -253,6 +284,10 @@ def load_rt_dataset(path: str | Path) -> dict[str, Any]:
                 "schema_version": "v1",
                 "git_commit": "unknown",
                 "git_dirty": True,
+                "cmdline": "",
+                "seed": "",
+                "release_mode": False,
+                "git_diff": "",
             }
 
         out["frequency"] = np.asarray(f["frequency"][:], dtype=float)
