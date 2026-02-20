@@ -53,6 +53,11 @@ def fit_and_generate(
     num_synth_rays: int = 64,
     incidence_bins_deg: list[float] | None = None,
     seed: int = 0,
+    xpd_freq_noise_sigma_db: float = 0.0,
+    sample_slope: bool = False,
+    slope_sigma_db_per_hz: float = 0.0,
+    kappa_min: float = 1e-6,
+    kappa_max: float = 1e12,
     return_paths: bool = False,
 ) -> dict[str, Any]:
     ds = load_rt_dataset(input_h5)
@@ -103,7 +108,7 @@ def fit_and_generate(
     else:
         powers = np.ones((max(len(all_paths), 1),), dtype=float)
 
-    synth_paths = generate_synthetic_paths(
+    synth_out = generate_synthetic_paths(
         f_hz=freq,
         num_rays=num_synth_rays,
         delay_samples_s=delays,
@@ -111,10 +116,35 @@ def fit_and_generate(
         parity_probs=parity_probs,
         parity_fit=condition_fits["parity"],
         parity_slope_model=slope_models["parity"],
+        matrix_source=matrix_source,
+        xpd_freq_noise_sigma_db=float(xpd_freq_noise_sigma_db),
+        sample_slope=bool(sample_slope),
+        slope_sigma_db_per_hz=float(max(slope_sigma_db_per_hz, 0.0)),
+        kappa_min=float(kappa_min),
+        kappa_max=float(kappa_max),
+        return_diagnostics=True,
         seed=seed,
     )
+    synth_paths, synth_diag = synth_out
 
-    comparison = summarize_rt_vs_synth(all_paths, synth_paths, subbands=subbands, rt_matrix_source=matrix_source)
+    comparison = summarize_rt_vs_synth(
+        all_paths,
+        synth_paths,
+        subbands=subbands,
+        rt_matrix_source=matrix_source,
+        synth_matrix_source=matrix_source,
+        phase_bootstrap_B=500,
+        seed=seed,
+    )
+    comparison.update(
+        {
+            "synthetic_kappa_clamp_rate": float(synth_diag.get("kappa_clamp_rate", np.nan)),
+            "synthetic_kappa_clamp_count": int(synth_diag.get("kappa_clamp_count", 0)),
+            "synthetic_kappa_total": int(synth_diag.get("kappa_total", 0)),
+            "synthetic_xpd_freq_noise_sigma_db": float(synth_diag.get("xpd_freq_noise_sigma_db", 0.0)),
+            "synthetic_sample_slope": bool(synth_diag.get("sample_slope", False)),
+        }
+    )
 
     model_obj = {
         "matrix_source": matrix_source,
@@ -125,6 +155,7 @@ def fit_and_generate(
         "condition_fits": condition_fits,
         "frequency_slope_models": slope_models,
         "parity_probs": parity_probs,
+        "synthetic_generation": synth_diag,
     }
     save_stats_json(output_json, model_obj)
 
@@ -156,6 +187,11 @@ def main() -> None:
     parser.add_argument("--num-subbands", type=int, default=4)
     parser.add_argument("--num-synth-rays", type=int, default=64)
     parser.add_argument("--incidence-bins-deg", type=str, default="0,20,40,60,90")
+    parser.add_argument("--xpd-freq-noise-sigma-db", type=float, default=0.0)
+    parser.add_argument("--sample-slope", action="store_true")
+    parser.add_argument("--slope-sigma-db-per-hz", type=float, default=0.0)
+    parser.add_argument("--kappa-min", type=float, default=1e-6)
+    parser.add_argument("--kappa-max", type=float, default=1e12)
     parser.add_argument("--seed", type=int, default=0)
     args = parser.parse_args()
 
@@ -168,6 +204,11 @@ def main() -> None:
         num_subbands=args.num_subbands,
         num_synth_rays=args.num_synth_rays,
         incidence_bins_deg=bins,
+        xpd_freq_noise_sigma_db=args.xpd_freq_noise_sigma_db,
+        sample_slope=args.sample_slope,
+        slope_sigma_db_per_hz=args.slope_sigma_db_per_hz,
+        kappa_min=args.kappa_min,
+        kappa_max=args.kappa_max,
         seed=args.seed,
     )
 

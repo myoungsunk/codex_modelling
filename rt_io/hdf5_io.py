@@ -23,6 +23,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 import json
 from pathlib import Path
+import subprocess
 from typing import Any
 
 import h5py
@@ -32,6 +33,24 @@ from analysis.ctf_cir import synthesize_ctf
 
 
 SCHEMA_VERSION = "v2"
+
+
+def _git_meta() -> tuple[str, bool]:
+    """Best-effort git commit/dirty metadata."""
+
+    try:
+        commit = (
+            subprocess.check_output(["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL, text=True)
+            .strip()
+        )
+    except Exception:
+        commit = "unknown"
+    try:
+        status = subprocess.check_output(["git", "status", "--porcelain"], stderr=subprocess.DEVNULL, text=True)
+        dirty = bool(status.strip())
+    except Exception:
+        dirty = True
+    return commit, dirty
 
 
 def _write_string_array(group: h5py.Group, name: str, values: list[str]) -> None:
@@ -114,10 +133,13 @@ def save_rt_dataset(path: str | Path, data: dict[str, Any]) -> Path:
         meta = f.create_group("meta")
         now = datetime.now(timezone.utc).isoformat()
         src_meta = data.get("meta", {})
+        git_commit, git_dirty = _git_meta()
         meta.attrs["created_at"] = src_meta.get("created_at", now)
         meta.attrs["basis"] = src_meta.get("basis", "linear")
         meta.attrs["convention"] = src_meta.get("convention", "IEEE-RHCP")
         meta.attrs["schema_version"] = src_meta.get("schema_version", SCHEMA_VERSION)
+        meta.attrs["git_commit"] = src_meta.get("git_commit", git_commit)
+        meta.attrs["git_dirty"] = bool(src_meta.get("git_dirty", git_dirty))
 
         freq = np.asarray(data["frequency"], dtype=float)
         nf = len(freq)
@@ -220,6 +242,8 @@ def load_rt_dataset(path: str | Path) -> dict[str, Any]:
                 "basis": meta_g.attrs.get("basis", "linear"),
                 "convention": meta_g.attrs.get("convention", "IEEE-RHCP"),
                 "schema_version": meta_g.attrs.get("schema_version", "v1"),
+                "git_commit": meta_g.attrs.get("git_commit", "unknown"),
+                "git_dirty": bool(meta_g.attrs.get("git_dirty", True)),
             }
         else:
             out["meta"] = {
@@ -227,6 +251,8 @@ def load_rt_dataset(path: str | Path) -> dict[str, Any]:
                 "basis": "linear",
                 "convention": "IEEE-RHCP",
                 "schema_version": "v1",
+                "git_commit": "unknown",
+                "git_dirty": True,
             }
 
         out["frequency"] = np.asarray(f["frequency"][:], dtype=float)

@@ -1,4 +1,4 @@
-"""Automated plotting suite P0~P18 with interpretation-safe labeling and selection."""
+"""Automated plotting suite P0~P21 with interpretation-safe labeling and selection."""
 
 from __future__ import annotations
 
@@ -8,9 +8,10 @@ from typing import Any
 
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy import stats
 
 from analysis.ctf_cir import ctf_to_cir, pdp
-from analysis.xpd_stats import make_subbands, pathwise_xpd
+from analysis.xpd_stats import gof_normal_db, make_subbands, pathwise_xpd
 from plots.plot_config import PlotConfig
 from rt_core.polarization import fresnel_reflection
 from scenarios.A4_dielectric_plane import MATERIALS
@@ -705,6 +706,162 @@ def p18_singular_values_vs_delay(data: dict[str, Any], out: Path, config: PlotCo
     _save(fig, out, "P18_singular_values_delay")
 
 
+def p19_reciprocity_sanity(data: dict[str, Any], out: Path, config: PlotConfig) -> None:
+    info = data.get("meta", {}).get("reciprocity_sanity", None)
+    if not info:
+        _write_skip(out, "P19_reciprocity_sanity", "Skipped: reciprocity_sanity results missing in dataset meta")
+        return
+
+    entries = info.get("entries", [])
+    if not entries:
+        _write_skip(out, "P19_reciprocity_sanity", "Skipped: no reciprocity entries")
+        return
+
+    x_tau = []
+    y_dsig = []
+    c_bounce = []
+    match_lines = []
+    for e in entries:
+        sid = str(e.get("scenario_id", "NA"))
+        cid = str(e.get("case_id", "NA"))
+        match_lines.append(f"{sid}/{cid}: {e.get('matched_ratio', np.nan):.2f}")
+        for m in e.get("matches", []):
+            x_tau.append(float(m.get("tau_f_s", 0.0)) * 1e9)
+            y_dsig.append(float(m.get("delta_sigma_max_db", np.nan)))
+            c_bounce.append(int(m.get("bounce_count", 0)))
+
+    if not x_tau:
+        _write_skip(out, "P19_reciprocity_sanity", "Skipped: no matched paths")
+        return
+
+    fig, ax = plt.subplots(figsize=(8, 4))
+    sc = ax.scatter(np.asarray(x_tau), np.asarray(y_dsig), c=np.asarray(c_bounce), cmap="viridis", s=18)
+    fig.colorbar(sc, ax=ax, label="bounce_count")
+    dtau_max = float(info.get("delta_tau_max_s_global", np.nan))
+    mr = float(info.get("matched_ratio_global", np.nan))
+    dsmax = float(info.get("delta_sigma_max_db_global", np.nan))
+    ax.set_title(
+        "P19 Reciprocity sanity (invariant-based)\n"
+        + _plot_meta_line(data, config, "None")
+        + f", matched_ratio={mr:.3f}, dTau_max={dtau_max:.3e}s, dSigma_max={dsmax:.3e}dB"
+    )
+    ax.set_xlabel("tau [ns]")
+    ax.set_ylabel("delta_sigma_max [dB]")
+    ax.grid(True, alpha=0.3)
+    _save(fig, out, "P19_reciprocity_sanity")
+
+
+def p20_xpd_fit_gof(data: dict[str, Any], out: Path, config: PlotConfig, exact_bounce_map: dict[str, int]) -> None:
+    samples = _collect_samples(data, config, exact_bounce_map)
+    if not samples:
+        _write_skip(out, "P20_xpd_fit_gof", "Skipped: no XPD samples")
+        return
+
+    min_n = 20
+    bootstrap_B = 200
+    parity_vals = {
+        "odd": np.asarray([float(s["xpd_db"]) for s in samples if s.get("parity") == "odd"], dtype=float),
+        "even": np.asarray([float(s["xpd_db"]) for s in samples if s.get("parity") == "even"], dtype=float),
+    }
+
+    fig, axs = plt.subplots(1, 2, figsize=(11, 4.5))
+    summary_lines: list[str] = []
+    for idx, key in enumerate(["odd", "even"]):
+        ax = axs[idx]
+        vals = parity_vals[key]
+        vals = vals[np.isfinite(vals)]
+        gr = gof_normal_db(vals, min_n=min_n, bootstrap_B=bootstrap_B, seed=idx)
+        status = str(gr.get("status", "NA"))
+
+        if status != "OK":
+            ax.text(0.5, 0.5, f"{key}: {status}\nn={int(gr.get('n', 0))}", ha="center", va="center", transform=ax.transAxes)
+            ax.set_xlabel("theoretical quantile")
+            ax.set_ylabel("sample quantile [dB]")
+            ax.grid(True, alpha=0.3)
+            summary_lines.append(f"{key}: {status}(n={int(gr.get('n', 0))})")
+            continue
+
+        (osm, osr), (slope, intercept, _r) = stats.probplot(vals, dist="norm", fit=True)
+        ax.plot(osm, osr, "o", ms=3, alpha=0.8, label=f"{key} samples")
+        ax.plot(osm, slope * np.asarray(osm) + intercept, "-", lw=1.2, label="fit")
+        ax.set_xlabel("theoretical quantile")
+        ax.set_ylabel("sample quantile [dB]")
+        warn_tag = " [WARN]" if bool(gr.get("warning", False)) else ""
+        ax.set_title(
+            f"{key}{warn_tag}: n={int(gr['n'])}, mu={float(gr['mu']):.2f}, sigma={float(gr['sigma']):.2f}\n"
+            f"qq_r={float(gr['qq_r']):.3f}, ks_D={float(gr['ks_D']):.3f}, ks_p_boot={float(gr['ks_p_boot']):.3f}",
+            fontsize=9,
+        )
+        ax.grid(True, alpha=0.3)
+        ax.legend(fontsize=8)
+        summary_lines.append(
+            f"{key}: n={int(gr['n'])}, qq_r={float(gr['qq_r']):.3f}, ks_p_boot={float(gr['ks_p_boot']):.3f}"
+        )
+
+    fig.suptitle(
+        "P20 XPD fit GOF (Normal in dB, parity buckets)\n"
+        + _plot_meta_line(data, config, "per-scenario map" if config.apply_exact_bounce else "None")
+        + f", min_n={min_n}, bootstrap_B={bootstrap_B}",
+        fontsize=9,
+    )
+    if summary_lines:
+        fig.text(0.01, 0.01, " | ".join(summary_lines), fontsize=8)
+    _save(fig, out, "P20_xpd_fit_gof")
+
+
+def p21_tap_vs_path_consistency(data: dict[str, Any], out: Path, config: PlotConfig) -> None:
+    info = data.get("meta", {}).get("tap_path_consistency", None)
+    if not info:
+        _write_skip(out, "P21_tap_vs_path_consistency", "Skipped: tap_path_consistency missing in dataset meta")
+        return
+    entries = info.get("entries", [])
+    if not entries:
+        _write_skip(out, "P21_tap_vs_path_consistency", "Skipped: empty tap_path_consistency entries")
+        return
+
+    x = np.asarray([float(e.get("xpd_path_strongest_db", np.nan)) for e in entries], dtype=float)
+    y = np.asarray([float(e.get("xpd_tap_peak_db", np.nan)) for e in entries], dtype=float)
+    d = np.asarray([float(e.get("delta_xpd_db", np.nan)) for e in entries], dtype=float)
+    w = np.asarray([bool(e.get("wrap_detected", False)) for e in entries], dtype=bool)
+    sids = [str(e.get("scenario_id", "NA")) for e in entries]
+    cids = [str(e.get("case_id", "NA")) for e in entries]
+
+    good = np.isfinite(x) & np.isfinite(y)
+    if not np.any(good):
+        _write_skip(out, "P21_tap_vs_path_consistency", "Skipped: no finite XPD points")
+        return
+
+    fig, ax = plt.subplots(figsize=(8, 5))
+    idx = np.where(good)[0]
+    cval = np.where(w[good], 1.0, 0.0)
+    sc = ax.scatter(x[good], y[good], c=cval, cmap="coolwarm", s=24, alpha=0.85)
+    fig.colorbar(sc, ax=ax, ticks=[0, 1], label="wrap_detected (0/1)")
+
+    mn = float(np.nanmin(np.concatenate([x[good], y[good]])))
+    mx = float(np.nanmax(np.concatenate([x[good], y[good]])))
+    pad = 0.05 * max(1.0, mx - mn)
+    lo, hi = mn - pad, mx + pad
+    ax.plot([lo, hi], [lo, hi], "k--", lw=1.0, label="y=x")
+    ax.set_xlim(lo, hi)
+    ax.set_ylim(lo, hi)
+
+    # Label outliers by scenario/case.
+    outlier_idx = [i for i in idx if np.isfinite(d[i]) and float(d[i]) > 10.0]
+    for i in outlier_idx[:20]:
+        ax.annotate(f"{sids[i]}/{cids[i]}", (x[i], y[i]), textcoords="offset points", xytext=(4, 4), fontsize=7)
+
+    ax.set_title(
+        "P21 tap-wise vs path-wise XPD consistency\n"
+        + _plot_meta_line(data, config, "None")
+        + f", outliers(ΔXPD>10dB)={len(outlier_idx)}, wraps={int(np.sum(w))}"
+    )
+    ax.set_xlabel("XPD_path_strongest [dB]")
+    ax.set_ylabel("XPD_tap_peak [dB]")
+    ax.grid(True, alpha=0.3)
+    ax.legend(fontsize=8)
+    _save(fig, out, "P21_tap_vs_path_consistency")
+
+
 def generate_all_plots(
     data: dict[str, Any],
     out_dir: str | Path,
@@ -733,6 +890,9 @@ def generate_all_plots(
     p17_cp_same_opp_vs_bounce(data, out, config, exact_map)
     p17_a6_bounce_compare(data, out, config)
     p18_singular_values_vs_delay(data, out, config)
+    p19_reciprocity_sanity(data, out, config)
+    p20_xpd_fit_gof(data, out, config, exact_map)
+    p21_tap_vs_path_consistency(data, out, config)
 
 
 def _run_self_test() -> None:

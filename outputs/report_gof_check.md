@@ -1,0 +1,730 @@
+# RT Validation Report
+
+- basis: circular
+- convention: IEEE-RHCP
+- git_commit: 68ee6c5a78afd85522da15afae7f326f8ba398b2
+- git_dirty: True
+- xpd_matrix_source: J
+- exact_bounce_defaults: {'A2': 1, 'A2R': 1, 'A3': 2, 'A3R': 2, 'A4': 1}
+- report_exact_bounce_applied: True (scenario-specific default map)
+- antenna_config: {'convention': 'IEEE-RHCP', 'tx_cross_pol_leakage_db': 120.0, 'rx_cross_pol_leakage_db': 120.0, 'tx_axial_ratio_db': 0.0, 'rx_axial_ratio_db': 0.0, 'enable_coupling': False}
+- physics_validation_mode: True
+- predicted_leakage_floor_db: 300.000 (eps_tx=0.00000, eps_rx=0.00000)
+- model_compare_enabled: True
+
+## C0
+
+- case 0: paths=1, bounce_dist={0: 1}
+- strongest path: tau=1.001e-08s, power=5.000e-01
+- LOS exists: True
+- case 1: paths=1, bounce_dist={0: 1}
+- strongest path: tau=2.001e-08s, power=5.000e-01
+- LOS exists: True
+- case 2: paths=1, bounce_dist={0: 1}
+- strongest path: tau=3.002e-08s, power=5.000e-01
+- LOS exists: True
+- avg_paths_per_case: 1.00 (cases=3)
+- WARNING: low path count per case; statistics may be unstable (single-path dominance likely).
+- cir_peak_match_ratio: 3/3
+- cir_peak_match_skipped_overlap_cases: 0
+- delay_ambiguity_period_ns: 15.750
+- wrap_detected_cases: 2
+- pdp_sum_consistency_max_abs: 0.000e+00
+- WARNING: CIR delay ambiguity/wrap detected (tau > 1/df aliasing likely); use denser frequency grid, delay unwrapping, or path-domain validation.
+- parity XPD stats (exact_bounce=None): {'even': {'mu': 123.00595918184662, 'sigma': 0.0, 'n': 3}}
+- leakage-limited check: median_xpd_db=123.006, sigma_db=0.000, delta_to_floor_db=176.994, floor_db=300.000
+- GOF[parity] (min_n=20, bootstrap_B=200):
+-   even: INSUFFICIENT (n=3)
+-   WARNING: GOF skipped for parity=even due to insufficient samples.
+- GOF[material] (min_n=20, bootstrap_B=200):
+-   NA: INSUFFICIENT (n=3)
+-   WARNING: GOF skipped for material=NA due to insufficient samples.
+- GOF[incidence_angle_bin] (min_n=20, bootstrap_B=200):
+-   NA: INSUFFICIENT (n=3)
+-   WARNING: GOF skipped for incidence_angle_bin=NA due to insufficient samples.
+- GOF[delay_bin] (min_n=20, bootstrap_B=200):
+-   early: INSUFFICIENT (n=2)
+-   WARNING: GOF skipped for delay_bin=early due to insufficient samples.
+-   late: INSUFFICIENT (n=1)
+-   WARNING: GOF skipped for delay_bin=late due to insufficient samples.
+- early_late_xpd_mu_db: early=123.006, late=123.006, split_tau_s=2.001e-08
+- NOTE: early<=late observed (environment-dependent); do not over-claim early-tap advantage.
+- subband_mu_span_db: 0.000
+- NOTE: weak subband variation observed (may be physically weak frequency dependence).
+
+## A1
+
+- case 0: paths=1, bounce_dist={0: 1}
+- strongest path: tau=1.336e-08s, power=5.000e-01
+- LOS exists: True
+- case 1: paths=1, bounce_dist={0: 1}
+- strongest path: tau=2.002e-08s, power=5.000e-01
+- LOS exists: True
+- case 2: paths=1, bounce_dist={0: 1}
+- strongest path: tau=2.669e-08s, power=5.000e-01
+- LOS exists: True
+- avg_paths_per_case: 1.00 (cases=3)
+- WARNING: low path count per case; statistics may be unstable (single-path dominance likely).
+- cir_peak_match_ratio: 3/3
+- cir_peak_match_skipped_overlap_cases: 0
+- delay_ambiguity_period_ns: 15.750
+- wrap_detected_cases: 2
+- pdp_sum_consistency_max_abs: 0.000e+00
+- WARNING: CIR delay ambiguity/wrap detected (tau > 1/df aliasing likely); use denser frequency grid, delay unwrapping, or path-domain validation.
+- parity XPD stats (exact_bounce=None): {'even': {'mu': 123.00595918184662, 'sigma': 0.0, 'n': 3}}
+- leakage-limited check: median_xpd_db=123.006, sigma_db=0.000, delta_to_floor_db=176.994, floor_db=300.000
+- GOF[parity] (min_n=20, bootstrap_B=200):
+-   even: INSUFFICIENT (n=3)
+-   WARNING: GOF skipped for parity=even due to insufficient samples.
+- GOF[material] (min_n=20, bootstrap_B=200):
+-   NA: INSUFFICIENT (n=3)
+-   WARNING: GOF skipped for material=NA due to insufficient samples.
+- GOF[incidence_angle_bin] (min_n=20, bootstrap_B=200):
+-   NA: INSUFFICIENT (n=3)
+-   WARNING: GOF skipped for incidence_angle_bin=NA due to insufficient samples.
+- GOF[delay_bin] (min_n=20, bootstrap_B=200):
+-   early: INSUFFICIENT (n=2)
+-   WARNING: GOF skipped for delay_bin=early due to insufficient samples.
+-   late: INSUFFICIENT (n=1)
+-   WARNING: GOF skipped for delay_bin=late due to insufficient samples.
+- early_late_xpd_mu_db: early=123.006, late=123.006, split_tau_s=2.002e-08
+- NOTE: early<=late observed (environment-dependent); do not over-claim early-tap advantage.
+- subband_mu_span_db: 0.000
+- NOTE: weak subband variation observed (may be physically weak frequency dependence).
+
+## A2
+
+- case 0: paths=1, bounce_dist={1: 1}
+- strongest path: tau=1.668e-08s, power=5.000e-01
+- LOS exists: False
+- case 1: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.238e-08s, power=5.000e-01
+- LOS exists: False
+- case 2: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.850e-08s, power=5.000e-01
+- LOS exists: False
+- case 3: paths=1, bounce_dist={1: 1}
+- strongest path: tau=1.887e-08s, power=5.000e-01
+- LOS exists: False
+- case 4: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.405e-08s, power=5.000e-01
+- LOS exists: False
+- case 5: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.983e-08s, power=5.000e-01
+- LOS exists: False
+- case 6: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.136e-08s, power=5.000e-01
+- LOS exists: False
+- case 7: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.605e-08s, power=5.000e-01
+- LOS exists: False
+- case 8: paths=1, bounce_dist={1: 1}
+- strongest path: tau=3.147e-08s, power=5.000e-01
+- LOS exists: False
+- avg_paths_per_case: 1.00 (cases=9)
+- WARNING: low path count per case; statistics may be unstable (single-path dominance likely).
+- cir_peak_match_ratio: 9/9
+- cir_peak_match_skipped_overlap_cases: 0
+- delay_ambiguity_period_ns: 15.750
+- wrap_detected_cases: 9
+- pdp_sum_consistency_max_abs: 0.000e+00
+- WARNING: CIR delay ambiguity/wrap detected (tau > 1/df aliasing likely); use denser frequency grid, delay unwrapping, or path-domain validation.
+- parity XPD stats (exact_bounce=1): {'odd': {'mu': 123.00595918184662, 'sigma': 0.0, 'n': 9}}
+- leakage-limited check: median_xpd_db=123.006, sigma_db=0.000, delta_to_floor_db=176.994, floor_db=300.000
+- GOF[parity] (min_n=20, bootstrap_B=200):
+-   odd: INSUFFICIENT (n=9)
+-   WARNING: GOF skipped for parity=odd due to insufficient samples.
+- GOF[material] (min_n=20, bootstrap_B=200):
+-   NA: INSUFFICIENT (n=9)
+-   WARNING: GOF skipped for material=NA due to insufficient samples.
+- GOF[incidence_angle_bin] (min_n=20, bootstrap_B=200):
+-   [20,40): INSUFFICIENT (n=1)
+-   WARNING: GOF skipped for incidence_angle_bin=[20,40) due to insufficient samples.
+-   [40,60): INSUFFICIENT (n=5)
+-   WARNING: GOF skipped for incidence_angle_bin=[40,60) due to insufficient samples.
+-   [60,90): INSUFFICIENT (n=3)
+-   WARNING: GOF skipped for incidence_angle_bin=[60,90) due to insufficient samples.
+- GOF[delay_bin] (min_n=20, bootstrap_B=200):
+-   early: INSUFFICIENT (n=5)
+-   WARNING: GOF skipped for delay_bin=early due to insufficient samples.
+-   late: INSUFFICIENT (n=4)
+-   WARNING: GOF skipped for delay_bin=late due to insufficient samples.
+- early_late_xpd_mu_db: early=123.006, late=123.006, split_tau_s=2.405e-08
+- subband_mu_span_db: 0.000
+- NOTE: weak subband variation observed (may be physically weak frequency dependence).
+
+## A2R
+
+- case 0: paths=1, bounce_dist={1: 1}
+- strongest path: tau=1.296e-07s, power=5.000e-01
+- LOS exists: False
+- case 1: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.625e-08s, power=5.000e-01
+- LOS exists: False
+- case 2: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.542e-08s, power=5.000e-01
+- LOS exists: False
+- case 3: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.790e-08s, power=5.000e-01
+- LOS exists: False
+- case 4: paths=0, bounce_dist={}
+- WARNING: no paths matched exact_bounce=1 for stats
+- case 5: paths=1, bounce_dist={1: 1}
+- strongest path: tau=3.477e-08s, power=5.000e-01
+- LOS exists: False
+- case 6: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.406e-08s, power=5.000e-01
+- LOS exists: False
+- case 7: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.620e-08s, power=5.000e-01
+- LOS exists: False
+- case 8: paths=0, bounce_dist={}
+- WARNING: no paths matched exact_bounce=1 for stats
+- case 9: paths=1, bounce_dist={1: 1}
+- strongest path: tau=5.753e-08s, power=5.000e-01
+- LOS exists: False
+- case 10: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.277e-08s, power=5.000e-01
+- LOS exists: False
+- case 11: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.445e-08s, power=5.000e-01
+- LOS exists: False
+- case 12: paths=0, bounce_dist={}
+- WARNING: no paths matched exact_bounce=1 for stats
+- case 13: paths=0, bounce_dist={}
+- WARNING: no paths matched exact_bounce=1 for stats
+- case 14: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.173e-08s, power=5.000e-01
+- LOS exists: False
+- case 15: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.286e-08s, power=5.000e-01
+- LOS exists: False
+- avg_paths_per_case: 0.75 (cases=16)
+- WARNING: low path count per case; statistics may be unstable (single-path dominance likely).
+- cir_peak_match_ratio: 12/12
+- cir_peak_match_skipped_overlap_cases: 0
+- delay_ambiguity_period_ns: 15.750
+- wrap_detected_cases: 12
+- pdp_sum_consistency_max_abs: 0.000e+00
+- WARNING: CIR delay ambiguity/wrap detected (tau > 1/df aliasing likely); use denser frequency grid, delay unwrapping, or path-domain validation.
+- parity XPD stats (exact_bounce=1): {'odd': {'mu': 21.04204000059842, 'sigma': 14.484561962940276, 'n': 12}}
+- leakage-limited check: median_xpd_db=23.343, sigma_db=14.485, delta_to_floor_db=276.657, floor_db=300.000
+- GOF[parity] (min_n=20, bootstrap_B=200):
+-   odd: INSUFFICIENT (n=12)
+-   WARNING: GOF skipped for parity=odd due to insufficient samples.
+- GOF[material] (min_n=20, bootstrap_B=200):
+-   NA: INSUFFICIENT (n=12)
+-   WARNING: GOF skipped for material=NA due to insufficient samples.
+- GOF[incidence_angle_bin] (min_n=20, bootstrap_B=200):
+-   [40,60): INSUFFICIENT (n=4)
+-   WARNING: GOF skipped for incidence_angle_bin=[40,60) due to insufficient samples.
+-   [60,90): INSUFFICIENT (n=8)
+-   WARNING: GOF skipped for incidence_angle_bin=[60,90) due to insufficient samples.
+- GOF[delay_bin] (min_n=20, bootstrap_B=200):
+-   early: INSUFFICIENT (n=6)
+-   WARNING: GOF skipped for delay_bin=early due to insufficient samples.
+-   late: INSUFFICIENT (n=6)
+-   WARNING: GOF skipped for delay_bin=late due to insufficient samples.
+- early_late_xpd_mu_db: early=31.921, late=10.163, split_tau_s=2.581e-08
+- subband_mu_span_db: 0.000
+- NOTE: weak subband variation observed (may be physically weak frequency dependence).
+
+## A3
+
+- case 0: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.405e-08s, power=5.000e-01
+- LOS exists: False
+- case 1: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.405e-08s, power=5.000e-01
+- LOS exists: False
+- case 2: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 3: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.780e-08s, power=5.000e-01
+- LOS exists: False
+- avg_paths_per_case: 1.00 (cases=4)
+- WARNING: low path count per case; statistics may be unstable (single-path dominance likely).
+- cir_peak_match_ratio: 4/4
+- cir_peak_match_skipped_overlap_cases: 0
+- delay_ambiguity_period_ns: 15.750
+- wrap_detected_cases: 4
+- pdp_sum_consistency_max_abs: 0.000e+00
+- WARNING: CIR delay ambiguity/wrap detected (tau > 1/df aliasing likely); use denser frequency grid, delay unwrapping, or path-domain validation.
+- parity XPD stats (exact_bounce=2): {'even': {'mu': 123.00595918184662, 'sigma': 8.204640795236539e-15, 'n': 4}}
+- leakage-limited check: median_xpd_db=123.006, sigma_db=0.000, delta_to_floor_db=176.994, floor_db=300.000
+- GOF[parity] (min_n=20, bootstrap_B=200):
+-   even: INSUFFICIENT (n=4)
+-   WARNING: GOF skipped for parity=even due to insufficient samples.
+- GOF[material] (min_n=20, bootstrap_B=200):
+-   NA: INSUFFICIENT (n=4)
+-   WARNING: GOF skipped for material=NA due to insufficient samples.
+- GOF[incidence_angle_bin] (min_n=20, bootstrap_B=200):
+-   [40,60): INSUFFICIENT (n=4)
+-   WARNING: GOF skipped for incidence_angle_bin=[40,60) due to insufficient samples.
+- GOF[delay_bin] (min_n=20, bootstrap_B=200):
+-   early: INSUFFICIENT (n=2)
+-   WARNING: GOF skipped for delay_bin=early due to insufficient samples.
+-   late: INSUFFICIENT (n=2)
+-   WARNING: GOF skipped for delay_bin=late due to insufficient samples.
+- early_late_xpd_mu_db: early=123.006, late=123.006, split_tau_s=2.494e-08
+- subband_mu_span_db: 0.000
+- NOTE: weak subband variation observed (may be physically weak frequency dependence).
+
+## A3R
+
+- case 0: paths=1, bounce_dist={2: 1}
+- strongest path: tau=3.493e-08s, power=5.000e-01
+- LOS exists: False
+- case 1: paths=1, bounce_dist={2: 1}
+- strongest path: tau=4.691e-08s, power=5.000e-01
+- LOS exists: False
+- case 2: paths=1, bounce_dist={2: 1}
+- strongest path: tau=6.773e-08s, power=5.000e-01
+- LOS exists: False
+- case 3: paths=1, bounce_dist={2: 1}
+- strongest path: tau=8.357e-08s, power=5.000e-01
+- LOS exists: False
+- avg_paths_per_case: 1.00 (cases=4)
+- WARNING: low path count per case; statistics may be unstable (single-path dominance likely).
+- cir_peak_match_ratio: 4/4
+- cir_peak_match_skipped_overlap_cases: 0
+- delay_ambiguity_period_ns: 15.750
+- wrap_detected_cases: 4
+- pdp_sum_consistency_max_abs: 0.000e+00
+- WARNING: CIR delay ambiguity/wrap detected (tau > 1/df aliasing likely); use denser frequency grid, delay unwrapping, or path-domain validation.
+- parity XPD stats (exact_bounce=2): {'even': {'mu': 9.613998443828748, 'sigma': 3.3018564132349337, 'n': 4}}
+- leakage-limited check: median_xpd_db=9.467, sigma_db=3.302, delta_to_floor_db=290.533, floor_db=300.000
+- GOF[parity] (min_n=20, bootstrap_B=200):
+-   even: INSUFFICIENT (n=4)
+-   WARNING: GOF skipped for parity=even due to insufficient samples.
+- GOF[material] (min_n=20, bootstrap_B=200):
+-   NA: INSUFFICIENT (n=4)
+-   WARNING: GOF skipped for material=NA due to insufficient samples.
+- GOF[incidence_angle_bin] (min_n=20, bootstrap_B=200):
+-   [40,60): INSUFFICIENT (n=4)
+-   WARNING: GOF skipped for incidence_angle_bin=[40,60) due to insufficient samples.
+- GOF[delay_bin] (min_n=20, bootstrap_B=200):
+-   early: INSUFFICIENT (n=2)
+-   WARNING: GOF skipped for delay_bin=early due to insufficient samples.
+-   late: INSUFFICIENT (n=2)
+-   WARNING: GOF skipped for delay_bin=late due to insufficient samples.
+- early_late_xpd_mu_db: early=12.261, late=6.967, split_tau_s=5.732e-08
+- subband_mu_span_db: 0.000
+- NOTE: weak subband variation observed (may be physically weak frequency dependence).
+
+## A4
+
+- case 0: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.238e-08s, power=1.195e-01
+- LOS exists: False
+- case 1: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.405e-08s, power=1.078e-01
+- LOS exists: False
+- case 2: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.605e-08s, power=1.022e-01
+- LOS exists: False
+- case 3: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.238e-08s, power=5.315e-02
+- LOS exists: False
+- case 4: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.405e-08s, power=3.573e-02
+- LOS exists: False
+- case 5: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.605e-08s, power=2.785e-02
+- LOS exists: False
+- case 6: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.238e-08s, power=6.842e-02
+- LOS exists: False
+- case 7: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.405e-08s, power=5.029e-02
+- LOS exists: False
+- case 8: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.605e-08s, power=4.180e-02
+- LOS exists: False
+- avg_paths_per_case: 1.00 (cases=9)
+- WARNING: low path count per case; statistics may be unstable (single-path dominance likely).
+- cir_peak_match_ratio: 9/9
+- cir_peak_match_skipped_overlap_cases: 0
+- delay_ambiguity_period_ns: 15.750
+- wrap_detected_cases: 9
+- pdp_sum_consistency_max_abs: 0.000e+00
+- WARNING: CIR delay ambiguity/wrap detected (tau > 1/df aliasing likely); use denser frequency grid, delay unwrapping, or path-domain validation.
+- parity XPD stats (exact_bounce=1): {'odd': {'mu': 113.79485821351136, 'sigma': 2.2533521840289312, 'n': 9}}
+- leakage-limited check: median_xpd_db=113.271, sigma_db=2.253, delta_to_floor_db=186.729, floor_db=300.000
+- GOF[parity] (min_n=20, bootstrap_B=200):
+-   odd: INSUFFICIENT (n=9)
+-   WARNING: GOF skipped for parity=odd due to insufficient samples.
+- GOF[material] (min_n=20, bootstrap_B=200):
+-   glass: INSUFFICIENT (n=3)
+-   WARNING: GOF skipped for material=glass due to insufficient samples.
+-   gypsum: INSUFFICIENT (n=3)
+-   WARNING: GOF skipped for material=gypsum due to insufficient samples.
+-   wood: INSUFFICIENT (n=3)
+-   WARNING: GOF skipped for material=wood due to insufficient samples.
+- GOF[incidence_angle_bin] (min_n=20, bootstrap_B=200):
+-   [40,60): INSUFFICIENT (n=6)
+-   WARNING: GOF skipped for incidence_angle_bin=[40,60) due to insufficient samples.
+-   [60,90): INSUFFICIENT (n=3)
+-   WARNING: GOF skipped for incidence_angle_bin=[60,90) due to insufficient samples.
+- GOF[delay_bin] (min_n=20, bootstrap_B=200):
+-   early: INSUFFICIENT (n=6)
+-   WARNING: GOF skipped for delay_bin=early due to insufficient samples.
+-   late: INSUFFICIENT (n=3)
+-   WARNING: GOF skipped for delay_bin=late due to insufficient samples.
+- early_late_xpd_mu_db: early=114.225, late=112.935, split_tau_s=2.405e-08
+- subband_mu_span_db: 0.000
+- NOTE: weak subband variation observed (may be physically weak frequency dependence).
+- material sub-summary: {'glass': {'mu': 116.41487615869353, 'sigma': 0.3455024426544337, 'n': 3}, 'wood': {'mu': 111.76070525991304, 'sigma': 1.415459307822358, 'n': 3}, 'gypsum': {'mu': 113.20899322192751, 'sigma': 1.0813057758937958, 'n': 3}}
+
+## A5
+
+- case 0: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 1: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 2: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 3: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 4: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 5: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 6: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 7: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 8: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 9: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 10: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 11: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 12: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 13: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 14: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 15: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 16: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 17: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 18: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 19: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 20: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 21: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 22: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 23: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 24: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 25: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 26: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 27: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 28: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 29: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- avg_paths_per_case: 1.00 (cases=30)
+- WARNING: low path count per case; statistics may be unstable (single-path dominance likely).
+- cir_peak_match_ratio: 30/30
+- cir_peak_match_skipped_overlap_cases: 0
+- delay_ambiguity_period_ns: 15.750
+- wrap_detected_cases: 30
+- pdp_sum_consistency_max_abs: 0.000e+00
+- WARNING: CIR delay ambiguity/wrap detected (tau > 1/df aliasing likely); use denser frequency grid, delay unwrapping, or path-domain validation.
+- parity XPD stats (exact_bounce=None): {'even': {'mu': 2.5433483268121484, 'sigma': 7.525457271493679, 'n': 30}}
+- leakage-limited check: median_xpd_db=3.126, sigma_db=7.525, delta_to_floor_db=296.874, floor_db=300.000
+- GOF[parity] (min_n=20, bootstrap_B=200):
+-   even: n=30, mu=2.543, sigma=7.525, qq_r=0.9758, ks_D=0.0920, ks_p_boot=0.7400
+-   WARNING: GOF borderline for parity=even (qq_r<0.98 or ks_p_boot<0.05).
+- GOF[material] (min_n=20, bootstrap_B=200):
+-   NA: n=30, mu=2.543, sigma=7.525, qq_r=0.9758, ks_D=0.0920, ks_p_boot=0.7400
+-   WARNING: GOF borderline for material=NA (qq_r<0.98 or ks_p_boot<0.05).
+- GOF[incidence_angle_bin] (min_n=20, bootstrap_B=200):
+-   [40,60): n=30, mu=2.543, sigma=7.525, qq_r=0.9758, ks_D=0.0920, ks_p_boot=0.7400
+-   WARNING: GOF borderline for incidence_angle_bin=[40,60) (qq_r<0.98 or ks_p_boot<0.05).
+- GOF[delay_bin] (min_n=20, bootstrap_B=200):
+-   early: n=30, mu=2.543, sigma=7.525, qq_r=0.9758, ks_D=0.0920, ks_p_boot=0.7400
+-   WARNING: GOF borderline for delay_bin=early (qq_r<0.98 or ks_p_boot<0.05).
+- subband_mu_span_db: 0.000
+- NOTE: weak subband variation observed (may be physically weak frequency dependence).
+
+## A6
+
+- case 0: paths=1, bounce_dist={1: 1}
+- strongest path: tau=1.336e-08s, power=5.000e-01
+- LOS exists: False
+- case 1: paths=1, bounce_dist={1: 1}
+- strongest path: tau=1.336e-08s, power=5.000e-01
+- LOS exists: False
+- case 2: paths=1, bounce_dist={1: 1}
+- strongest path: tau=1.336e-08s, power=5.000e-01
+- LOS exists: False
+- case 3: paths=1, bounce_dist={1: 1}
+- strongest path: tau=1.341e-08s, power=5.000e-01
+- LOS exists: False
+- case 4: paths=1, bounce_dist={1: 1}
+- strongest path: tau=1.341e-08s, power=5.000e-01
+- LOS exists: False
+- case 5: paths=1, bounce_dist={1: 1}
+- strongest path: tau=1.341e-08s, power=5.000e-01
+- LOS exists: False
+- case 6: paths=1, bounce_dist={1: 1}
+- strongest path: tau=1.350e-08s, power=5.000e-01
+- LOS exists: False
+- case 7: paths=1, bounce_dist={1: 1}
+- strongest path: tau=1.349e-08s, power=5.000e-01
+- LOS exists: False
+- case 8: paths=1, bounce_dist={1: 1}
+- strongest path: tau=1.350e-08s, power=5.000e-01
+- LOS exists: False
+- case 9: paths=2, bounce_dist={2: 2}
+- strongest path: tau=2.670e-08s, power=5.000e-01
+- LOS exists: False
+- case 10: paths=2, bounce_dist={2: 2}
+- strongest path: tau=2.669e-08s, power=5.000e-01
+- LOS exists: False
+- case 11: paths=2, bounce_dist={2: 2}
+- strongest path: tau=2.670e-08s, power=5.000e-01
+- LOS exists: False
+- case 12: paths=2, bounce_dist={2: 2}
+- strongest path: tau=2.672e-08s, power=5.000e-01
+- LOS exists: False
+- case 13: paths=2, bounce_dist={2: 2}
+- strongest path: tau=2.672e-08s, power=5.000e-01
+- LOS exists: False
+- case 14: paths=2, bounce_dist={2: 2}
+- strongest path: tau=2.672e-08s, power=5.000e-01
+- LOS exists: False
+- case 15: paths=2, bounce_dist={2: 2}
+- strongest path: tau=2.676e-08s, power=5.000e-01
+- LOS exists: False
+- case 16: paths=2, bounce_dist={2: 2}
+- strongest path: tau=2.676e-08s, power=5.000e-01
+- LOS exists: False
+- case 17: paths=2, bounce_dist={2: 2}
+- strongest path: tau=2.676e-08s, power=5.000e-01
+- LOS exists: False
+- avg_paths_per_case: 1.50 (cases=18)
+- WARNING: low path count per case; statistics may be unstable (single-path dominance likely).
+- cir_peak_match_ratio: 9/9
+- cir_peak_match_skipped_overlap_cases: 9
+- delay_ambiguity_period_ns: 15.750
+- wrap_detected_cases: 9
+- pdp_sum_consistency_max_abs: 0.000e+00
+- WARNING: CIR delay ambiguity/wrap detected (tau > 1/df aliasing likely); use denser frequency grid, delay unwrapping, or path-domain validation.
+- parity XPD stats (exact_bounce=None): {'odd': {'mu': 43.766082516167714, 'sigma': 59.58398993523661, 'n': 9}, 'even': {'mu': 123.00595918184665, 'sigma': 2.0679831183912225e-14, 'n': 18}}
+- leakage-limited check: median_xpd_db=123.006, sigma_db=50.412, delta_to_floor_db=176.994, floor_db=300.000
+- GOF[parity] (min_n=20, bootstrap_B=200):
+-   even: INSUFFICIENT (n=18)
+-   WARNING: GOF skipped for parity=even due to insufficient samples.
+-   odd: INSUFFICIENT (n=9)
+-   WARNING: GOF skipped for parity=odd due to insufficient samples.
+- GOF[material] (min_n=20, bootstrap_B=200):
+-   NA: n=27, mu=96.593, sigma=50.412, qq_r=0.7325, ks_D=0.4776, ks_p_boot=0.0000
+-   WARNING: GOF borderline for material=NA (qq_r<0.98 or ks_p_boot<0.05).
+- GOF[incidence_angle_bin] (min_n=20, bootstrap_B=200):
+-   [0,20): n=27, mu=96.593, sigma=50.412, qq_r=0.7325, ks_D=0.4776, ks_p_boot=0.0000
+-   WARNING: GOF borderline for incidence_angle_bin=[0,20) (qq_r<0.98 or ks_p_boot<0.05).
+- GOF[delay_bin] (min_n=20, bootstrap_B=200):
+-   early: INSUFFICIENT (n=15)
+-   WARNING: GOF skipped for delay_bin=early due to insufficient samples.
+-   late: INSUFFICIENT (n=12)
+-   WARNING: GOF skipped for delay_bin=late due to insufficient samples.
+- early_late_xpd_mu_db: early=75.462, late=123.006, split_tau_s=2.670e-08
+- NOTE: early<=late observed (environment-dependent); do not over-claim early-tap advantage.
+- subband_mu_span_db: 0.000
+- NOTE: weak subband variation observed (may be physically weak frequency dependence).
+- A6_near_normal_odd_max_deg: 8.647
+- A6_near_normal_even_max_deg: 4.348
+- note: A6 is a near-normal-incidence CP benchmark; odd/even trends from this setup should not be generalized to arbitrary oblique incidence.
+
+## B0
+
+- case 0: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=2.359e-08s, power=5.000e-01
+- LOS exists: True
+- case 1: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=2.090e-08s, power=5.000e-01
+- LOS exists: True
+- case 2: paths=21, bounce_dist={0: 1, 1: 6, 2: 14}
+- strongest path: tau=5.347e-08s, power=5.000e-01
+- LOS exists: True
+- case 3: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=2.090e-08s, power=5.000e-01
+- LOS exists: True
+- case 4: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=2.359e-08s, power=5.000e-01
+- LOS exists: True
+- case 5: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=4.401e-08s, power=5.000e-01
+- LOS exists: True
+- case 6: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=3.407e-08s, power=5.000e-01
+- LOS exists: True
+- case 7: paths=21, bounce_dist={0: 1, 1: 6, 2: 14}
+- strongest path: tau=2.313e-08s, power=5.000e-01
+- LOS exists: True
+- case 8: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=3.407e-08s, power=5.000e-01
+- LOS exists: True
+- case 9: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=4.401e-08s, power=5.000e-01
+- LOS exists: True
+- case 10: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=4.403e-08s, power=5.000e-01
+- LOS exists: True
+- case 11: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=3.522e-08s, power=5.000e-01
+- LOS exists: True
+- case 12: paths=21, bounce_dist={0: 1, 1: 6, 2: 14}
+- strongest path: tau=2.694e-08s, power=5.000e-01
+- LOS exists: True
+- case 13: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=3.522e-08s, power=5.000e-01
+- LOS exists: True
+- case 14: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=4.403e-08s, power=5.000e-01
+- LOS exists: True
+- case 15: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=4.120e-08s, power=5.000e-01
+- LOS exists: True
+- case 16: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=3.682e-08s, power=5.000e-01
+- LOS exists: True
+- case 17: paths=21, bounce_dist={0: 1, 1: 6, 2: 14}
+- strongest path: tau=5.567e-08s, power=5.000e-01
+- LOS exists: True
+- case 18: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=3.682e-08s, power=5.000e-01
+- LOS exists: True
+- case 19: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=4.120e-08s, power=5.000e-01
+- LOS exists: True
+- case 20: paths=24, bounce_dist={0: 1, 1: 6, 2: 17}
+- strongest path: tau=3.623e-08s, power=5.000e-01
+- LOS exists: True
+- case 21: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=3.978e-08s, power=5.000e-01
+- LOS exists: True
+- case 22: paths=21, bounce_dist={0: 1, 1: 6, 2: 14}
+- strongest path: tau=2.238e-08s, power=5.000e-01
+- LOS exists: True
+- case 23: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=3.978e-08s, power=5.000e-01
+- LOS exists: True
+- case 24: paths=24, bounce_dist={0: 1, 1: 6, 2: 17}
+- strongest path: tau=3.623e-08s, power=5.000e-01
+- LOS exists: True
+- avg_paths_per_case: 24.12 (cases=25)
+- cir_peak_match_ratio: 0/0
+- cir_peak_match_skipped_overlap_cases: 25
+- delay_ambiguity_period_ns: 15.750
+- wrap_detected_cases: 2
+- pdp_sum_consistency_max_abs: 0.000e+00
+- WARNING: CIR delay ambiguity/wrap detected (tau > 1/df aliasing likely); use denser frequency grid, delay unwrapping, or path-domain validation.
+- parity XPD stats (exact_bounce=None): {'even': {'mu': 76.47097837488461, 'sigma': 63.27981578595831, 'n': 453}, 'odd': {'mu': 123.0059591818466, 'sigma': 1.481782879088607e-14, 'n': 150}}
+- leakage-limited check: median_xpd_db=123.006, sigma_db=58.412, delta_to_floor_db=176.994, floor_db=300.000
+- GOF[parity] (min_n=20, bootstrap_B=200):
+-   even: n=453, mu=76.471, sigma=63.280, qq_r=0.8031, ks_D=0.4157, ks_p_boot=0.0000
+-   WARNING: GOF borderline for parity=even (qq_r<0.98 or ks_p_boot<0.05).
+-   odd: n=150, mu=123.006, sigma=0.000, qq_r=0.0583, ks_D=0.8312, ks_p_boot=0.0000
+-   WARNING: GOF borderline for parity=odd (qq_r<0.98 or ks_p_boot<0.05).
+- GOF[material] (min_n=20, bootstrap_B=200):
+-   NA: n=603, mu=88.047, sigma=58.412, qq_r=0.7611, ks_D=0.4599, ks_p_boot=0.0000
+-   WARNING: GOF borderline for material=NA (qq_r<0.98 or ks_p_boot<0.05).
+- GOF[incidence_angle_bin] (min_n=20, bootstrap_B=200):
+-   NA: n=25, mu=123.006, sigma=0.000, qq_r=0.0000, ks_D=0.8364, ks_p_boot=0.0000
+-   WARNING: GOF borderline for incidence_angle_bin=NA (qq_r<0.98 or ks_p_boot<0.05).
+-   [0,20): n=164, mu=123.006, sigma=0.000, qq_r=0.6303, ks_D=0.5000, ks_p_boot=0.0000
+-   WARNING: GOF borderline for incidence_angle_bin=[0,20) (qq_r<0.98 or ks_p_boot<0.05).
+-   [20,40): n=74, mu=123.006, sigma=0.000, qq_r=0.1835, ks_D=0.7989, ks_p_boot=0.0000
+-   WARNING: GOF borderline for incidence_angle_bin=[20,40) (qq_r<0.98 or ks_p_boot<0.05).
+-   [40,60): n=322, mu=59.022, sigma=66.410, qq_r=0.8350, ks_D=0.3479, ks_p_boot=0.0000
+-   WARNING: GOF borderline for incidence_angle_bin=[40,60) (qq_r<0.98 or ks_p_boot<0.05).
+-   [60,90): INSUFFICIENT (n=18)
+-   WARNING: GOF skipped for incidence_angle_bin=[60,90) due to insufficient samples.
+- GOF[delay_bin] (min_n=20, bootstrap_B=200):
+-   early: n=305, mu=87.234, sigma=58.262, qq_r=0.7655, ks_D=0.4550, ks_p_boot=0.0000
+-   WARNING: GOF borderline for delay_bin=early (qq_r<0.98 or ks_p_boot<0.05).
+-   late: n=298, mu=88.879, sigma=58.651, qq_r=0.7560, ks_D=0.4646, ks_p_boot=0.0000
+-   WARNING: GOF borderline for delay_bin=late (qq_r<0.98 or ks_p_boot<0.05).
+- early_late_xpd_mu_db: early=87.234, late=88.879, split_tau_s=3.518e-08
+- NOTE: early<=late observed (environment-dependent); do not over-claim early-tap advantage.
+- subband_mu_span_db: 0.000
+- NOTE: weak subband variation observed (may be physically weak frequency dependence).
+
+## Physics Mode Check
+
+- scenario_median_xpd_std_db: 53.268
+- non-pinned behavior observed across scenarios in physics mode.
+
+## Model Compare (F2-F4)
+
+- f2_pdp_peak_tau_rt_ns: 10.112915039062495
+- f2_pdp_peak_tau_synth_ns: 11.843261718749993
+- f3_xpd_mu_rt_db: 84.41587636503128
+- f3_xpd_mu_synth_db: -12.240677960763428
+- f4_parity_direction_match: True
+- f4_rt_even_mu_db: 74.17529418348373
+- f4_rt_odd_mu_db: 112.32010823538575
+- f4_synth_even_mu_db: -38.84045218664958
+- f4_synth_odd_mu_db: 55.73652283872342
+
+## Reciprocity Sanity (C10)
+
+- matrix_source: J
+- matched_ratio_global: 1.000000
+- delta_tau_max_s_global: 0.000e+00
+- delta_sigma_max_db_global: 0.000e+00
+- C0/0: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00
+- C0/1: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00
+- C0/2: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00
+- A1/0: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00
+- A1/1: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00
+- A1/2: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00

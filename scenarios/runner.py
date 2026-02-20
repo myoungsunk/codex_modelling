@@ -7,16 +7,22 @@ Example:
 from __future__ import annotations
 
 import argparse
+import inspect
 from pathlib import Path
+import subprocess
 from typing import Any
 
 import numpy as np
 
+from analysis.reciprocity import reciprocity_sanity
+from analysis.tap_path_consistency import evaluate_dataset_tap_path_consistency
 from analysis.ctf_cir import ctf_to_cir, detect_cir_wrap, first_peak_tau_s, pdp, synthesize_ctf_with_source, tau_resolution_s
 from analysis.run_model_fit import fit_and_generate
 from analysis.xpd_stats import (
     conditional_fit,
     estimate_leakage_floor_from_antenna_config,
+    gof_normal_db,
+    incidence_angle_bin_label,
     make_subbands,
     leakage_limited_summary,
     pathwise_xpd,
@@ -24,6 +30,8 @@ from analysis.xpd_stats import (
 from plots.model_compare import generate_rt_vs_synth_plots
 from plots.plot_config import PlotConfig
 from plots.p0_p13 import generate_all_plots
+from rt_core.antenna import Antenna
+from rt_core.geometry import normalize
 from rt_io.hdf5_io import save_rt_dataset
 from scenarios import (
     A1_los_only,
@@ -96,6 +104,150 @@ def _circular_delay_error(a_s: float, b_s: float, period_s: float) -> float:
     return min(d, period_s - d)
 
 
+def _gof_by_bucket(
+    samples: list[dict[str, Any]],
+    key: str,
+    min_n: int = 20,
+    bootstrap_B: int = 200,
+    seed: int = 0,
+) -> dict[str, dict[str, Any]]:
+    buckets: dict[str, list[float]] = {}
+    for s in samples:
+        k = str(s.get(key, "NA"))
+        buckets.setdefault(k, []).append(float(s.get("xpd_db", np.nan)))
+    out: dict[str, dict[str, Any]] = {}
+    for i, (k, vals) in enumerate(sorted(buckets.items(), key=lambda x: x[0])):
+        out[k] = gof_normal_db(vals, min_n=min_n, bootstrap_B=bootstrap_B, seed=seed + i)
+    return out
+
+
+def _git_meta() -> tuple[str, bool]:
+    try:
+        commit = subprocess.check_output(["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL, text=True).strip()
+    except Exception:
+        commit = "unknown"
+    try:
+        status = subprocess.check_output(["git", "status", "--porcelain"], stderr=subprocess.DEVNULL, text=True)
+        dirty = bool(status.strip())
+    except Exception:
+        dirty = True
+    return commit, dirty
+
+
+def _projected_hv(boresight: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    b = normalize(np.asarray(boresight, dtype=float))
+    h = np.array([0.0, 1.0, 0.0], dtype=float)
+    h = h - float(np.dot(h, b)) * b
+    if np.linalg.norm(h) < 1e-9:
+        h = np.array([0.0, 0.0, 1.0], dtype=float) - float(np.dot(np.array([0.0, 0.0, 1.0]), b)) * b
+    h = normalize(h)
+    v = normalize(np.cross(b, h))
+    return h, v
+
+
+def _antennas_from_points(
+    tx_pos: np.ndarray,
+    rx_pos: np.ndarray,
+    basis: str,
+    convention: str,
+    antenna_config: dict[str, Any],
+) -> tuple[Antenna, Antenna]:
+    b_tx = normalize(np.asarray(rx_pos, dtype=float) - np.asarray(tx_pos, dtype=float))
+    h_tx, v_tx = _projected_hv(b_tx)
+    b_rx = normalize(np.asarray(tx_pos, dtype=float) - np.asarray(rx_pos, dtype=float))
+    h_rx, v_rx = _projected_hv(b_rx)
+    tx = Antenna(
+        position=np.asarray(tx_pos, dtype=float),
+        boresight=b_tx,
+        h_axis=h_tx,
+        v_axis=v_tx,
+        basis=basis,
+        convention=convention,
+        cross_pol_leakage_db=float(antenna_config.get("tx_cross_pol_leakage_db", 35.0)),
+        axial_ratio_db=float(antenna_config.get("tx_axial_ratio_db", 0.0)),
+        enable_coupling=bool(antenna_config.get("enable_coupling", True)),
+    )
+    rx = Antenna(
+        position=np.asarray(rx_pos, dtype=float),
+        boresight=b_rx,
+        h_axis=h_rx,
+        v_axis=v_rx,
+        basis=basis,
+        convention=convention,
+        cross_pol_leakage_db=float(antenna_config.get("rx_cross_pol_leakage_db", 35.0)),
+        axial_ratio_db=float(antenna_config.get("rx_axial_ratio_db", 0.0)),
+        enable_coupling=bool(antenna_config.get("enable_coupling", True)),
+    )
+    return tx, rx
+
+
+def _build_scene_from_module(mod: Any, params: dict[str, Any]) -> list[Any]:
+    if not hasattr(mod, "build_scene"):
+        return []
+    sig = inspect.signature(mod.build_scene)
+    p = dict(params)
+    if "material_name" in sig.parameters and "material" in p:
+        p["material_name"] = p["material"]
+    kwargs = {k: p[k] for k in sig.parameters if k in p}
+    return mod.build_scene(**kwargs)
+
+
+def compute_reciprocity_checks(
+    data: dict[str, Any],
+    matrix_source: str,
+    scenario_ids: list[str] | None = None,
+) -> dict[str, Any]:
+    targets = scenario_ids or ["C0", "A1"]
+    freq = np.asarray(data["frequency"], dtype=float)
+    basis = str(data.get("meta", {}).get("basis", "linear"))
+    conv = str(data.get("meta", {}).get("convention", "IEEE-RHCP"))
+    ant_cfg = data.get("meta", {}).get("antenna_config", {})
+    force_cp = bool(data.get("meta", {}).get("force_cp_swap_on_odd_reflection", False))
+
+    entries = []
+    for sid in targets:
+        if sid not in data["scenarios"] or sid not in SCENARIOS:
+            continue
+        mod = SCENARIOS[sid]
+        for cid, case in data["scenarios"][sid]["cases"].items():
+            paths = case.get("paths", [])
+            if not paths or "points" not in paths[0] or len(paths[0]["points"]) < 2:
+                continue
+            tx_pos = np.asarray(paths[0]["points"][0], dtype=float)
+            rx_pos = np.asarray(paths[0]["points"][-1], dtype=float)
+            tx, rx = _antennas_from_points(tx_pos, rx_pos, basis=basis, convention=conv, antenna_config=ant_cfg)
+            scene = _build_scene_from_module(mod, case.get("params", {}))
+            max_bounce = int(max(int(p["meta"]["bounce_count"]) for p in paths))
+            los_enabled = bool(any(int(p["meta"]["bounce_count"]) == 0 for p in paths))
+            out = reciprocity_sanity(
+                scene=scene,
+                tx=tx,
+                rx=rx,
+                f_hz=freq,
+                max_bounce=max_bounce,
+                los_enabled=los_enabled,
+                use_fspl=True,
+                force_cp_swap_on_odd_reflection=force_cp,
+                matrix_source=matrix_source,
+            )
+            out["scenario_id"] = sid
+            out["case_id"] = str(cid)
+            entries.append(out)
+
+    if not entries:
+        return {"entries": []}
+    mr = [float(e.get("matched_ratio", np.nan)) for e in entries]
+    dt = [float(e.get("delta_tau_max_s", np.nan)) for e in entries]
+    ds = [float(e.get("delta_sigma_max_db", np.nan)) for e in entries]
+    return {
+        "entries": entries,
+        "matched_ratio_global": float(np.nanmean(np.asarray(mr, dtype=float))),
+        "delta_tau_max_s_global": float(np.nanmax(np.asarray(dt, dtype=float))),
+        "delta_sigma_max_db_global": float(np.nanmax(np.asarray(ds, dtype=float))),
+        "matrix_source": matrix_source,
+    }
+
+
 def build_dataset(
     basis: str = "linear",
     convention: str = "IEEE-RHCP",
@@ -104,12 +256,15 @@ def build_dataset(
     force_cp_swap_on_odd_reflection: bool = False,
 ) -> dict[str, Any]:
     freq = uwb_frequency(nf=nf)
+    git_commit, git_dirty = _git_meta()
     data: dict[str, Any] = {
         "meta": {
             "basis": basis,
             "convention": convention,
             "antenna_config": antenna_config or {},
             "force_cp_swap_on_odd_reflection": force_cp_swap_on_odd_reflection,
+            "git_commit": git_commit,
+            "git_dirty": git_dirty,
         },
         "frequency": freq,
         "scenarios": {},
@@ -135,10 +290,16 @@ def build_quality_report(
     out_md: str | Path,
     matrix_source: str = "A",
     model_metrics: dict[str, Any] | None = None,
+    reciprocity_metrics: dict[str, Any] | None = None,
+    tap_path_metrics: dict[str, Any] | None = None,
 ) -> Path:
     lines = ["# RT Validation Report", ""]
-    lines.append(f"- basis: {data.get('meta', {}).get('basis', 'NA')}")
-    lines.append(f"- convention: {data.get('meta', {}).get('convention', 'NA')}")
+    basis_now = str(data.get("meta", {}).get("basis", "NA"))
+    convention_now = str(data.get("meta", {}).get("convention", "NA"))
+    lines.append(f"- basis: {basis_now}")
+    lines.append(f"- convention: {convention_now}")
+    lines.append(f"- git_commit: {data.get('meta', {}).get('git_commit', 'unknown')}")
+    lines.append(f"- git_dirty: {bool(data.get('meta', {}).get('git_dirty', True))}")
     lines.append(f"- xpd_matrix_source: {matrix_source}")
     lines.append(f"- exact_bounce_defaults: {DEFAULT_EXACT_BOUNCE}")
     lines.append("- report_exact_bounce_applied: True (scenario-specific default map)")
@@ -162,6 +323,7 @@ def build_quality_report(
     for sid, sc in data["scenarios"].items():
         lines += [f"## {sid}", ""]
         all_paths = []
+        all_ctx: list[dict[str, Any]] = []
         path_counts_per_case: list[int] = []
         d3_ok = 0
         d3_n = 0
@@ -173,7 +335,9 @@ def build_quality_report(
             paths = case["paths"]
             path_counts_per_case.append(len(paths))
             stat_paths = [p for p in paths if exact_bounce is None or int(p["meta"]["bounce_count"]) == exact_bounce]
-            all_paths.extend(paths)
+            for p in paths:
+                all_paths.append(p)
+                all_ctx.append({"params": case.get("params", {}), "scenario_id": sid, "case_id": cid})
             counts = [p["meta"]["bounce_count"] for p in paths]
             lines.append(f"- case {cid}: paths={len(paths)}, bounce_dist={dict((c, counts.count(c)) for c in sorted(set(counts)))}")
             if paths:
@@ -264,6 +428,41 @@ def build_quality_report(
         if np.isfinite(leak_chk["median_xpd_db"]):
             scenario_medians.append(float(leak_chk["median_xpd_db"]))
 
+        # E8: GOF diagnostics for major conditional buckets.
+        gof_min_n = 20
+        gof_B = 200
+        if len(samples) > 0:
+            taus = np.asarray([float(s["tau_s"]) for s in samples], dtype=float)
+            split_tau = float(np.median(taus))
+            enriched: list[dict[str, Any]] = []
+            inc_bins = [0.0, 20.0, 40.0, 60.0, 90.0]
+            for s in samples:
+                i = int(s["path_index"])
+                p = all_paths[i]
+                meta = p.get("meta", {})
+                ctx = all_ctx[i] if i < len(all_ctx) else {"params": {}}
+                e = dict(s)
+                e["material"] = str(ctx.get("params", {}).get("material", "NA"))
+                e["incidence_angle_bin"] = incidence_angle_bin_label(meta.get("incidence_angles", []), bins_deg=inc_bins)
+                e["delay_bin"] = "early" if float(s["tau_s"]) <= split_tau else "late"
+                enriched.append(e)
+
+            gof_keys = ["parity", "material", "incidence_angle_bin", "delay_bin"]
+            for gk in gof_keys:
+                lines.append(f"- GOF[{gk}] (min_n={gof_min_n}, bootstrap_B={gof_B}):")
+                table = _gof_by_bucket(enriched, key=gk, min_n=gof_min_n, bootstrap_B=gof_B, seed=0)
+                for bk, gr in table.items():
+                    if gr.get("status") == "INSUFFICIENT":
+                        lines.append(f"-   {bk}: INSUFFICIENT (n={int(gr.get('n', 0))})")
+                        lines.append(f"-   WARNING: GOF skipped for {gk}={bk} due to insufficient samples.")
+                        continue
+                    lines.append(
+                        f"-   {bk}: n={int(gr['n'])}, mu={float(gr['mu']):.3f}, sigma={float(gr['sigma']):.3f}, "
+                        f"qq_r={float(gr['qq_r']):.4f}, ks_D={float(gr['ks_D']):.4f}, ks_p_boot={float(gr['ks_p_boot']):.4f}"
+                    )
+                    if bool(gr.get("warning", False)):
+                        lines.append(f"-   WARNING: GOF borderline for {gk}={bk} (qq_r<0.98 or ks_p_boot<0.05).")
+
         # E4: early/late trend diagnostic.
         if len(samples) >= 2:
             taus = np.asarray([float(s["tau_s"]) for s in samples], dtype=float)
@@ -337,13 +536,125 @@ def build_quality_report(
         lines.append("")
 
     if model_metrics is not None:
-        lines.append("## Model Compare (F2-F4)")
+        lines.append("## Model Compare (F2-F6)")
         lines.append("")
         for k in sorted(model_metrics.keys()):
             lines.append(f"- {k}: {model_metrics[k]}")
+        f3_delta = float(model_metrics.get("f3_xpd_mu_delta_abs_db", np.nan))
+        if np.isfinite(f3_delta):
+            lines.append(f"- f3_xpd_mu_delta_abs_db: {f3_delta:.3f}")
+            if f3_delta > 10.0:
+                reasons = []
+                clamp_rate = float(model_metrics.get("synthetic_kappa_clamp_rate", np.nan))
+                if np.isfinite(clamp_rate) and clamp_rate > 0.05:
+                    reasons.append(f"kappa_clamp_rate={clamp_rate:.3f}")
+                noise_sig = float(model_metrics.get("synthetic_xpd_freq_noise_sigma_db", np.nan))
+                if np.isfinite(noise_sig) and noise_sig > 0.0:
+                    reasons.append(f"xpd_freq_noise_sigma_db={noise_sig:.3f}")
+                sb_rmse = float(model_metrics.get("f5_subband_mu_rmse_db", np.nan))
+                if np.isfinite(sb_rmse) and sb_rmse > 10.0:
+                    reasons.append(f"subband_mu_rmse_db={sb_rmse:.3f}")
+                if not reasons:
+                    reasons.append("sampling mismatch or sigma over-dispersion")
+                lines.append(
+                    "- WARNING: F3 mean-XPD mismatch remains >10 dB; "
+                    "check synthetic sampling settings. Suspected causes: "
+                    + ", ".join(reasons)
+                )
         if not bool(model_metrics.get("f4_parity_direction_match", False)):
             lines.append("- WARNING: synthetic parity direction does not match RT.")
         lines.append("")
+
+    if reciprocity_metrics is not None and reciprocity_metrics.get("entries"):
+        lines.append("## Reciprocity Sanity (C10)")
+        lines.append("")
+        lines.append(f"- matrix_source: {reciprocity_metrics.get('matrix_source', matrix_source)}")
+        lines.append(f"- matched_ratio_global: {float(reciprocity_metrics.get('matched_ratio_global', np.nan)):.6f}")
+        lines.append(f"- delta_tau_max_s_global: {float(reciprocity_metrics.get('delta_tau_max_s_global', np.nan)):.3e}")
+        lines.append(f"- delta_sigma_max_db_global: {float(reciprocity_metrics.get('delta_sigma_max_db_global', np.nan)):.3e}")
+        for e in reciprocity_metrics.get("entries", []):
+            sid = e.get("scenario_id", "NA")
+            cid = e.get("case_id", "NA")
+            lines.append(
+                f"- {sid}/{cid}: matched_ratio={float(e.get('matched_ratio', np.nan)):.3f}, "
+                f"delta_tau_max_s={float(e.get('delta_tau_max_s', np.nan)):.3e}, "
+                f"delta_sigma_max_db={float(e.get('delta_sigma_max_db', np.nan)):.3e}"
+            )
+            if e.get("unmatched_forward"):
+                lines.append(f"- WARNING: reciprocity unmatched paths in {sid}/{cid}: {len(e.get('unmatched_forward', []))}")
+        lines.append("")
+
+    if tap_path_metrics is not None and tap_path_metrics.get("entries"):
+        lines.append("## Tap-vs-Path Consistency (E12)")
+        lines.append("")
+        lines.append(f"- matrix_source: {tap_path_metrics.get('matrix_source', matrix_source)}")
+        lines.append(f"- n_cases: {int(tap_path_metrics.get('n_cases', 0))}")
+        lines.append(f"- delta_tau_median_s: {float(tap_path_metrics.get('delta_tau_median_s', np.nan)):.3e}")
+        lines.append(f"- delta_tau_max_s: {float(tap_path_metrics.get('delta_tau_max_s', np.nan)):.3e}")
+        lines.append(f"- delta_xpd_median_db: {float(tap_path_metrics.get('delta_xpd_median_db', np.nan)):.3f}")
+        lines.append(f"- delta_xpd_max_db: {float(tap_path_metrics.get('delta_xpd_max_db', np.nan)):.3f}")
+        lines.append(f"- wrap_detected_cases: {int(tap_path_metrics.get('wrap_detected_cases', 0))}")
+        lines.append(f"- outlier_cases: {int(tap_path_metrics.get('outlier_cases', 0))}")
+        lines.append("- per-case (scenario/case): Δtau_s, ΔXPD_dB, wrap, n_paths")
+
+        single_path_warn_thresh_db = 10.0
+        for e in tap_path_metrics.get("entries", []):
+            sid = str(e.get("scenario_id", "NA"))
+            cid = str(e.get("case_id", "NA"))
+            dt = float(e.get("delta_tau_s", np.nan))
+            dx = float(e.get("delta_xpd_db", np.nan))
+            wr = bool(e.get("wrap_detected", False))
+            npth = int(e.get("n_paths", 0))
+            lines.append(f"- {sid}/{cid}: delta_tau_s={dt:.3e}, delta_xpd_db={dx:.3f}, wrap={wr}, n_paths={npth}")
+            if wr:
+                lines.append(f"-   NOTE: wrap_detected=True for {sid}/{cid} (interpret tap/path mismatch cautiously).")
+            if npth <= 1 and sid in {"C0", "A1", "A2"} and np.isfinite(dx) and dx > single_path_warn_thresh_db:
+                lines.append(
+                    f"-   WARNING: large tap/path XPD mismatch in near-single-path case {sid}/{cid} "
+                    f"(delta_xpd_db={dx:.3f} > {single_path_warn_thresh_db:.1f} dB)."
+                )
+        lines.append("")
+
+    lines.append("## Measurement Bridge (G2)")
+    lines.append("")
+    lines.append(f"- current_basis: {basis_now}")
+    lines.append(f"- current_convention: {convention_now}")
+    lines.append(f"- current_matrix_source: {matrix_source}")
+    enable_coupling = bool(antenna_config.get("enable_coupling", True))
+    lines.append(f"- current_antenna_coupling_enabled: {enable_coupling}")
+    lines.append(
+        "- comparison_rule: "
+        "antenna-included S21/S12 -> A_f (embedded), "
+        "antenna de-embedded propagation comparison -> J_f (propagation-only)"
+    )
+    if str(matrix_source).upper() == "A":
+        lines.append(
+            "- recommendation_for_this_run: compare to antenna-included measurements "
+            "(e.g., raw S21/S12 with antenna effects)."
+        )
+        lines.append(
+            "- if_target_is_deembedded: rerun with --xpd-matrix-source J "
+            "and keep basis/convention identical."
+        )
+    else:
+        lines.append(
+            "- recommendation_for_this_run: compare to antenna de-embedded / propagation-only references."
+        )
+        lines.append(
+            "- if_target_is_embedded_s21: rerun with --xpd-matrix-source A "
+            "and realistic coupling/leakage settings."
+        )
+    lines.append(
+        "- basis_convention_rule: measurement post-processing must match "
+        f"basis={basis_now}, convention={convention_now}; do not mix linear CP interpretation without explicit conversion."
+    )
+    lines.append("- mismatch_diagnosis_order:")
+    lines.append("-   1) geometry/delay/occlusion")
+    lines.append("-   2) FSPL/scalar_gain")
+    lines.append("-   3) Fresnel Gamma_s,Gamma_p")
+    lines.append("-   4) polarization basis/parity interpretation")
+    lines.append("-   5) antenna coupling/leakage/AR")
+    lines.append("")
 
     p = Path(out_md)
     p.parent.mkdir(parents=True, exist_ok=True)
@@ -432,6 +743,19 @@ def main() -> None:
             power_floor_db=float(args.plot_power_floor_db),
         )
 
+        reciprocity_metrics = compute_reciprocity_checks(data, matrix_source=args.xpd_matrix_source, scenario_ids=["C0", "A1"])
+        data.setdefault("meta", {})["reciprocity_sanity"] = reciprocity_metrics
+        tap_path_metrics = evaluate_dataset_tap_path_consistency(
+            data,
+            matrix_source=args.xpd_matrix_source,
+            nfft=2048,
+            window="hann",
+            power_floor=1e-12,
+            outlier_tau_factor=2.0,
+            outlier_xpd_db=10.0,
+        )
+        data.setdefault("meta", {})["tap_path_consistency"] = tap_path_metrics
+
         save_rt_dataset(out_h5, data)
         generate_all_plots(data, out_dir=out_plot, config=plot_config, exact_bounce_map=DEFAULT_EXACT_BOUNCE)
         model_metrics = None
@@ -448,17 +772,26 @@ def main() -> None:
                 seed=int(args.model_seed),
                 return_paths=True,
             )
-            model_metrics = generate_rt_vs_synth_plots(
+            plot_metrics = generate_rt_vs_synth_plots(
                 rt_paths=model_res.get("rt_paths", []),
                 synth_paths=model_res.get("synthetic_paths", []),
                 f_hz=np.asarray(data["frequency"], dtype=float),
                 out_dir=out_plot,
                 matrix_source=args.xpd_matrix_source,
+                num_subbands=int(args.model_num_subbands),
             )
-            model_metrics["model_params_json"] = str(model_json)
-            model_metrics["synthetic_compare_json"] = str(synth_json)
+            compare_metrics = model_res.get("comparison", {}).get("comparison", {})
+            model_metrics = dict(compare_metrics)
+            model_metrics.update(plot_metrics)
 
-        build_quality_report(data, out_rep, matrix_source=args.xpd_matrix_source, model_metrics=model_metrics)
+        build_quality_report(
+            data,
+            out_rep,
+            matrix_source=args.xpd_matrix_source,
+            model_metrics=model_metrics,
+            reciprocity_metrics=reciprocity_metrics,
+            tap_path_metrics=tap_path_metrics,
+        )
 
 
 if __name__ == "__main__":

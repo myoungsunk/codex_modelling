@@ -13,6 +13,7 @@ from typing import Any, Literal
 
 import numpy as np
 from numpy.typing import NDArray
+from scipy import stats
 
 
 EPS = 1e-15
@@ -215,6 +216,89 @@ def save_stats_json(path: str | Path, stats_obj: dict[str, Any]) -> Path:
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps(stats_obj, indent=2), encoding="utf-8")
     return p
+
+
+def gof_normal_db(
+    values_db: list[float] | NDArray[np.float64],
+    min_n: int = 20,
+    bootstrap_B: int = 200,
+    seed: int = 0,
+) -> dict[str, Any]:
+    """Goodness-of-fit for Normal model on dB-domain samples.
+
+    Returns:
+      n, mu, sigma, qq_r, qq_r2, ks_D, ks_p_raw, ks_p_boot, status, warning
+    """
+
+    v = np.asarray(values_db, dtype=float)
+    v = v[np.isfinite(v)]
+    n = int(len(v))
+    if n < int(min_n):
+        return {
+            "n": n,
+            "mu": np.nan,
+            "sigma": np.nan,
+            "qq_r": np.nan,
+            "qq_r2": np.nan,
+            "ks_D": np.nan,
+            "ks_p_raw": np.nan,
+            "ks_p_boot": np.nan,
+            "status": "INSUFFICIENT",
+            "warning": True,
+        }
+
+    mu = float(np.mean(v))
+    sigma = float(np.std(v, ddof=1)) if n > 1 else 0.0
+    if sigma <= 0.0:
+        return {
+            "n": n,
+            "mu": mu,
+            "sigma": sigma,
+            "qq_r": 1.0,
+            "qq_r2": 1.0,
+            "ks_D": 0.0,
+            "ks_p_raw": 1.0,
+            "ks_p_boot": np.nan,
+            "status": "DEGENERATE",
+            "warning": True,
+        }
+
+    (_, _), (_, _, qq_r) = stats.probplot(v, dist="norm", fit=True)
+    qq_r = float(qq_r)
+    qq_r2 = float(qq_r**2)
+
+    ks = stats.kstest(v, "norm", args=(mu, sigma))
+    ks_D = float(ks.statistic)
+    ks_p_raw = float(ks.pvalue)
+
+    ks_p_boot = np.nan
+    B = int(max(0, bootstrap_B))
+    if B > 0:
+        rng = np.random.default_rng(int(seed))
+        d_boot = np.zeros(B, dtype=float)
+        for b in range(B):
+            x = rng.normal(loc=mu, scale=sigma, size=n)
+            mb = float(np.mean(x))
+            sb = float(np.std(x, ddof=1)) if n > 1 else 0.0
+            if sb <= 0.0:
+                d_boot[b] = 0.0
+            else:
+                d_boot[b] = float(stats.kstest(x, "norm", args=(mb, sb)).statistic)
+        ks_p_boot = float(np.mean(d_boot >= ks_D))
+
+    warning = bool((qq_r < 0.98) or (np.isfinite(ks_p_boot) and ks_p_boot < 0.05))
+    return {
+        "n": n,
+        "mu": mu,
+        "sigma": sigma,
+        "qq_r": qq_r,
+        "qq_r2": qq_r2,
+        "ks_D": ks_D,
+        "ks_p_raw": ks_p_raw,
+        "ks_p_boot": ks_p_boot,
+        "status": "OK",
+        "warning": warning,
+    }
 
 
 def coupling_eps_from_params(cross_pol_leakage_db: float, axial_ratio_db: float, enable_coupling: bool = True) -> float:
