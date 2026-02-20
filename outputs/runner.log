@@ -1,0 +1,2 @@
+/Users/kimmyoungsun/Documents/codex/plots/p0_p13.py:159: RuntimeWarning: Mean of empty slice
+  c = np.array([np.nanmean(p["meta"].get("incidence_angles", [0.0])) for p in paths], dtype=float)
