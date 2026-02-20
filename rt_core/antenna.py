@@ -31,6 +31,8 @@ class Antenna:
     v_axis: Vec3
     basis: str = "linear"  # linear or circular
     convention: str = "IEEE-RHCP"
+    cross_pol_leakage_db: float = 35.0
+    axial_ratio_db: float = 0.0
 
     def __post_init__(self) -> None:
         p = np.asarray(self.position, dtype=float)
@@ -81,5 +83,25 @@ class Antenna:
 
     def rx_receive_matrix(self, direction: Vec3, wave_basis: CMat | None = None) -> NDArray[np.complex128]:
         wb = self.wave_basis(direction) if wave_basis is None else wave_basis
-        pb = self.port_basis_vectors(direction)
+        # Receive circular handedness is defined for the incoming wave, i.e., opposite look direction.
+        pb = self.port_basis_vectors(-np.asarray(direction, dtype=float))
         return (pb.conj().T @ wb).astype(np.complex128)
+
+    def _coupling_matrix(self, n_f: int) -> NDArray[np.complex128]:
+        leak = 10.0 ** (-self.cross_pol_leakage_db / 20.0)
+        ar = 10.0 ** (self.axial_ratio_db / 20.0)
+        ar_leak = abs((ar - 1.0) / (ar + 1.0))
+        eps = float(np.clip(leak + ar_leak, 0.0, 0.49))
+        base = np.array([[1.0, eps], [eps, 1.0]], dtype=np.complex128)
+        base /= np.sqrt(1.0 + eps**2)
+        return np.repeat(base[None, :, :], n_f, axis=0)
+
+    def tx_port_to_wave(self, direction: Vec3, f_hz: NDArray[np.float64], wave_basis: CMat | None = None) -> NDArray[np.complex128]:
+        proj = self.tx_emit_matrix(direction, wave_basis=wave_basis)
+        cpl = self._coupling_matrix(len(f_hz))
+        return np.einsum("ab,kbc->kac", proj, cpl).astype(np.complex128)
+
+    def rx_wave_to_port(self, direction: Vec3, f_hz: NDArray[np.float64], wave_basis: CMat | None = None) -> NDArray[np.complex128]:
+        proj = self.rx_receive_matrix(direction, wave_basis=wave_basis)
+        cpl = self._coupling_matrix(len(f_hz))
+        return np.einsum("kab,bc->kac", cpl.conj().transpose(0, 2, 1), proj).astype(np.complex128)

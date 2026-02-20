@@ -12,7 +12,18 @@ from scenarios.common import default_antennas
 
 
 def build_scene(y_plane: float = 2.0) -> list[Plane]:
-    return [Plane(id=1, p0=np.array([0.0, y_plane, 0.0]), normal=np.array([0.0, -1.0, 0.0]), material=Material.pec())]
+    return [
+        Plane(
+            id=1,
+            p0=np.array([0.0, y_plane, 0.0]),
+            normal=np.array([0.0, -1.0, 0.0]),
+            material=Material.pec(),
+            u_axis=np.array([1.0, 0.0, 0.0]),
+            v_axis=np.array([0.0, 0.0, 1.0]),
+            half_extent_u=20.0,
+            half_extent_v=20.0,
+        )
+    ]
 
 
 def build_sweep_params() -> list[dict[str, Any]]:

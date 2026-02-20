@@ -29,6 +29,8 @@ SCENARIOS = {
     "A5": A5_depol_stress,
 }
 
+DEFAULT_EXACT_BOUNCE = {"A2": 1, "A3": 2, "A4": 1}
+
 
 def build_dataset(basis: str = "linear", convention: str = "IEEE-RHCP", nf: int = 256) -> dict[str, Any]:
     freq = uwb_frequency(nf=nf)
@@ -54,8 +56,10 @@ def build_quality_report(data: dict[str, Any], out_md: str | Path) -> Path:
     for sid, sc in data["scenarios"].items():
         lines += [f"## {sid}", ""]
         all_paths = []
+        exact_bounce = DEFAULT_EXACT_BOUNCE.get(sid)
         for cid, case in sc["cases"].items():
             paths = case["paths"]
+            stat_paths = [p for p in paths if exact_bounce is None or int(p["meta"]["bounce_count"]) == exact_bounce]
             all_paths.extend(paths)
             counts = [p["meta"]["bounce_count"] for p in paths]
             lines.append(f"- case {cid}: paths={len(paths)}, bounce_dist={dict((c, counts.count(c)) for c in sorted(set(counts)))}")
@@ -69,16 +73,20 @@ def build_quality_report(data: dict[str, Any], out_md: str | Path) -> Path:
                     lines.append("- WARNING: A2 should block LOS but LOS path is present")
                 if sid == "A2" and not any(p["meta"]["bounce_count"] == 1 for p in paths):
                     lines.append("- WARNING: A2 missing 1-bounce path")
+                if sid == "A3" and not any(p["meta"]["bounce_count"] == 2 for p in paths):
+                    lines.append("- WARNING: A3 missing 2-bounce path")
+            if exact_bounce is not None and len(stat_paths) == 0:
+                lines.append(f"- WARNING: no paths matched exact_bounce={exact_bounce} for stats")
 
-        samples = pathwise_xpd(all_paths)
+        samples = pathwise_xpd(all_paths, exact_bounce=exact_bounce)
         par_stats = conditional_fit(samples, keys=["parity"])
-        lines.append(f"- parity XPD stats: {par_stats}")
+        lines.append(f"- parity XPD stats (exact_bounce={exact_bounce}): {par_stats}")
 
         if sid == "A4":
             with_mat = []
             for cid, case in sc["cases"].items():
                 mat = str(case["params"].get("material", "NA"))
-                for s in pathwise_xpd(case["paths"]):
+                for s in pathwise_xpd(case["paths"], exact_bounce=1):
                     s["material"] = mat
                     with_mat.append(s)
             mat_stats = conditional_fit(with_mat, keys=["material"])

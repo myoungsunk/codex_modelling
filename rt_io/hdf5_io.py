@@ -86,6 +86,11 @@ def save_rt_dataset(path: str | Path, data: dict[str, Any]) -> Path:
                 p_g.create_dataset("incidence_angles", data=ang)
                 p_g.create_dataset("AoD", data=np.asarray([pp["meta"]["AoD"] for pp in paths], dtype=float))
                 p_g.create_dataset("AoA", data=np.asarray([pp["meta"]["AoA"] for pp in paths], dtype=float))
+                _write_string_array(
+                    p_g,
+                    "segment_basis_uv",
+                    [json.dumps(pp["meta"].get("segment_basis_uv", [])) for pp in paths],
+                )
     return p
 
 
@@ -112,6 +117,11 @@ def load_rt_dataset(path: str | Path) -> dict[str, Any]:
                 ang = np.asarray(p_g["incidence_angles"][:], dtype=float)
                 aod = np.asarray(p_g["AoD"][:], dtype=float)
                 aoa = np.asarray(p_g["AoA"][:], dtype=float)
+                segb = (
+                    [x.decode("utf-8") if isinstance(x, bytes) else str(x) for x in p_g["segment_basis_uv"][:]]
+                    if "segment_basis_uv" in p_g
+                    else ["[]"] * len(tau)
+                )
 
                 paths = []
                 for i in range(len(tau)):
@@ -128,6 +138,7 @@ def load_rt_dataset(path: str | Path) -> dict[str, Any]:
                                 "incidence_angles": angs,
                                 "AoD": aod[i].tolist(),
                                 "AoA": aoa[i].tolist(),
+                                "segment_basis_uv": json.loads(segb[i]),
                             },
                         }
                     )

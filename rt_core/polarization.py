@@ -62,8 +62,13 @@ def _safe_s(k_in: Vec3, n_eff: Vec3) -> Vec3:
     return normalize(s)
 
 
-def local_sp_bases(k_in: Vec3, k_out: Vec3, normal: Vec3) -> tuple[Vec3, Vec3, Vec3, float, Vec3]:
-    """Return (s, p_in, p_out, incidence_angle, effective_normal)."""
+def local_sp_bases(k_in: Vec3, k_out: Vec3, normal: Vec3) -> tuple[Vec3, Vec3, Vec3, Vec3, float, Vec3]:
+    """Return (s_in, p_in, s_out, p_out, incidence_angle, effective_normal).
+
+    Sign convention:
+    - effective normal points against incoming wave so cos(theta_i) >= 0.
+    - (s_in, p_in, k_in) and (s_out, p_out, k_out) are right-handed.
+    """
 
     kin = normalize(np.asarray(k_in, dtype=float))
     kout = normalize(np.asarray(k_out, dtype=float))
@@ -73,10 +78,11 @@ def local_sp_bases(k_in: Vec3, k_out: Vec3, normal: Vec3) -> tuple[Vec3, Vec3, V
     cos_i = -float(np.dot(kin, n))
     cos_i = float(np.clip(cos_i, 0.0, 1.0))
     theta_i = float(np.arccos(cos_i))
-    s = _safe_s(kin, n)
-    p_in = normalize(np.cross(s, kin))
-    p_out = normalize(np.cross(s, kout))
-    return s, p_in, p_out, theta_i, n
+    s_in = _safe_s(kin, n)
+    s_out = _safe_s(kout, n)
+    p_in = normalize(np.cross(kin, s_in))
+    p_out = normalize(np.cross(kout, s_out))
+    return s_in, p_in, s_out, p_out, theta_i, n
 
 
 def fresnel_reflection(material: Material, theta_i: float, f_hz: NDArray[np.float64]) -> tuple[NDArray[np.complex128], NDArray[np.complex128]]:

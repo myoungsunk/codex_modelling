@@ -46,6 +46,10 @@ class Plane:
     p0: Vec3
     normal: Vec3
     material: Material
+    u_axis: Vec3 | None = None
+    v_axis: Vec3 | None = None
+    half_extent_u: float | None = None
+    half_extent_v: float | None = None
 
     def unit_normal(self) -> Vec3:
         n = np.asarray(self.normal, dtype=float)
@@ -53,6 +57,34 @@ class Plane:
         if nn == 0:
             raise ValueError("Plane normal cannot be zero")
         return n / nn
+
+    def local_axes(self) -> tuple[Vec3, Vec3]:
+        n = self.unit_normal()
+        if self.u_axis is not None:
+            u = np.asarray(self.u_axis, dtype=float)
+            u = u - float(np.dot(u, n)) * n
+            u = normalize(u)
+        else:
+            hint = np.array([1.0, 0.0, 0.0]) if abs(n[0]) < 0.9 else np.array([0.0, 1.0, 0.0])
+            u = normalize(np.cross(hint, n))
+        if self.v_axis is not None:
+            v = np.asarray(self.v_axis, dtype=float)
+            v = v - float(np.dot(v, n)) * n - float(np.dot(v, u)) * u
+            v = normalize(v)
+        else:
+            v = normalize(np.cross(n, u))
+        return u, v
+
+    def contains_point(self, point: Vec3, eps: float = 1e-7) -> bool:
+        """Return True for infinite plane or if point is inside finite plate bounds."""
+
+        if self.half_extent_u is None or self.half_extent_v is None:
+            return True
+        u, v = self.local_axes()
+        d = np.asarray(point, dtype=float) - np.asarray(self.p0, dtype=float)
+        uu = float(np.dot(d, u))
+        vv = float(np.dot(d, v))
+        return abs(uu) <= float(self.half_extent_u) + eps and abs(vv) <= float(self.half_extent_v) + eps
 
 
 @dataclass(frozen=True)

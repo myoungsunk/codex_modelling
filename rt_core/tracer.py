@@ -22,7 +22,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from rt_core.antenna import Antenna
-from rt_core.geometry import Plane, line_plane_intersection, normalize, path_length, reflect_direction, reflect_point
+from rt_core.geometry import Plane, line_plane_intersection, normalize, path_length, ray_plane_intersection, reflect_point
 from rt_core.polarization import DepolConfig, apply_depol, basis_change, depol_matrix, jones_reflection, local_sp_bases, transverse_basis
 
 
@@ -37,6 +37,7 @@ class PathResult:
     AoD: NDArray[np.float64]
     AoA: NDArray[np.float64]
     points: list[NDArray[np.float64]]
+    segment_basis_uv: list[dict[str, list[float]]]
 
     def meta_dict(self) -> dict:
         return {
@@ -46,6 +47,7 @@ class PathResult:
             "incidence_angles": self.incidence_angles,
             "AoD": self.AoD.tolist(),
             "AoA": self.AoA.tolist(),
+            "segment_basis_uv": self.segment_basis_uv,
         }
 
 
@@ -89,6 +91,48 @@ def _default_rho(_: dict) -> float:
     return 0.0
 
 
+def _segment_blocked(
+    a: NDArray[np.float64],
+    b: NDArray[np.float64],
+    planes: Sequence[Plane],
+    skip_ids: set[int],
+    eps: float = 1e-7,
+) -> bool:
+    d = np.asarray(b, dtype=float) - np.asarray(a, dtype=float)
+    seg_len = float(np.linalg.norm(d))
+    if seg_len < eps:
+        return True
+    direction = d / seg_len
+    for pl in planes:
+        if pl.id in skip_ids:
+            continue
+        hit = ray_plane_intersection(np.asarray(a, dtype=float), direction, pl, eps=eps)
+        if hit is None:
+            continue
+        if eps < hit.t < seg_len - eps and pl.contains_point(hit.point, eps=eps):
+            return True
+    return False
+
+
+def _path_occluded(points: list[NDArray[np.float64]], planes: Sequence[Plane], seq: Sequence[Plane], eps: float = 1e-7) -> bool:
+    n_seg = len(points) - 1
+    for i in range(n_seg):
+        skip = set()
+        if i > 0:
+            skip.add(seq[i - 1].id)
+        if i < len(seq):
+            skip.add(seq[i].id)
+        if _segment_blocked(points[i], points[i + 1], planes, skip_ids=skip, eps=eps):
+            return True
+    return False
+
+
+def _path_key(points: list[NDArray[np.float64]], seq: Sequence[Plane], tau_s: float) -> tuple:
+    sid = tuple(pl.id for pl in seq)
+    pflat = tuple(tuple(np.round(p, 6).tolist()) for p in points[1:-1])
+    return (sid, pflat, round(float(tau_s), 12))
+
+
 def trace_paths(
     planes: Sequence[Plane],
     tx: Antenna,
@@ -96,6 +140,7 @@ def trace_paths(
     f_hz: NDArray[np.float64],
     max_bounce: int = 2,
     los_enabled: bool = True,
+    use_fspl: bool = True,
     c0: float = 299_792_458.0,
     depol: DepolConfig | None = None,
 ) -> list[PathResult]:
@@ -111,6 +156,7 @@ def trace_paths(
     freq = np.asarray(f_hz, dtype=float)
     n_f = len(freq)
     results: list[PathResult] = []
+    seen: set[tuple] = set()
 
     for b in range(max_bounce + 1):
         if b == 0 and not los_enabled:
@@ -120,17 +166,32 @@ def trace_paths(
             points = _construct_reflection_points(tx.position, rx.position, seq)
             if points is None or not _path_valid(points):
                 continue
+            if any(not seq[i].contains_point(points[i + 1]) for i in range(len(seq))):
+                continue
+            if _path_occluded(points, planes, seq):
+                continue
 
             dirs = [normalize(points[i + 1] - points[i]) for i in range(len(points) - 1)]
             total_len = path_length(points)
             if total_len <= 0.0:
                 continue
+            tau = total_len / c0
+            key = _path_key(points, seq, tau)
+            if key in seen:
+                continue
+            seen.add(key)
 
-            # Baseband path amplitude only (phase applied later in channel synthesis).
-            scalar_gain = 1.0 / total_len
+            if use_fspl:
+                scalar_gain_f = (c0 / freq) / (4.0 * np.pi * total_len)
+            else:
+                scalar_gain_f = np.full(n_f, 1.0 / total_len, dtype=float)
 
             wave_basis = tx.wave_basis(dirs[0])
-            A = np.repeat(tx.tx_emit_matrix(dirs[0], wave_basis=wave_basis)[None, :, :], n_f, axis=0).astype(np.complex128)
+            J = np.repeat(np.eye(2, dtype=np.complex128)[None, :, :], n_f, axis=0)
+            seg_basis_uv: list[dict[str, list[float]]] = []
+            u0 = np.real(wave_basis[:, 0]).astype(float)
+            v0 = np.real(wave_basis[:, 1]).astype(float)
+            seg_basis_uv.append({"k": dirs[0].tolist(), "u": u0.tolist(), "v": v0.tolist()})
 
             incidence_angles: list[float] = []
             interactions: list[str] = []
@@ -139,13 +200,13 @@ def trace_paths(
             for i, pl in enumerate(seq):
                 k_in = dirs[i]
                 k_out = dirs[i + 1]
-                s, p_in, p_out, theta_i, _ = local_sp_bases(k_in, k_out, pl.unit_normal())
+                s_in, p_in, s_out, p_out, theta_i, _ = local_sp_bases(k_in, k_out, pl.unit_normal())
                 incidence_angles.append(theta_i)
                 interactions.append("reflection")
                 surface_ids.append(pl.id)
 
-                sp_in = np.column_stack([s, p_in]).astype(np.complex128)
-                sp_out = np.column_stack([s, p_out]).astype(np.complex128)
+                sp_in = np.column_stack([s_in, p_in]).astype(np.complex128)
+                sp_out = np.column_stack([s_out, p_out]).astype(np.complex128)
 
                 t_in = basis_change(wave_basis, sp_in)
                 next_u, next_v = transverse_basis(k_out, pl.unit_normal())
@@ -153,21 +214,27 @@ def trace_paths(
                 t_out = basis_change(next_basis, sp_out)
                 r_f = jones_reflection(pl.material, theta_i, freq)
 
-                updated = np.zeros_like(A)
+                updated = np.zeros_like(J)
                 for k in range(n_f):
-                    updated[k] = t_out.conj().T @ r_f[k] @ t_in @ A[k]
-                A = updated
+                    updated[k] = t_out.conj().T @ r_f[k] @ t_in @ J[k]
+                J = updated
                 wave_basis = next_basis
+                seg_basis_uv.append({"k": k_out.tolist(), "u": next_u.tolist(), "v": next_v.tolist()})
 
                 if dep.enabled and dep.apply_mode == "event":
                     rho = float(np.clip(rho_fn({"surface_id": pl.id, "bounce_index": i, "theta_i": theta_i}), 0.0, 1.0))
                     D_in = depol_matrix(rho, rng)
                     D_out = depol_matrix(rho, rng)
-                    A = apply_depol(A, D_in=D_in, D_out=D_out, side_mode=dep.side_mode)
+                    J = apply_depol(J, D_in=D_in, D_out=D_out, side_mode=dep.side_mode)
 
-            rx_mat = rx.rx_receive_matrix(dirs[-1], wave_basis=wave_basis)
-            A = np.einsum("ab,kbc->kac", rx_mat, A).astype(np.complex128)
-            A *= scalar_gain
+            g_tx = tx.tx_port_to_wave(dirs[0], freq, wave_basis=tx.wave_basis(dirs[0]))
+            g_rx_h = rx.rx_wave_to_port(dirs[-1], freq, wave_basis=wave_basis)
+            A = np.einsum("kab,kbc,kcd->kad", g_rx_h, J, g_tx).astype(np.complex128)
+            A *= scalar_gain_f[:, None, None]
+            if rx.basis == "circular" and (b % 2 == 1):
+                # Specular mirror reflection flips helicity; odd bounce swaps R/L at receive side.
+                swap = np.array([[0.0, 1.0], [1.0, 0.0]], dtype=np.complex128)
+                A = np.einsum("ab,kbc->kac", swap, A)
 
             if dep.enabled and dep.apply_mode == "path":
                 rho = float(np.clip(rho_fn({"bounce_count": b, "surface_ids": surface_ids}), 0.0, 1.0))
@@ -177,7 +244,7 @@ def trace_paths(
 
             results.append(
                 PathResult(
-                    tau_s=total_len / c0,
+                    tau_s=tau,
                     A_f=A,
                     bounce_count=b,
                     interactions=interactions,
@@ -186,6 +253,7 @@ def trace_paths(
                     AoD=dirs[0],
                     AoA=dirs[-1],
                     points=[np.asarray(p, dtype=float) for p in points],
+                    segment_basis_uv=seg_basis_uv,
                 )
             )
 
