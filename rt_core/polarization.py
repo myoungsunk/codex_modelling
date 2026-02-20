@@ -118,17 +118,17 @@ def jones_reflection(material: Material, theta_i: float, f_hz: NDArray[np.float6
 
 
 def depol_matrix(rho: float, rng: np.random.Generator) -> Mat2:
-    """Construct random depolarization mixer D(rho)."""
+    """Construct power-preserving SU(2) depolarization mixer D(rho).
+
+    rho controls mixing as sin^2(theta)=rho.
+    """
 
     rr = float(np.clip(rho, 0.0, 1.0))
-    phi1 = float(rng.uniform(0.0, 2.0 * np.pi))
-    phi2 = float(rng.uniform(0.0, 2.0 * np.pi))
-    a = np.sqrt(1.0 - rr)
-    b = np.sqrt(rr)
-    return np.array(
-        [[a, b * np.exp(1j * phi1)], [b * np.exp(1j * phi2), a]],
-        dtype=np.complex128,
-    )
+    theta = float(np.arcsin(np.sqrt(rr)))
+    phi = float(rng.uniform(0.0, 2.0 * np.pi))
+    c = np.cos(theta)
+    s = np.sin(theta)
+    return np.array([[c, np.exp(1j * phi) * s], [-np.exp(-1j * phi) * s, c]], dtype=np.complex128)
 
 
 def apply_depol(A: NDArray[np.complex128], D_in: Mat2, D_out: Mat2, side_mode: str = "both") -> NDArray[np.complex128]:

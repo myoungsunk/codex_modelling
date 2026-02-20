@@ -16,20 +16,24 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from itertools import product
-from typing import Callable, Iterable, Sequence
+from typing import Callable, Sequence
 
 import numpy as np
 from numpy.typing import NDArray
 
 from rt_core.antenna import Antenna
 from rt_core.geometry import Plane, line_plane_intersection, normalize, path_length, ray_plane_intersection, reflect_point
-from rt_core.polarization import DepolConfig, apply_depol, basis_change, depol_matrix, jones_reflection, local_sp_bases, transverse_basis
+from rt_core.polarization import DepolConfig, apply_depol, basis_change, depol_matrix, jones_reflection, local_sp_bases
 
 
 @dataclass
 class PathResult:
     tau_s: float
     A_f: NDArray[np.complex128]  # (Nf,2,2)
+    J_f: NDArray[np.complex128]  # (Nf,2,2), propagation-only before antenna and FSPL
+    scalar_gain_f: NDArray[np.float64]  # (Nf,)
+    G_tx_f: NDArray[np.complex128]  # (Nf,2,2), tx port -> wave
+    G_rx_f: NDArray[np.complex128]  # (Nf,2,2), wave -> rx port
     bounce_count: int
     interactions: list[str]
     surface_ids: list[int]
@@ -38,6 +42,10 @@ class PathResult:
     AoA: NDArray[np.float64]
     points: list[NDArray[np.float64]]
     segment_basis_uv: list[dict[str, list[float]]]
+
+    @staticmethod
+    def _complex_array_to_dict(x: NDArray[np.complex128]) -> dict:
+        return {"real": np.real(x).tolist(), "imag": np.imag(x).tolist()}
 
     def meta_dict(self) -> dict:
         return {
@@ -48,6 +56,10 @@ class PathResult:
             "AoD": self.AoD.tolist(),
             "AoA": self.AoA.tolist(),
             "segment_basis_uv": self.segment_basis_uv,
+            "J_f": self._complex_array_to_dict(self.J_f),
+            "scalar_gain_f": self.scalar_gain_f.tolist(),
+            "G_tx_f": self._complex_array_to_dict(self.G_tx_f),
+            "G_rx_f": self._complex_array_to_dict(self.G_rx_f),
         }
 
 
@@ -141,6 +153,7 @@ def trace_paths(
     max_bounce: int = 2,
     los_enabled: bool = True,
     use_fspl: bool = True,
+    force_cp_swap_on_odd_reflection: bool = False,
     c0: float = 299_792_458.0,
     depol: DepolConfig | None = None,
 ) -> list[PathResult]:
@@ -209,8 +222,7 @@ def trace_paths(
                 sp_out = np.column_stack([s_out, p_out]).astype(np.complex128)
 
                 t_in = basis_change(wave_basis, sp_in)
-                next_u, next_v = transverse_basis(k_out, pl.unit_normal())
-                next_basis = np.column_stack([next_u, next_v]).astype(np.complex128)
+                next_basis = tx.wave_basis(k_out)
                 t_out = basis_change(next_basis, sp_out)
                 r_f = jones_reflection(pl.material, theta_i, freq)
 
@@ -219,7 +231,13 @@ def trace_paths(
                     updated[k] = t_out.conj().T @ r_f[k] @ t_in @ J[k]
                 J = updated
                 wave_basis = next_basis
-                seg_basis_uv.append({"k": k_out.tolist(), "u": next_u.tolist(), "v": next_v.tolist()})
+                seg_basis_uv.append(
+                    {
+                        "k": k_out.tolist(),
+                        "u": np.real(wave_basis[:, 0]).astype(float).tolist(),
+                        "v": np.real(wave_basis[:, 1]).astype(float).tolist(),
+                    }
+                )
 
                 if dep.enabled and dep.apply_mode == "event":
                     rho = float(np.clip(rho_fn({"surface_id": pl.id, "bounce_index": i, "theta_i": theta_i}), 0.0, 1.0))
@@ -227,25 +245,31 @@ def trace_paths(
                     D_out = depol_matrix(rho, rng)
                     J = apply_depol(J, D_in=D_in, D_out=D_out, side_mode=dep.side_mode)
 
-            g_tx = tx.tx_port_to_wave(dirs[0], freq, wave_basis=tx.wave_basis(dirs[0]))
-            g_rx_h = rx.rx_wave_to_port(dirs[-1], freq, wave_basis=wave_basis)
-            A = np.einsum("kab,kbc,kcd->kad", g_rx_h, J, g_tx).astype(np.complex128)
-            A *= scalar_gain_f[:, None, None]
-            if rx.basis == "circular" and (b % 2 == 1):
-                # Specular mirror reflection flips helicity; odd bounce swaps R/L at receive side.
-                swap = np.array([[0.0, 1.0], [1.0, 0.0]], dtype=np.complex128)
-                A = np.einsum("ab,kbc->kac", swap, A)
-
             if dep.enabled and dep.apply_mode == "path":
                 rho = float(np.clip(rho_fn({"bounce_count": b, "surface_ids": surface_ids}), 0.0, 1.0))
                 D_in = depol_matrix(rho, rng)
                 D_out = depol_matrix(rho, rng)
-                A = apply_depol(A, D_in=D_in, D_out=D_out, side_mode=dep.side_mode)
+                J = apply_depol(J, D_in=D_in, D_out=D_out, side_mode=dep.side_mode)
+
+            g_tx = tx.tx_port_to_wave(dirs[0], freq, wave_basis=tx.wave_basis(dirs[0]))
+            g_rx_h = rx.rx_wave_to_port(dirs[-1], freq, wave_basis=wave_basis)
+            A = np.einsum("kab,kbc,kcd->kad", g_rx_h, J, g_tx).astype(np.complex128)
+            A *= scalar_gain_f[:, None, None]
+
+            # Optional heuristic: odd mirror reflections can swap CP handedness near normal incidence.
+            # Keep disabled by default; for oblique incidence Fresnel imbalance can produce elliptical states.
+            if force_cp_swap_on_odd_reflection and rx.basis == "circular" and (b % 2 == 1):
+                swap = np.array([[0.0, 1.0], [1.0, 0.0]], dtype=np.complex128)
+                A = np.einsum("ab,kbc->kac", swap, A)
 
             results.append(
                 PathResult(
                     tau_s=tau,
                     A_f=A,
+                    J_f=J.copy(),
+                    scalar_gain_f=scalar_gain_f.astype(float),
+                    G_tx_f=g_tx.copy(),
+                    G_rx_f=g_rx_h.copy(),
                     bounce_count=b,
                     interactions=interactions,
                     surface_ids=surface_ids,

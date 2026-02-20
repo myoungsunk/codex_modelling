@@ -10,6 +10,8 @@ import numpy as np
 
 from analysis.ctf_cir import ctf_to_cir, pdp, synthesize_ctf
 from analysis.xpd_stats import conditional_fit, pathwise_xpd
+from rt_core.polarization import fresnel_reflection
+from scenarios.A4_dielectric_plane import MATERIALS
 
 
 def _ensure_dir(out_dir: str | Path) -> Path:
@@ -42,7 +44,7 @@ def _all_paths(data: dict[str, Any], scenario_ids: list[str] | None = None) -> l
 def p0_geometry_ray_overlay(data: dict[str, Any], out: Path) -> None:
     fig, ax = plt.subplots(figsize=(7, 5))
     cmap = {0: "tab:blue", 1: "tab:orange", 2: "tab:green"}
-    for sid in ["A2", "A3", "A5"]:
+    for sid in ["A2", "A2R", "A3", "A3R", "A5"]:
         if sid not in data["scenarios"]:
             continue
         first_case = next(iter(data["scenarios"][sid]["cases"].values()))
@@ -125,7 +127,8 @@ def p4_main_taps(data: dict[str, Any], out: Path) -> None:
 
 
 def p5_cp_same_vs_opp(data: dict[str, Any], out: Path) -> None:
-    paths = _all_paths(data, scenario_ids=["A2", "A3", "A5"])
+    sel = [x for x in ["A2", "A2R", "A3", "A3R", "A5"] if x in data["scenarios"]]
+    paths = _all_paths(data, scenario_ids=sel)
     tau = np.array([p["tau_s"] for p in paths], dtype=float)
     same = np.array([np.mean(np.abs(np.asarray(p["A_f"])[:, 0, 0]) ** 2 + np.abs(np.asarray(p["A_f"])[:, 1, 1]) ** 2) for p in paths])
     opp = np.array([np.mean(np.abs(np.asarray(p["A_f"])[:, 0, 1]) ** 2 + np.abs(np.asarray(p["A_f"])[:, 1, 0]) ** 2) for p in paths])
@@ -141,7 +144,8 @@ def p5_cp_same_vs_opp(data: dict[str, Any], out: Path) -> None:
 
 
 def p6_parity_xpd_box(data: dict[str, Any], out: Path) -> None:
-    samples = pathwise_xpd(_all_paths(data, ["A2", "A3", "A5"]))
+    sel = [x for x in ["A2", "A2R", "A3", "A3R", "A5"] if x in data["scenarios"]]
+    samples = pathwise_xpd(_all_paths(data, sel))
     odd = [s["xpd_db"] for s in samples if s["parity"] == "odd"]
     even = [s["xpd_db"] for s in samples if s["parity"] == "even"]
     fig, ax = plt.subplots(figsize=(6, 4))
@@ -214,7 +218,8 @@ def p9_subband_mu_sigma(data: dict[str, Any], out: Path) -> None:
 
 
 def p10_parity_collapse(data: dict[str, Any], out: Path) -> None:
-    base = pathwise_xpd(_all_paths(data, ["A2", "A3"]) if all(x in data["scenarios"] for x in ["A2", "A3"]) else _all_paths(data))
+    base_sel = [x for x in ["A2", "A2R", "A3", "A3R"] if x in data["scenarios"]]
+    base = pathwise_xpd(_all_paths(data, base_sel) if base_sel else _all_paths(data))
     stress = pathwise_xpd(_all_paths(data, ["A5"]) if "A5" in data["scenarios"] else _all_paths(data))
     fig, ax = plt.subplots(figsize=(7, 4))
     ax.hist([s["xpd_db"] for s in base], bins=25, alpha=0.5, label="A2/A3")
@@ -287,6 +292,117 @@ def p13_k_factor(data: dict[str, Any], out: Path) -> None:
     _save(fig, out, "P13_k_factor")
 
 
+def p14_tau_error_hist(data: dict[str, Any], out: Path) -> None:
+    c0 = 299_792_458.0
+    errs_ps = []
+    for p in _all_paths(data):
+        pts = np.asarray(p.get("points", []), dtype=float)
+        if len(pts) < 2:
+            continue
+        d = float(sum(np.linalg.norm(pts[i + 1] - pts[i]) for i in range(len(pts) - 1)))
+        tau_geo = d / c0
+        errs_ps.append((float(p["tau_s"]) - tau_geo) * 1e12)
+    fig, ax = plt.subplots(figsize=(7, 4))
+    ax.hist(errs_ps, bins=30, alpha=0.8)
+    ax.set_title("P14 tau error histogram")
+    ax.set_xlabel("tau_error [ps]")
+    ax.set_ylabel("count")
+    ax.grid(True, alpha=0.3)
+    _save(fig, out, "P14_tau_error_hist")
+
+
+def p15_incidence_distribution(data: dict[str, Any], out: Path) -> None:
+    fig, ax = plt.subplots(figsize=(7, 4))
+    for sid in data["scenarios"]:
+        vals = []
+        for case in data["scenarios"][sid]["cases"].values():
+            for p in case["paths"]:
+                vals.extend(p["meta"].get("incidence_angles", []))
+        if vals:
+            ax.hist(np.rad2deg(np.asarray(vals, dtype=float)), bins=20, alpha=0.4, label=sid)
+    ax.set_title("P15 incidence angle distribution")
+    ax.set_xlabel("incidence angle [deg]")
+    ax.set_ylabel("count")
+    ax.legend(fontsize=8)
+    ax.grid(True, alpha=0.3)
+    _save(fig, out, "P15_incidence_distribution")
+
+
+def p16_fresnel_curves(data: dict[str, Any], out: Path) -> None:
+    freq = np.asarray(data["frequency"], dtype=float)
+    fig, axs = plt.subplots(2, 1, figsize=(8, 7), sharex=True)
+    theta = np.deg2rad(45.0)
+    for name, mat in MATERIALS.items():
+        gs, gp = fresnel_reflection(mat, theta_i=theta, f_hz=freq)
+        axs[0].plot(freq * 1e-9, np.abs(gs), label=f"{name} |Gs|")
+        axs[0].plot(freq * 1e-9, np.abs(gp), "--", label=f"{name} |Gp|")
+        axs[1].plot(freq * 1e-9, np.unwrap(np.angle(gs)), label=f"{name} ∠Gs")
+        axs[1].plot(freq * 1e-9, np.unwrap(np.angle(gp)), "--", label=f"{name} ∠Gp")
+    axs[0].set_title("P16 Fresnel magnitude/phase vs frequency")
+    axs[0].set_ylabel("magnitude")
+    axs[1].set_xlabel("f [GHz]")
+    axs[1].set_ylabel("phase [rad]")
+    axs[0].grid(True, alpha=0.3)
+    axs[1].grid(True, alpha=0.3)
+    axs[0].legend(fontsize=7, ncol=2)
+    _save(fig, out, "P16_fresnel_curves")
+
+
+def p17_cp_same_opp_vs_bounce(data: dict[str, Any], out: Path) -> None:
+    paths = _all_paths(data)
+    b = np.array([int(p["meta"]["bounce_count"]) for p in paths], dtype=int)
+    same = np.array([np.mean(np.abs(np.asarray(p["A_f"])[:, 0, 0]) ** 2 + np.abs(np.asarray(p["A_f"])[:, 1, 1]) ** 2) for p in paths], dtype=float)
+    opp = np.array([np.mean(np.abs(np.asarray(p["A_f"])[:, 0, 1]) ** 2 + np.abs(np.asarray(p["A_f"])[:, 1, 0]) ** 2) for p in paths], dtype=float)
+
+    fig, axs = plt.subplots(1, 2, figsize=(10, 4))
+    axs[0].scatter(b, 10 * np.log10(same + 1e-18), s=12, label="same")
+    axs[0].scatter(b + 0.05, 10 * np.log10(opp + 1e-18), s=12, label="opp")
+    axs[0].set_title("P17 same/opp power vs bounce")
+    axs[0].set_xlabel("bounce_count")
+    axs[0].set_ylabel("power [dB]")
+    axs[0].legend(fontsize=8)
+    axs[0].grid(True, alpha=0.3)
+
+    uniq = sorted(set(b.tolist()))
+    ratios = [10 * np.log10((np.mean(same[b == k]) + 1e-18) / (np.mean(opp[b == k]) + 1e-18)) for k in uniq]
+    axs[1].bar(np.arange(len(uniq)), ratios)
+    axs[1].set_xticks(np.arange(len(uniq)), [str(k) for k in uniq])
+    axs[1].set_title("P17 same-vs-opp ratio by bounce")
+    axs[1].set_xlabel("bounce_count")
+    axs[1].set_ylabel("10log10(Psame/Popp) [dB]")
+    axs[1].grid(True, alpha=0.3)
+    _save(fig, out, "P17_cp_same_opp_vs_bounce")
+
+
+def p18_singular_values_vs_delay(data: dict[str, Any], out: Path) -> None:
+    paths = _all_paths(data)
+    tau = np.array([float(p["tau_s"]) for p in paths], dtype=float) * 1e9
+    s1, s2, cond = [], [], []
+    for p in paths:
+        M = np.mean(np.asarray(p["A_f"], dtype=np.complex128), axis=0)
+        sv = np.linalg.svd(M, compute_uv=False)
+        smax, smin = float(sv[0]), float(max(sv[-1], 1e-15))
+        s1.append(smax)
+        s2.append(smin)
+        cond.append(smax / smin)
+
+    fig, axs = plt.subplots(1, 2, figsize=(10, 4))
+    axs[0].scatter(tau, 20 * np.log10(np.asarray(s1) + 1e-18), s=12, label="σ1")
+    axs[0].scatter(tau, 20 * np.log10(np.asarray(s2) + 1e-18), s=12, label="σ2")
+    axs[0].set_title("P18 singular values vs delay")
+    axs[0].set_xlabel("tau [ns]")
+    axs[0].set_ylabel("magnitude [dB]")
+    axs[0].legend(fontsize=8)
+    axs[0].grid(True, alpha=0.3)
+
+    axs[1].scatter(tau, 20 * np.log10(np.asarray(cond) + 1e-18), s=12)
+    axs[1].set_title("P18 condition number vs delay")
+    axs[1].set_xlabel("tau [ns]")
+    axs[1].set_ylabel("cond [dB]")
+    axs[1].grid(True, alpha=0.3)
+    _save(fig, out, "P18_singular_values_delay")
+
+
 def generate_all_plots(data: dict[str, Any], out_dir: str | Path) -> None:
     out = _ensure_dir(out_dir)
     p0_geometry_ray_overlay(data, out)
@@ -303,3 +419,8 @@ def generate_all_plots(data: dict[str, Any], out_dir: str | Path) -> None:
     p11_var_vs_rho(data, out)
     p12_delay_conditioned(data, out)
     p13_k_factor(data, out)
+    p14_tau_error_hist(data, out)
+    p15_incidence_distribution(data, out)
+    p16_fresnel_curves(data, out)
+    p17_cp_same_opp_vs_bounce(data, out)
+    p18_singular_values_vs_delay(data, out)

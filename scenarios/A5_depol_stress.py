@@ -41,8 +41,14 @@ def build_sweep_params() -> list[dict[str, Any]]:
     return [{"offset": 3.5, "rx_x": 3.5, "rx_y": 4.5, "rho": rho} for rho in [0.05, 0.15, 0.25, 0.35, 0.45]]
 
 
-def run_case(params: dict[str, Any], f_hz, basis: str = "linear"):
-    tx, rx = default_antennas(basis=basis)
+def run_case(
+    params: dict[str, Any],
+    f_hz,
+    basis: str = "linear",
+    antenna_config: dict[str, Any] | None = None,
+    force_cp_swap_on_odd_reflection: bool = False,
+):
+    tx, rx = default_antennas(basis=basis, **(antenna_config or {}))
     rx.position[:] = [params["rx_x"], params["rx_y"], 1.5]
     scene = build_scene(offset=params["offset"])
 
@@ -51,4 +57,13 @@ def run_case(params: dict[str, Any], f_hz, basis: str = "linear"):
         return float(params["rho"])
 
     dep = DepolConfig(enabled=True, apply_mode="event", side_mode="both", rho_func=rho_hook, seed=1234)
-    return trace_paths(scene, tx, rx, f_hz, max_bounce=2, los_enabled=False, depol=dep)
+    return trace_paths(
+        scene,
+        tx,
+        rx,
+        f_hz,
+        max_bounce=2,
+        los_enabled=False,
+        depol=dep,
+        force_cp_swap_on_odd_reflection=force_cp_swap_on_odd_reflection,
+    )

@@ -41,8 +41,22 @@ def build_sweep_params() -> list[dict[str, Any]]:
     return params
 
 
-def run_case(params: dict[str, Any], f_hz, basis: str = "linear"):
-    tx, rx = default_antennas(basis=basis)
+def run_case(
+    params: dict[str, Any],
+    f_hz,
+    basis: str = "linear",
+    antenna_config: dict[str, Any] | None = None,
+    force_cp_swap_on_odd_reflection: bool = False,
+):
+    tx, rx = default_antennas(basis=basis, **(antenna_config or {}))
     rx.position[:] = [params["distance_m"], 0.0, 1.5]
     scene = build_scene(params["material"], y_plane=params["y_plane"])
-    return trace_paths(scene, tx, rx, f_hz, max_bounce=1, los_enabled=False)
+    return trace_paths(
+        scene,
+        tx,
+        rx,
+        f_hz,
+        max_bounce=1,
+        los_enabled=False,
+        force_cp_swap_on_odd_reflection=force_cp_swap_on_odd_reflection,
+    )

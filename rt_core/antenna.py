@@ -11,7 +11,7 @@ Example:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 from numpy.typing import NDArray
@@ -33,6 +33,8 @@ class Antenna:
     convention: str = "IEEE-RHCP"
     cross_pol_leakage_db: float = 35.0
     axial_ratio_db: float = 0.0
+    enable_coupling: bool = True
+    global_up: Vec3 = field(default_factory=lambda: np.array([0.0, 0.0, 1.0], dtype=float))
 
     def __post_init__(self) -> None:
         p = np.asarray(self.position, dtype=float)
@@ -47,9 +49,14 @@ class Antenna:
         object.__setattr__(self, "boresight", b)
         object.__setattr__(self, "h_axis", h)
         object.__setattr__(self, "v_axis", v)
+        gup = np.asarray(self.global_up, dtype=float)
+        if np.linalg.norm(gup) < 1e-9:
+            gup = np.array([0.0, 0.0, 1.0], dtype=float)
+        object.__setattr__(self, "global_up", normalize(gup))
 
     def wave_basis(self, direction: Vec3) -> CMat:
-        u, v = transverse_basis(direction, self.h_axis)
+        # Use a global reference vector to avoid locking wave basis to antenna H axis.
+        u, v = transverse_basis(direction, self.global_up)
         return np.column_stack([u, v]).astype(np.complex128)
 
     def port_basis_vectors(self, direction: Vec3) -> CMat:
@@ -88,6 +95,9 @@ class Antenna:
         return (pb.conj().T @ wb).astype(np.complex128)
 
     def _coupling_matrix(self, n_f: int) -> NDArray[np.complex128]:
+        if not self.enable_coupling:
+            eye = np.eye(2, dtype=np.complex128)
+            return np.repeat(eye[None, :, :], n_f, axis=0)
         leak = 10.0 ** (-self.cross_pol_leakage_db / 20.0)
         ar = 10.0 ** (self.axial_ratio_db / 20.0)
         ar_leak = abs((ar - 1.0) / (ar + 1.0))

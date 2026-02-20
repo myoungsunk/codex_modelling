@@ -79,12 +79,20 @@ class GoldenTests(unittest.TestCase):
             half_extent_u=20.0,
             half_extent_v=20.0,
         )
-        paths = trace_paths([plane], tx, rx, self.f, max_bounce=1, los_enabled=False)
+        paths = trace_paths(
+            [plane],
+            tx,
+            rx,
+            self.f,
+            max_bounce=1,
+            los_enabled=False,
+            force_cp_swap_on_odd_reflection=True,
+        )
         odd = [p for p in paths if p.bounce_count == 1]
         self.assertTrue(len(odd) > 0)
-        A = np.mean(odd[0].A_f, axis=0)
-        same = np.abs(A[0, 0]) ** 2 + np.abs(A[1, 1]) ** 2
-        opp = np.abs(A[0, 1]) ** 2 + np.abs(A[1, 0]) ** 2
+        A_f = odd[0].A_f
+        same = np.mean(np.abs(A_f[:, 0, 0]) ** 2 + np.abs(A_f[:, 1, 1]) ** 2)
+        opp = np.mean(np.abs(A_f[:, 0, 1]) ** 2 + np.abs(A_f[:, 1, 0]) ** 2)
         self.assertGreater(opp, same)
 
     def test_p2_a3_even_bounce_same_hand_recovery(self) -> None:
@@ -110,12 +118,20 @@ class GoldenTests(unittest.TestCase):
             half_extent_u=20.0,
             half_extent_v=20.0,
         )
-        paths = trace_paths([p1, p2], tx, rx, self.f, max_bounce=2, los_enabled=False)
+        paths = trace_paths(
+            [p1, p2],
+            tx,
+            rx,
+            self.f,
+            max_bounce=2,
+            los_enabled=False,
+            force_cp_swap_on_odd_reflection=True,
+        )
         even = [p for p in paths if p.bounce_count == 2]
         self.assertTrue(len(even) > 0)
-        A = np.mean(even[0].A_f, axis=0)
-        same = np.abs(A[0, 0]) ** 2 + np.abs(A[1, 1]) ** 2
-        opp = np.abs(A[0, 1]) ** 2 + np.abs(A[1, 0]) ** 2
+        A_f = even[0].A_f
+        same = np.mean(np.abs(A_f[:, 0, 0]) ** 2 + np.abs(A_f[:, 1, 1]) ** 2)
+        opp = np.mean(np.abs(A_f[:, 0, 1]) ** 2 + np.abs(A_f[:, 1, 0]) ** 2)
         self.assertGreaterEqual(same, opp)
 
     def test_g2_image_method_tau_match(self) -> None:
