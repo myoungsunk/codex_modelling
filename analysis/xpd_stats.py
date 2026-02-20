@@ -215,3 +215,83 @@ def save_stats_json(path: str | Path, stats_obj: dict[str, Any]) -> Path:
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps(stats_obj, indent=2), encoding="utf-8")
     return p
+
+
+def coupling_eps_from_params(cross_pol_leakage_db: float, axial_ratio_db: float, enable_coupling: bool = True) -> float:
+    """Return coupling epsilon that matches rt_core.antenna.Antenna._coupling_matrix."""
+
+    if not enable_coupling:
+        return 0.0
+    leak = 10.0 ** (-float(cross_pol_leakage_db) / 20.0)
+    ar = 10.0 ** (float(axial_ratio_db) / 20.0)
+    ar_leak = abs((ar - 1.0) / (ar + 1.0))
+    return float(np.clip(leak + ar_leak, 0.0, 0.49))
+
+
+def estimate_leakage_floor_db(
+    tx_cross_pol_leakage_db: float,
+    rx_cross_pol_leakage_db: float,
+    tx_axial_ratio_db: float = 0.0,
+    rx_axial_ratio_db: float = 0.0,
+    tx_enable_coupling: bool = True,
+    rx_enable_coupling: bool = True,
+) -> dict[str, float]:
+    """Predict XPD floor from Tx/Rx coupling parameters.
+
+    floor_db ~= 20*log10(1/(eps_tx + eps_rx + 1e-15))
+    """
+
+    eps_tx = coupling_eps_from_params(
+        cross_pol_leakage_db=tx_cross_pol_leakage_db,
+        axial_ratio_db=tx_axial_ratio_db,
+        enable_coupling=tx_enable_coupling,
+    )
+    eps_rx = coupling_eps_from_params(
+        cross_pol_leakage_db=rx_cross_pol_leakage_db,
+        axial_ratio_db=rx_axial_ratio_db,
+        enable_coupling=rx_enable_coupling,
+    )
+    floor_db = float(20.0 * np.log10(1.0 / (eps_tx + eps_rx + 1e-15)))
+    return {"eps_tx": eps_tx, "eps_rx": eps_rx, "xpd_floor_db": floor_db}
+
+
+def estimate_leakage_floor_from_antenna_config(antenna_config: dict[str, Any]) -> dict[str, float]:
+    """Convenience wrapper to estimate leakage floor from runner antenna_config dict."""
+
+    en = bool(antenna_config.get("enable_coupling", True))
+    return estimate_leakage_floor_db(
+        tx_cross_pol_leakage_db=float(antenna_config.get("tx_cross_pol_leakage_db", 35.0)),
+        rx_cross_pol_leakage_db=float(antenna_config.get("rx_cross_pol_leakage_db", 35.0)),
+        tx_axial_ratio_db=float(antenna_config.get("tx_axial_ratio_db", 0.0)),
+        rx_axial_ratio_db=float(antenna_config.get("rx_axial_ratio_db", 0.0)),
+        tx_enable_coupling=en,
+        rx_enable_coupling=en,
+    )
+
+
+def leakage_limited_summary(
+    xpd_samples_db: list[float] | NDArray[np.float64],
+    xpd_floor_db: float,
+    median_tolerance_db: float = 1.0,
+    sigma_threshold_db: float = 1.0,
+) -> dict[str, float | bool]:
+    """Return leakage-floor proximity and trigger flag for XPD samples."""
+
+    v = np.asarray(xpd_samples_db, dtype=float)
+    if len(v) == 0:
+        return {
+            "median_xpd_db": np.nan,
+            "sigma_xpd_db": np.nan,
+            "delta_floor_db": np.nan,
+            "is_leakage_limited": False,
+        }
+    median_xpd_db = float(np.median(v))
+    sigma_xpd_db = float(np.std(v, ddof=1)) if len(v) > 1 else 0.0
+    delta_floor_db = float(abs(median_xpd_db - float(xpd_floor_db)))
+    is_limited = bool(delta_floor_db < float(median_tolerance_db) and sigma_xpd_db < float(sigma_threshold_db))
+    return {
+        "median_xpd_db": median_xpd_db,
+        "sigma_xpd_db": sigma_xpd_db,
+        "delta_floor_db": delta_floor_db,
+        "is_leakage_limited": is_limited,
+    }

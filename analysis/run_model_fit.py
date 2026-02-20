@@ -53,6 +53,7 @@ def fit_and_generate(
     num_synth_rays: int = 64,
     incidence_bins_deg: list[float] | None = None,
     seed: int = 0,
+    return_paths: bool = False,
 ) -> dict[str, Any]:
     ds = load_rt_dataset(input_h5)
     freq = np.asarray(ds["frequency"], dtype=float)
@@ -139,7 +140,11 @@ def fit_and_generate(
         ],
     }
     save_stats_json(synthetic_compare_json, synth_obj)
-    return {"model": model_obj, "comparison": synth_obj}
+    out = {"model": model_obj, "comparison": synth_obj}
+    if return_paths:
+        out["rt_paths"] = all_paths
+        out["synthetic_paths"] = synth_paths
+    return out
 
 
 def main() -> None:

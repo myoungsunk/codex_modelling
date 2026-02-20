@@ -1,0 +1,441 @@
+# RT Validation Report
+
+- basis: linear
+- xpd_matrix_source: A
+- antenna_config: {'convention': 'IEEE-RHCP', 'tx_cross_pol_leakage_db': 35.0, 'rx_cross_pol_leakage_db': 35.0, 'tx_axial_ratio_db': 0.0, 'rx_axial_ratio_db': 0.0, 'enable_coupling': True}
+- predicted_leakage_floor_db: 28.979 (eps_tx=0.01778, eps_rx=0.01778)
+
+## C0
+
+- case 0: paths=1, bounce_dist={0: 1}
+- strongest path: tau=1.001e-08s, power=5.307e-07
+- LOS exists: True
+- case 1: paths=1, bounce_dist={0: 1}
+- strongest path: tau=2.001e-08s, power=1.327e-07
+- LOS exists: True
+- case 2: paths=1, bounce_dist={0: 1}
+- strongest path: tau=3.002e-08s, power=5.897e-08
+- LOS exists: True
+- avg_paths_per_case: 1.00 (cases=3)
+- WARNING: low path count per case; statistics may be unstable (single-path dominance likely).
+- parity XPD stats (exact_bounce=None): {'even': {'mu': 28.982138819710187, 'sigma': 6.540465201709871e-06, 'n': 3}}
+- leakage-limited check: median_xpd_db=28.982, sigma_db=0.000, delta_to_floor_db=0.003, floor_db=28.979
+- WARNING: XPD appears leakage-limited; use --physics-validation-mode and/or --xpd-matrix-source J for propagation-only analysis.
+
+## A1
+
+- case 0: paths=1, bounce_dist={0: 1}
+- strongest path: tau=1.336e-08s, power=2.978e-07
+- LOS exists: True
+- case 1: paths=1, bounce_dist={0: 1}
+- strongest path: tau=2.002e-08s, power=1.325e-07
+- LOS exists: True
+- case 2: paths=1, bounce_dist={0: 1}
+- strongest path: tau=2.669e-08s, power=7.459e-08
+- LOS exists: True
+- avg_paths_per_case: 1.00 (cases=3)
+- WARNING: low path count per case; statistics may be unstable (single-path dominance likely).
+- parity XPD stats (exact_bounce=None): {'even': {'mu': 28.982139411903038, 'sigma': 4.335522386760578e-06, 'n': 3}}
+- leakage-limited check: median_xpd_db=28.982, sigma_db=0.000, delta_to_floor_db=0.003, floor_db=28.979
+- WARNING: XPD appears leakage-limited; use --physics-validation-mode and/or --xpd-matrix-source J for propagation-only analysis.
+
+## A2
+
+- case 0: paths=1, bounce_dist={1: 1}
+- strongest path: tau=1.668e-08s, power=1.911e-07
+- LOS exists: False
+- case 1: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.238e-08s, power=1.061e-07
+- LOS exists: False
+- case 2: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.850e-08s, power=6.543e-08
+- LOS exists: False
+- case 3: paths=1, bounce_dist={1: 1}
+- strongest path: tau=1.887e-08s, power=1.493e-07
+- LOS exists: False
+- case 4: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.405e-08s, power=9.186e-08
+- LOS exists: False
+- case 5: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.983e-08s, power=5.971e-08
+- LOS exists: False
+- case 6: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.136e-08s, power=1.165e-07
+- LOS exists: False
+- case 7: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.605e-08s, power=7.830e-08
+- LOS exists: False
+- case 8: paths=1, bounce_dist={1: 1}
+- strongest path: tau=3.147e-08s, power=5.367e-08
+- LOS exists: False
+- avg_paths_per_case: 1.00 (cases=9)
+- WARNING: low path count per case; statistics may be unstable (single-path dominance likely).
+- parity XPD stats (exact_bounce=1): {'odd': {'mu': 28.98213642215994, 'sigma': 3.956975284329778e-06, 'n': 9}}
+- leakage-limited check: median_xpd_db=28.982, sigma_db=0.000, delta_to_floor_db=0.003, floor_db=28.979
+- WARNING: XPD appears leakage-limited; use --physics-validation-mode and/or --xpd-matrix-source J for propagation-only analysis.
+
+## A2R
+
+- case 0: paths=1, bounce_dist={1: 1}
+- strongest path: tau=1.296e-07s, power=3.158e-09
+- LOS exists: False
+- case 1: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.625e-08s, power=7.696e-08
+- LOS exists: False
+- case 2: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.542e-08s, power=8.227e-08
+- LOS exists: False
+- case 3: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.790e-08s, power=6.827e-08
+- LOS exists: False
+- case 4: paths=0, bounce_dist={}
+- WARNING: no paths matched exact_bounce=1 for stats
+- case 5: paths=1, bounce_dist={1: 1}
+- strongest path: tau=3.477e-08s, power=4.390e-08
+- LOS exists: False
+- case 6: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.406e-08s, power=9.182e-08
+- LOS exists: False
+- case 7: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.620e-08s, power=7.739e-08
+- LOS exists: False
+- case 8: paths=0, bounce_dist={}
+- WARNING: no paths matched exact_bounce=1 for stats
+- case 9: paths=1, bounce_dist={1: 1}
+- strongest path: tau=5.753e-08s, power=1.605e-08
+- LOS exists: False
+- case 10: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.277e-08s, power=1.025e-07
+- LOS exists: False
+- case 11: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.445e-08s, power=8.890e-08
+- LOS exists: False
+- case 12: paths=0, bounce_dist={}
+- WARNING: no paths matched exact_bounce=1 for stats
+- case 13: paths=0, bounce_dist={}
+- WARNING: no paths matched exact_bounce=1 for stats
+- case 14: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.173e-08s, power=1.126e-07
+- LOS exists: False
+- case 15: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.286e-08s, power=1.017e-07
+- LOS exists: False
+- avg_paths_per_case: 0.75 (cases=16)
+- WARNING: low path count per case; statistics may be unstable (single-path dominance likely).
+- parity XPD stats (exact_bounce=1): {'odd': {'mu': 11.708909609283571, 'sigma': 9.049711686503452, 'n': 12}}
+- leakage-limited check: median_xpd_db=11.517, sigma_db=9.050, delta_to_floor_db=17.462, floor_db=28.979
+
+## A3
+
+- case 0: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.405e-08s, power=9.186e-08
+- LOS exists: False
+- case 1: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.405e-08s, power=9.186e-08
+- LOS exists: False
+- case 2: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=7.969e-08
+- LOS exists: False
+- case 3: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.780e-08s, power=6.878e-08
+- LOS exists: False
+- avg_paths_per_case: 1.00 (cases=4)
+- WARNING: low path count per case; statistics may be unstable (single-path dominance likely).
+- parity XPD stats (exact_bounce=2): {'even': {'mu': 28.982135880412635, 'sigma': 1.490991155943428e-06, 'n': 4}}
+- leakage-limited check: median_xpd_db=28.982, sigma_db=0.000, delta_to_floor_db=0.003, floor_db=28.979
+- WARNING: XPD appears leakage-limited; use --physics-validation-mode and/or --xpd-matrix-source J for propagation-only analysis.
+
+## A3R
+
+- case 0: paths=1, bounce_dist={2: 1}
+- strongest path: tau=3.493e-08s, power=4.351e-08
+- LOS exists: False
+- case 1: paths=1, bounce_dist={2: 1}
+- strongest path: tau=4.691e-08s, power=2.409e-08
+- LOS exists: False
+- case 2: paths=1, bounce_dist={2: 1}
+- strongest path: tau=6.773e-08s, power=1.157e-08
+- LOS exists: False
+- case 3: paths=1, bounce_dist={2: 1}
+- strongest path: tau=8.357e-08s, power=7.598e-09
+- LOS exists: False
+- avg_paths_per_case: 1.00 (cases=4)
+- WARNING: low path count per case; statistics may be unstable (single-path dominance likely).
+- parity XPD stats (exact_bounce=2): {'even': {'mu': -2.7129067427702473, 'sigma': 4.942571697711514, 'n': 4}}
+- leakage-limited check: median_xpd_db=-0.971, sigma_db=4.943, delta_to_floor_db=29.950, floor_db=28.979
+
+## A4
+
+- case 0: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.238e-08s, power=2.533e-08
+- LOS exists: False
+- case 1: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.405e-08s, power=1.976e-08
+- LOS exists: False
+- case 2: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.605e-08s, power=1.597e-08
+- LOS exists: False
+- case 3: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.238e-08s, power=1.127e-08
+- LOS exists: False
+- case 4: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.405e-08s, power=6.556e-09
+- LOS exists: False
+- case 5: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.605e-08s, power=4.354e-09
+- LOS exists: False
+- case 6: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.238e-08s, power=1.451e-08
+- LOS exists: False
+- case 7: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.405e-08s, power=9.225e-09
+- LOS exists: False
+- case 8: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.605e-08s, power=6.534e-09
+- LOS exists: False
+- avg_paths_per_case: 1.00 (cases=9)
+- WARNING: low path count per case; statistics may be unstable (single-path dominance likely).
+- parity XPD stats (exact_bounce=1): {'odd': {'mu': 33.50343203156502, 'sigma': 2.338648919139077, 'n': 9}}
+- leakage-limited check: median_xpd_db=33.421, sigma_db=2.339, delta_to_floor_db=4.442, floor_db=28.979
+- material sub-summary: {'glass': {'mu': 35.7095534086122, 'sigma': 2.280987595056381, 'n': 3}, 'wood': {'mu': 32.02498761154467, 'sigma': 1.5215923486622314, 'n': 3}, 'gypsum': {'mu': 32.77575507453819, 'sigma': 1.7278722762231056, 'n': 3}}
+
+## A5
+
+- case 0: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=7.968e-08
+- LOS exists: False
+- case 1: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=7.968e-08
+- LOS exists: False
+- case 2: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=7.968e-08
+- LOS exists: False
+- case 3: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=7.968e-08
+- LOS exists: False
+- case 4: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=7.967e-08
+- LOS exists: False
+- case 5: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=7.967e-08
+- LOS exists: False
+- case 6: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=7.967e-08
+- LOS exists: False
+- case 7: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=7.967e-08
+- LOS exists: False
+- case 8: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=7.954e-08
+- LOS exists: False
+- case 9: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=7.952e-08
+- LOS exists: False
+- case 10: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=7.964e-08
+- LOS exists: False
+- case 11: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=7.957e-08
+- LOS exists: False
+- case 12: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=7.951e-08
+- LOS exists: False
+- case 13: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=7.955e-08
+- LOS exists: False
+- case 14: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=7.966e-08
+- LOS exists: False
+- case 15: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=7.951e-08
+- LOS exists: False
+- case 16: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=7.966e-08
+- LOS exists: False
+- case 17: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=7.967e-08
+- LOS exists: False
+- case 18: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=7.957e-08
+- LOS exists: False
+- case 19: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=7.966e-08
+- LOS exists: False
+- case 20: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=7.960e-08
+- LOS exists: False
+- case 21: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=7.963e-08
+- LOS exists: False
+- case 22: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=7.969e-08
+- LOS exists: False
+- case 23: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=7.959e-08
+- LOS exists: False
+- case 24: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=7.961e-08
+- LOS exists: False
+- case 25: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=7.951e-08
+- LOS exists: False
+- case 26: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=7.961e-08
+- LOS exists: False
+- case 27: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=7.955e-08
+- LOS exists: False
+- case 28: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=7.961e-08
+- LOS exists: False
+- case 29: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=7.965e-08
+- LOS exists: False
+- avg_paths_per_case: 1.00 (cases=30)
+- WARNING: low path count per case; statistics may be unstable (single-path dominance likely).
+- parity XPD stats (exact_bounce=None): {'even': {'mu': 2.5256518695420396, 'sigma': 7.484750171474607, 'n': 30}}
+- leakage-limited check: median_xpd_db=3.123, sigma_db=7.485, delta_to_floor_db=25.856, floor_db=28.979
+
+## A6
+
+- case 0: paths=1, bounce_dist={1: 1}
+- strongest path: tau=1.336e-08s, power=2.976e-07
+- LOS exists: False
+- case 1: paths=1, bounce_dist={1: 1}
+- strongest path: tau=1.336e-08s, power=2.978e-07
+- LOS exists: False
+- case 2: paths=1, bounce_dist={1: 1}
+- strongest path: tau=1.336e-08s, power=2.976e-07
+- LOS exists: False
+- case 3: paths=1, bounce_dist={1: 1}
+- strongest path: tau=1.341e-08s, power=2.954e-07
+- LOS exists: False
+- case 4: paths=1, bounce_dist={1: 1}
+- strongest path: tau=1.341e-08s, power=2.956e-07
+- LOS exists: False
+- case 5: paths=1, bounce_dist={1: 1}
+- strongest path: tau=1.341e-08s, power=2.954e-07
+- LOS exists: False
+- case 6: paths=1, bounce_dist={1: 1}
+- strongest path: tau=1.350e-08s, power=2.918e-07
+- LOS exists: False
+- case 7: paths=1, bounce_dist={1: 1}
+- strongest path: tau=1.349e-08s, power=2.920e-07
+- LOS exists: False
+- case 8: paths=1, bounce_dist={1: 1}
+- strongest path: tau=1.350e-08s, power=2.918e-07
+- LOS exists: False
+- case 9: paths=2, bounce_dist={2: 2}
+- strongest path: tau=2.670e-08s, power=7.457e-08
+- LOS exists: False
+- case 10: paths=2, bounce_dist={2: 2}
+- strongest path: tau=2.669e-08s, power=7.459e-08
+- LOS exists: False
+- case 11: paths=2, bounce_dist={2: 2}
+- strongest path: tau=2.670e-08s, power=7.457e-08
+- LOS exists: False
+- case 12: paths=2, bounce_dist={2: 2}
+- strongest path: tau=2.672e-08s, power=7.443e-08
+- LOS exists: False
+- case 13: paths=2, bounce_dist={2: 2}
+- strongest path: tau=2.672e-08s, power=7.445e-08
+- LOS exists: False
+- case 14: paths=2, bounce_dist={2: 2}
+- strongest path: tau=2.672e-08s, power=7.443e-08
+- LOS exists: False
+- case 15: paths=2, bounce_dist={2: 2}
+- strongest path: tau=2.676e-08s, power=7.420e-08
+- LOS exists: False
+- case 16: paths=2, bounce_dist={2: 2}
+- strongest path: tau=2.676e-08s, power=7.422e-08
+- LOS exists: False
+- case 17: paths=2, bounce_dist={2: 2}
+- strongest path: tau=2.676e-08s, power=7.420e-08
+- LOS exists: False
+- avg_paths_per_case: 1.50 (cases=18)
+- WARNING: low path count per case; statistics may be unstable (single-path dominance likely).
+- parity XPD stats (exact_bounce=None): {'odd': {'mu': 28.982143460165915, 'sigma': 2.519034994742306e-08, 'n': 9}, 'even': {'mu': 28.98213482898805, 'sigma': 2.4438173925448444e-08, 'n': 18}}
+- leakage-limited check: median_xpd_db=28.982, sigma_db=0.000, delta_to_floor_db=0.003, floor_db=28.979
+- WARNING: XPD appears leakage-limited; use --physics-validation-mode and/or --xpd-matrix-source J for propagation-only analysis.
+- note: A6 is a near-normal-incidence CP benchmark; odd/even trends from this setup should not be generalized to arbitrary oblique incidence.
+
+## B0
+
+- case 0: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=1.055e-08s, power=4.776e-07
+- LOS exists: True
+- case 1: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=6.013e-09s, power=1.470e-06
+- LOS exists: True
+- case 2: paths=21, bounce_dist={0: 1, 1: 6, 2: 14}
+- strongest path: tau=3.336e-09s, power=4.776e-06
+- LOS exists: True
+- case 3: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=6.013e-09s, power=1.470e-06
+- LOS exists: True
+- case 4: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=1.055e-08s, power=4.776e-07
+- LOS exists: True
+- case 5: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=1.251e-08s, power=3.397e-07
+- LOS exists: True
+- case 6: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=9.020e-09s, power=6.532e-07
+- LOS exists: True
+- case 7: paths=21, bounce_dist={0: 1, 1: 6, 2: 14}
+- strongest path: tau=7.505e-09s, power=9.435e-07
+- LOS exists: True
+- case 8: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=9.020e-09s, power=6.532e-07
+- LOS exists: True
+- case 9: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=1.251e-08s, power=3.397e-07
+- LOS exists: True
+- case 10: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=1.538e-08s, power=2.248e-07
+- LOS exists: True
+- case 11: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=1.270e-08s, power=3.294e-07
+- LOS exists: True
+- case 12: paths=21, bounce_dist={0: 1, 1: 6, 2: 14}
+- strongest path: tau=1.167e-08s, power=3.899e-07
+- LOS exists: True
+- case 13: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=1.270e-08s, power=3.294e-07
+- LOS exists: True
+- case 14: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=1.538e-08s, power=2.248e-07
+- LOS exists: True
+- case 15: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=1.874e-08s, power=1.513e-07
+- LOS exists: True
+- case 16: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=1.662e-08s, power=1.925e-07
+- LOS exists: True
+- case 17: paths=21, bounce_dist={0: 1, 1: 6, 2: 14}
+- strongest path: tau=1.584e-08s, power=2.117e-07
+- LOS exists: True
+- case 18: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=1.662e-08s, power=1.925e-07
+- LOS exists: True
+- case 19: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=1.874e-08s, power=1.513e-07
+- LOS exists: True
+- case 20: paths=24, bounce_dist={0: 1, 1: 6, 2: 17}
+- strongest path: tau=2.238e-08s, power=1.061e-07
+- LOS exists: True
+- case 21: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=2.063e-08s, power=1.249e-07
+- LOS exists: True
+- case 22: paths=21, bounce_dist={0: 1, 1: 6, 2: 14}
+- strongest path: tau=2.001e-08s, power=1.327e-07
+- LOS exists: True
+- case 23: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=2.063e-08s, power=1.249e-07
+- LOS exists: True
+- case 24: paths=24, bounce_dist={0: 1, 1: 6, 2: 17}
+- strongest path: tau=2.238e-08s, power=1.061e-07
+- LOS exists: True
+- avg_paths_per_case: 24.12 (cases=25)
+- parity XPD stats (exact_bounce=None): {'even': {'mu': 21.48170131979229, 'sigma': 24.416397433521155, 'n': 453}, 'odd': {'mu': 29.41341130504699, 'sigma': 20.77254444729087, 'n': 150}}
+- leakage-limited check: median_xpd_db=28.982, sigma_db=23.795, delta_to_floor_db=0.003, floor_db=28.979

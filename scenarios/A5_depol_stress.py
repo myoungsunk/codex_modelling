@@ -11,6 +11,10 @@ from rt_core.polarization import DepolConfig
 from rt_core.tracer import trace_paths
 from scenarios.common import default_antennas
 
+RHO_VALUES = [0.05, 0.15, 0.25, 0.35, 0.45]
+N_REPS_PER_RHO = 6
+BASE_SEED = 1234
+
 
 def build_scene(offset: float = 3.0) -> list[Plane]:
     return [
@@ -38,7 +42,20 @@ def build_scene(offset: float = 3.0) -> list[Plane]:
 
 
 def build_sweep_params() -> list[dict[str, Any]]:
-    return [{"offset": 3.5, "rx_x": 3.5, "rx_y": 4.5, "rho": rho} for rho in [0.05, 0.15, 0.25, 0.35, 0.45]]
+    params: list[dict[str, Any]] = []
+    for rho_idx, rho in enumerate(RHO_VALUES):
+        for rep_id in range(N_REPS_PER_RHO):
+            params.append(
+                {
+                    "offset": 3.5,
+                    "rx_x": 3.5,
+                    "rx_y": 4.5,
+                    "rho": rho,
+                    "rep_id": rep_id,
+                    "seed": BASE_SEED + rho_idx * 100 + rep_id,
+                }
+            )
+    return params
 
 
 def run_case(
@@ -56,7 +73,13 @@ def run_case(
         _ = ctx
         return float(params["rho"])
 
-    dep = DepolConfig(enabled=True, apply_mode="event", side_mode="both", rho_func=rho_hook, seed=1234)
+    dep = DepolConfig(
+        enabled=True,
+        apply_mode="event",
+        side_mode="both",
+        rho_func=rho_hook,
+        seed=int(params.get("seed", BASE_SEED)),
+    )
     return trace_paths(
         scene,
         tx,
