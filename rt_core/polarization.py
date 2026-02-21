@@ -107,7 +107,15 @@ def fresnel_reflection(material: Material, theta_i: float, f_hz: NDArray[np.floa
     root = np.sqrt(eps_c - sin2)
     gamma_s = (cos_i - root) / (cos_i + root)
     gamma_p = (eps_c * cos_i - root) / (eps_c * cos_i + root)
-    return gamma_s.astype(np.complex128), gamma_p.astype(np.complex128)
+    # Passive-media guard: preserve phase while limiting |Gamma|<=1.
+    # Small numerical branch-cut errors can otherwise produce |Gamma| slightly above 1.
+    def _clamp_passive(g: NDArray[np.complex128]) -> NDArray[np.complex128]:
+        mag = np.abs(g)
+        phase = np.exp(1j * np.angle(g))
+        mag_c = np.minimum(mag, 1.0)
+        return (mag_c * phase).astype(np.complex128)
+
+    return _clamp_passive(gamma_s.astype(np.complex128)), _clamp_passive(gamma_p.astype(np.complex128))
 
 
 def jones_reflection(material: Material, theta_i: float, f_hz: NDArray[np.float64]) -> NDArray[np.complex128]:

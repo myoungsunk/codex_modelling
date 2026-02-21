@@ -537,7 +537,8 @@ def build_quality_report(
     exact_bounce_now = data.get("meta", {}).get("exact_bounce_defaults", DEFAULT_EXACT_BOUNCE)
     lines.append(f"- xpd_matrix_source: {xpd_src_now}")
     lines.append(f"- exact_bounce_defaults: {exact_bounce_now}")
-    lines.append("- report_exact_bounce_applied: True (scenario-specific default map)")
+    exact_bounce_applied_now = bool(data.get("meta", {}).get("exact_bounce_applied", True))
+    lines.append(f"- report_exact_bounce_applied: {exact_bounce_applied_now} (scenario-specific default map)")
     antenna_config = data.get("meta", {}).get("antenna_config", {})
     lines.append(f"- antenna_config: {antenna_config}")
     physics_mode = bool(
@@ -553,6 +554,24 @@ def build_quality_report(
         f"(eps_tx={floor_info['eps_tx']:.5f}, eps_rx={floor_info['eps_rx']:.5f})"
     )
     lines.append(f"- model_compare_enabled: {model_metrics is not None}")
+    lines.append("")
+
+    lines.append("## Reproducibility & Provenance")
+    lines.append("")
+    lines.append(f"- schema_version: {data.get('meta', {}).get('schema_version', 'v2')}")
+    lines.append(f"- git_commit: {data.get('meta', {}).get('git_commit', 'unknown')}")
+    lines.append(f"- git_dirty: {git_dirty_now}")
+    lines.append(f"- release_mode: {release_mode_now}")
+    lines.append(f"- cmdline: {data.get('meta', {}).get('cmdline', '')}")
+    lines.append(f"- seed_json: {data.get('meta', {}).get('seed_json', '')}")
+    lines.append(f"- basis: {basis_now}")
+    lines.append(f"- convention: {convention_now}")
+    lines.append(f"- xpd_matrix_source: {xpd_src_now}")
+    lines.append(f"- exact_bounce_defaults: {exact_bounce_now}")
+    lines.append(f"- exact_bounce_applied: {exact_bounce_applied_now}")
+    lines.append(f"- antenna_config: {antenna_config}")
+    lines.append(f"- physics_validation_mode: {physics_mode}")
+    lines.append(f"- meta_roundtrip: {bool(data.get('meta', {}).get('meta_roundtrip', False))}")
     lines.append("")
 
     freq = np.asarray(data["frequency"], dtype=float)
@@ -1274,6 +1293,7 @@ def main() -> None:
         data.setdefault("meta", {})["release_mode"] = bool(args.release_mode)
         data.setdefault("meta", {})["xpd_matrix_source"] = str(args.xpd_matrix_source)
         data.setdefault("meta", {})["exact_bounce_defaults"] = dict(DEFAULT_EXACT_BOUNCE)
+        data.setdefault("meta", {})["exact_bounce_applied"] = True
         data.setdefault("meta", {})["physics_validation_mode"] = not bool(antenna_config.get("enable_coupling", True))
         data.setdefault("meta", {})["antenna_config"] = dict(antenna_config)
         out_h5 = _basis_output_path(args.output, b, multi)
@@ -1337,7 +1357,9 @@ def main() -> None:
         data.setdefault("meta", {})["tap_path_consistency"] = tap_path_metrics
 
         save_rt_dataset(out_h5, data)
-        if not self_test_meta_roundtrip(out_h5, expected_meta=data.get("meta", {})):
+        meta_roundtrip_ok = self_test_meta_roundtrip(out_h5, expected_meta=data.get("meta", {}))
+        data.setdefault("meta", {})["meta_roundtrip"] = bool(meta_roundtrip_ok)
+        if not meta_roundtrip_ok:
             raise SystemExit("HDF5 meta roundtrip self-test failed: saved artifact is not reproducible.")
         generate_all_plots(data, out_dir=out_plot, config=plot_config, exact_bounce_map=DEFAULT_EXACT_BOUNCE)
         model_metrics = None

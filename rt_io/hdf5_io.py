@@ -21,6 +21,7 @@ Example:
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import hashlib
 import json
 from pathlib import Path
 import subprocess
@@ -43,6 +44,7 @@ V2_REQUIRED_META_ATTRS = (
     "convention",
     "xpd_matrix_source",
     "exact_bounce_defaults_json",
+    "exact_bounce_applied",
     "physics_validation_mode",
     "antenna_config_json",
     "release_mode",
@@ -56,6 +58,7 @@ META_COMPARE_KEYS = (
     "convention",
     "xpd_matrix_source",
     "exact_bounce_defaults",
+    "exact_bounce_applied",
     "physics_validation_mode",
     "antenna_config",
     "release_mode",
@@ -100,7 +103,14 @@ def _write_string_array(group: h5py.Group, name: str, values: list[str]) -> None
 
 
 def _json_dumps_canonical(value: Any) -> str:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"))
+    def _default(o: Any) -> Any:
+        if isinstance(o, np.generic):
+            return o.item()
+        if isinstance(o, np.ndarray):
+            return o.tolist()
+        return str(o)
+
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), default=_default)
 
 
 def _json_loads_safe(text: str, fallback: Any) -> Any:
@@ -128,7 +138,7 @@ def _normalize_meta_for_compare(meta: dict[str, Any], default_schema_version: st
     out["cmdline"] = str(out.get("cmdline", ""))
     out["basis"] = str(out.get("basis", "linear"))
     out["convention"] = str(out.get("convention", "IEEE-RHCP"))
-    out["xpd_matrix_source"] = str(out.get("xpd_matrix_source", out.get("matrix_source", "")))
+    out["xpd_matrix_source"] = str(out.get("xpd_matrix_source", out.get("matrix_source", "A")))
     out["release_mode"] = bool(out.get("release_mode", False))
     out["physics_validation_mode"] = bool(
         out.get(
@@ -145,6 +155,7 @@ def _normalize_meta_for_compare(meta: dict[str, Any], default_schema_version: st
         eb = _json_loads_safe(eb, {})
     out["exact_bounce_defaults"] = eb if isinstance(eb, dict) else {}
     out["seed_json"] = str(out.get("seed_json", _stringify_seed(out.get("seed", ""))))
+    out["exact_bounce_applied"] = bool(out.get("exact_bounce_applied", True))
     return out
 
 
@@ -247,6 +258,7 @@ def save_rt_dataset(path: str | Path, data: dict[str, Any]) -> Path:
         exact_bounce_defaults = src_meta.get("exact_bounce_defaults", {})
         antenna_cfg = src_meta.get("antenna_config", {})
         meta.attrs["exact_bounce_defaults_json"] = _json_dumps_canonical(exact_bounce_defaults)
+        meta.attrs["exact_bounce_applied"] = bool(src_meta.get("exact_bounce_applied", True))
         meta.attrs["antenna_config_json"] = _json_dumps_canonical(antenna_cfg)
         meta.attrs["physics_validation_mode"] = bool(src_meta.get("physics_validation_mode", False))
         meta.attrs["release_mode"] = bool(src_meta.get("release_mode", False))
@@ -257,6 +269,10 @@ def save_rt_dataset(path: str | Path, data: dict[str, Any]) -> Path:
 
         freq = np.asarray(data["frequency"], dtype=float)
         nf = len(freq)
+        # v2 canonical location
+        freq_g = f.create_group("freq")
+        freq_g.create_dataset("f", data=freq)
+        # backward-compatible location
         f.create_dataset("frequency", data=freq)
 
         sc_root = f.create_group("scenarios")
@@ -271,6 +287,8 @@ def save_rt_dataset(path: str | Path, data: dict[str, Any]) -> Path:
                 p_g = c_g.create_group("paths")
                 l = len(paths)
                 p_g.create_dataset("tau_s", data=np.asarray([pp.get("tau_s", 0.0) for pp in paths], dtype=float))
+                p_g.create_dataset("path_length_m", data=np.asarray([pp.get("path_length_m", np.nan) for pp in paths], dtype=float))
+                p_g.create_dataset("segment_count", data=np.asarray([pp.get("segment_count", 0) for pp in paths], dtype=np.int32))
 
                 if l == 0:
                     p_g.create_dataset("A_f", data=np.zeros((0, nf, 2, 2), dtype=np.complex128))
@@ -278,10 +296,15 @@ def save_rt_dataset(path: str | Path, data: dict[str, Any]) -> Path:
                     p_g.create_dataset("G_tx_f", data=np.zeros((0, nf, 2, 2), dtype=np.complex128))
                     p_g.create_dataset("G_rx_f", data=np.zeros((0, nf, 2, 2), dtype=np.complex128))
                     p_g.create_dataset("scalar_gain_f", data=np.zeros((0, nf), dtype=np.float64))
+                    p_g.create_dataset("path_power_A", data=np.zeros((0,), dtype=np.float64))
+                    p_g.create_dataset("path_power_J", data=np.zeros((0,), dtype=np.float64))
                     p_g.create_dataset("bounce_count", data=np.zeros((0,), dtype=np.int32))
                     _write_string_array(p_g, "interactions", [])
                     p_g.create_dataset("surface_ids", data=np.zeros((0, 0), dtype=np.int32))
+                    p_g.create_dataset("material_ids", data=np.zeros((0, 0), dtype=np.int32))
                     p_g.create_dataset("incidence_angles", data=np.zeros((0, 0), dtype=float))
+                    p_g.create_dataset("incidence_angles_deg", data=np.zeros((0, 0), dtype=float))
+                    p_g.create_dataset("reflection_points", data=np.zeros((0, 0, 3), dtype=float))
                     p_g.create_dataset("AoD", data=np.zeros((0, 3), dtype=float))
                     p_g.create_dataset("AoA", data=np.zeros((0, 3), dtype=float))
                     p_g.create_dataset("bounce_normals", data=np.zeros((0, 0, 3), dtype=float))
@@ -308,6 +331,26 @@ def save_rt_dataset(path: str | Path, data: dict[str, Any]) -> Path:
                     "scalar_gain_f",
                     data=np.asarray([pp.get("scalar_gain_f", np.ones(nf, dtype=float)) for pp in paths], dtype=np.float64),
                 )
+                p_g.create_dataset(
+                    "path_power_A",
+                    data=np.asarray(
+                        [
+                            float(np.mean(np.abs(np.asarray(pp.get("A_f", np.zeros((nf, 2, 2), dtype=np.complex128)), dtype=np.complex128)) ** 2))
+                            for pp in paths
+                        ],
+                        dtype=np.float64,
+                    ),
+                )
+                p_g.create_dataset(
+                    "path_power_J",
+                    data=np.asarray(
+                        [
+                            float(np.mean(np.abs(np.asarray(pp.get("J_f", np.zeros((nf, 2, 2), dtype=np.complex128)), dtype=np.complex128)) ** 2))
+                            for pp in paths
+                        ],
+                        dtype=np.float64,
+                    ),
+                )
 
                 p_g.create_dataset(
                     "bounce_count",
@@ -322,19 +365,34 @@ def save_rt_dataset(path: str | Path, data: dict[str, Any]) -> Path:
                 max_sid = max((len(pp.get("meta", {}).get("surface_ids", [])) for pp in paths), default=0)
                 max_ang = max((len(pp.get("meta", {}).get("incidence_angles", [])) for pp in paths), default=0)
                 max_nrm = max((len(pp.get("meta", {}).get("bounce_normals", [])) for pp in paths), default=0)
+                max_ref = max((max(len(pp.get("points", [])) - 2, 0) for pp in paths), default=0)
                 sid = np.full((l, max_sid), -1, dtype=np.int32)
+                mid = np.full((l, max_sid), -1, dtype=np.int32)
                 ang = np.full((l, max_ang), np.nan, dtype=float)
+                ang_deg = np.full((l, max_ang), np.nan, dtype=float)
                 nrm = np.full((l, max_nrm, 3), np.nan, dtype=float)
+                rpts = np.full((l, max_ref, 3), np.nan, dtype=float)
                 for i, pp in enumerate(paths):
                     sv = np.asarray(pp.get("meta", {}).get("surface_ids", []), dtype=np.int32)
+                    mv = np.asarray(pp.get("meta", {}).get("material_ids", sv.tolist()), dtype=np.int32)
                     av = np.asarray(pp.get("meta", {}).get("incidence_angles", []), dtype=float)
                     nv = np.asarray(pp.get("meta", {}).get("bounce_normals", []), dtype=float)
+                    rp = np.asarray(pp.get("points", [])[1:-1], dtype=float)
                     sid[i, : len(sv)] = sv
+                    mid[i, : min(len(mv), sid.shape[1])] = mv[: min(len(mv), sid.shape[1])]
                     ang[i, : len(av)] = av
+                    if len(av):
+                        ang_deg[i, : len(av)] = np.rad2deg(av)
                     if nv.size > 0:
                         nrm[i, : len(nv), :] = nv.reshape(len(nv), 3)
+                    if rp.size > 0:
+                        rp = rp.reshape(-1, 3)
+                        rpts[i, : len(rp), :] = rp
                 p_g.create_dataset("surface_ids", data=sid)
+                p_g.create_dataset("material_ids", data=mid)
                 p_g.create_dataset("incidence_angles", data=ang)
+                p_g.create_dataset("incidence_angles_deg", data=ang_deg)
+                p_g.create_dataset("reflection_points", data=rpts)
                 p_g.create_dataset("bounce_normals", data=nrm)
                 p_g.create_dataset("AoD", data=np.asarray([pp.get("meta", {}).get("AoD", [0.0, 0.0, 0.0]) for pp in paths], dtype=float))
                 p_g.create_dataset("AoA", data=np.asarray([pp.get("meta", {}).get("AoA", [0.0, 0.0, 0.0]) for pp in paths], dtype=float))
@@ -371,6 +429,7 @@ def load_rt_dataset(path: str | Path) -> dict[str, Any]:
                 "seed": _json_loads_safe(seed_json, seed_json),
                 "exact_bounce_defaults_json": exact_json,
                 "exact_bounce_defaults": _json_loads_safe(exact_json, {}),
+                "exact_bounce_applied": bool(meta_g.attrs.get("exact_bounce_applied", True)),
                 "physics_validation_mode": bool(meta_g.attrs.get("physics_validation_mode", False)),
                 "antenna_config_json": antenna_json,
                 "antenna_config": _json_loads_safe(antenna_json, {}),
@@ -392,6 +451,7 @@ def load_rt_dataset(path: str | Path) -> dict[str, Any]:
                 "seed": "",
                 "exact_bounce_defaults_json": "{}",
                 "exact_bounce_defaults": {},
+                "exact_bounce_applied": True,
                 "physics_validation_mode": False,
                 "antenna_config_json": "{}",
                 "antenna_config": {},
@@ -399,7 +459,10 @@ def load_rt_dataset(path: str | Path) -> dict[str, Any]:
                 "git_diff": "",
             }
 
-        out["frequency"] = np.asarray(f["frequency"][:], dtype=float)
+        if "freq" in f and "f" in f["freq"]:
+            out["frequency"] = np.asarray(f["freq"]["f"][:], dtype=float)
+        else:
+            out["frequency"] = np.asarray(f["frequency"][:], dtype=float)
         nf = len(out["frequency"])
 
         for scenario_id, sc_g in f["scenarios"].items():
@@ -410,6 +473,8 @@ def load_rt_dataset(path: str | Path) -> dict[str, Any]:
 
                 tau = _read_dataset_or_default(p_g, "tau_s", float, np.zeros((0,), dtype=float))
                 l = len(tau)
+                plen = _read_dataset_or_default(p_g, "path_length_m", float, np.full((l,), np.nan, dtype=float))
+                segc = _read_dataset_or_default(p_g, "segment_count", int, np.zeros((l,), dtype=np.int32))
                 af = _read_dataset_or_default(p_g, "A_f", np.complex128, np.zeros((l, nf, 2, 2), dtype=np.complex128))
                 jf = _read_dataset_or_default(p_g, "J_f", np.complex128, np.zeros((l, nf, 2, 2), dtype=np.complex128))
                 gtx = _read_dataset_or_default(p_g, "G_tx_f", np.complex128, _default_identity_stack(l, nf))
@@ -423,7 +488,10 @@ def load_rt_dataset(path: str | Path) -> dict[str, Any]:
                     inter_raw = [""] * l
 
                 sid = _read_dataset_or_default(p_g, "surface_ids", int, np.full((l, 0), -1, dtype=np.int32))
+                mid = _read_dataset_or_default(p_g, "material_ids", int, np.full((l, 0), -1, dtype=np.int32))
                 ang = _read_dataset_or_default(p_g, "incidence_angles", float, np.full((l, 0), np.nan, dtype=float))
+                ang_deg = _read_dataset_or_default(p_g, "incidence_angles_deg", float, np.full((l, 0), np.nan, dtype=float))
+                rpts = _read_dataset_or_default(p_g, "reflection_points", float, np.full((l, 0, 3), np.nan, dtype=float))
                 nrm = _read_dataset_or_default(p_g, "bounce_normals", float, np.full((l, 0, 3), np.nan, dtype=float))
                 aod = _read_dataset_or_default(p_g, "AoD", float, np.zeros((l, 3), dtype=float))
                 aoa = _read_dataset_or_default(p_g, "AoA", float, np.zeros((l, 3), dtype=float))
@@ -435,11 +503,19 @@ def load_rt_dataset(path: str | Path) -> dict[str, Any]:
                 paths = []
                 for i in range(l):
                     sids = [int(x) for x in np.asarray(sid[i]).tolist() if x >= 0]
+                    mids = [int(x) for x in np.asarray(mid[i]).tolist() if x >= 0]
                     angs = [float(x) for x in np.asarray(ang[i]).tolist() if np.isfinite(x)]
+                    if not angs:
+                        ang_deg_i = [float(x) for x in np.asarray(ang_deg[i]).tolist() if np.isfinite(x)]
+                        angs = [float(np.deg2rad(x)) for x in ang_deg_i]
                     nrms = [list(map(float, row)) for row in np.asarray(nrm[i], dtype=float).tolist() if np.all(np.isfinite(row))]
+                    ref_pts = [list(map(float, row)) for row in np.asarray(rpts[i], dtype=float).tolist() if np.all(np.isfinite(row))]
                     paths.append(
                         {
                             "tau_s": float(tau[i]),
+                            "path_length_m": float(plen[i]) if np.isfinite(plen[i]) else float(tau[i]) * 299_792_458.0,
+                            "segment_count": int(segc[i]) if int(segc[i]) > 0 else int(bc[i]) + 1,
+                            "reflection_points": ref_pts,
                             "A_f": af[i],
                             "J_f": jf[i],
                             "G_tx_f": gtx[i],
@@ -449,7 +525,9 @@ def load_rt_dataset(path: str | Path) -> dict[str, Any]:
                                 "bounce_count": int(bc[i]),
                                 "interactions": [z for z in inter_raw[i].split("|") if z],
                                 "surface_ids": sids,
+                                "material_ids": mids if mids else sids,
                                 "incidence_angles": angs,
+                                "incidence_angles_deg": [float(np.rad2deg(a)) for a in angs],
                                 "bounce_normals": nrms,
                                 "AoD": np.asarray(aod[i], dtype=float).tolist(),
                                 "AoA": np.asarray(aoa[i], dtype=float).tolist(),
@@ -499,7 +577,57 @@ def self_test_meta_roundtrip(path: str | Path, expected_meta: dict[str, Any] | N
                     return False
                 if np.asarray(p.get("scalar_gain_f", np.zeros((0,)))).shape != (nf,):
                     return False
+    # Hash/compare roundtrip determinism check (excluding timestamps that are not part of META_COMPARE_KEYS).
+    try:
+        h0 = _dataset_fingerprint(loaded)
+        tmp = Path(path).with_suffix(".meta_roundtrip.h5")
+        save_rt_dataset(tmp, loaded)
+        loaded2 = load_rt_dataset(tmp)
+        h1 = _dataset_fingerprint(loaded2)
+        if h0 != h1:
+            return False
+    except Exception:
+        return False
     return True
+
+
+def _hash_update_array(h: "hashlib._Hash", name: str, arr: np.ndarray) -> None:
+    a = np.ascontiguousarray(arr)
+    h.update(name.encode("utf-8"))
+    h.update(str(a.shape).encode("utf-8"))
+    h.update(str(a.dtype).encode("utf-8"))
+    h.update(memoryview(a.view(np.uint8)))
+
+
+def _dataset_fingerprint(data: dict[str, Any]) -> str:
+    h = hashlib.sha256()
+    meta = _normalize_meta_for_compare(data.get("meta", {}), default_schema_version=SCHEMA_VERSION)
+    meta_slim = {k: meta.get(k) for k in META_COMPARE_KEYS}
+    h.update(_json_dumps_canonical(meta_slim).encode("utf-8"))
+    freq = np.asarray(data.get("frequency", []), dtype=np.float64)
+    _hash_update_array(h, "frequency", freq)
+    scenarios = data.get("scenarios", {})
+    for sid in sorted(scenarios.keys()):
+        h.update(f"scenario:{sid}".encode("utf-8"))
+        cases = scenarios[sid].get("cases", {})
+        for cid in sorted(cases.keys(), key=lambda x: (len(str(x)), str(x))):
+            h.update(f"case:{cid}".encode("utf-8"))
+            case = cases[cid]
+            h.update(_json_dumps_canonical(case.get("params", {})).encode("utf-8"))
+            for i, p in enumerate(case.get("paths", [])):
+                h.update(f"path:{i}".encode("utf-8"))
+                _hash_update_array(h, "tau_s", np.asarray([float(p.get("tau_s", 0.0))], dtype=np.float64))
+                _hash_update_array(h, "path_length_m", np.asarray([float(p.get("path_length_m", np.nan))], dtype=np.float64))
+                _hash_update_array(h, "A_f", np.asarray(p.get("A_f", np.zeros((0, 2, 2))), dtype=np.complex128))
+                _hash_update_array(h, "J_f", np.asarray(p.get("J_f", np.zeros((0, 2, 2))), dtype=np.complex128))
+                _hash_update_array(h, "G_tx_f", np.asarray(p.get("G_tx_f", np.zeros((0, 2, 2))), dtype=np.complex128))
+                _hash_update_array(h, "G_rx_f", np.asarray(p.get("G_rx_f", np.zeros((0, 2, 2))), dtype=np.complex128))
+                _hash_update_array(h, "scalar_gain_f", np.asarray(p.get("scalar_gain_f", np.zeros((0,))), dtype=np.float64))
+                meta_p = p.get("meta", {})
+                h.update(_json_dumps_canonical(meta_p).encode("utf-8"))
+                if "reflection_points" in p:
+                    _hash_update_array(h, "reflection_points", np.asarray(p["reflection_points"], dtype=np.float64))
+    return h.hexdigest()
 
 
 def self_test_reproducibility(path: str | Path, scenario_id: str, case_id: str, atol: float = 1e-9) -> bool:

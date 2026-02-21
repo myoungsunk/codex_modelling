@@ -9,7 +9,7 @@ from pathlib import Path
 import h5py
 import numpy as np
 
-from rt_io.hdf5_io import load_rt_dataset, save_rt_dataset
+from rt_io.hdf5_io import V2_REQUIRED_META_ATTRS, load_rt_dataset, save_rt_dataset
 from scenarios.runner import build_quality_report
 
 
@@ -34,12 +34,13 @@ class ProvenanceMetadataTests(unittest.TestCase):
             save_rt_dataset(p, data)
             with h5py.File(p, "r") as f:
                 m = f["meta"].attrs
-                self.assertIn("git_commit", m)
-                self.assertIn("git_dirty", m)
-                self.assertIn("cmdline", m)
-                self.assertIn("seed", m)
+                for k in V2_REQUIRED_META_ATTRS:
+                    self.assertIn(k, m)
+                    if k in {"git_dirty", "release_mode", "exact_bounce_applied", "physics_validation_mode"}:
+                        continue
+                    self.assertTrue(str(m[k]) != "", k)
                 self.assertIn("git_diff", m)
-                self.assertIn("release_mode", m)
+                self.assertIn("seed", m)
             loaded = load_rt_dataset(p)
             self.assertEqual(str(loaded["meta"]["git_commit"]), "abc123")
             self.assertFalse(bool(loaded["meta"]["git_dirty"]))
@@ -72,4 +73,3 @@ class ProvenanceMetadataTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

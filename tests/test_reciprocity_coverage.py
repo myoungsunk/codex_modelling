@@ -28,7 +28,7 @@ class ReciprocityCoverageTests(unittest.TestCase):
             matrix_source="J",
             scenario_ids=None,
             tau_tol_s=1e-12,
-            sigma_tol_db=1e-6,
+            sigma_tol_db=1e-9,
             require_bidirectional_paths=True,
         )
 
@@ -46,8 +46,8 @@ class ReciprocityCoverageTests(unittest.TestCase):
             self.assertGreater(int(entry.get("n_reverse", 0)), 0, ctx)
             self.assertEqual(int(entry.get("n_forward", 0)), int(entry.get("n_reverse", 0)), ctx)
             self.assertLessEqual(float(entry.get("delta_tau_max_s", 0.0)), 1e-12 + 1e-18, ctx)
-            self.assertLessEqual(float(entry.get("delta_sigma_max_db", 0.0)), 1e-6 + 1e-12, ctx)
-            self.assertLessEqual(float(entry.get("delta_fro_max_db", 0.0)), 1e-6 + 1e-12, ctx)
+            self.assertLessEqual(float(entry.get("delta_sigma_max_db", 0.0)), 1e-9 + 1e-12, ctx)
+            self.assertLessEqual(float(entry.get("delta_fro_max_db", 0.0)), 1e-9 + 1e-12, ctx)
 
 
 if __name__ == "__main__":

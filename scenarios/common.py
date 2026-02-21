@@ -51,6 +51,8 @@ def paths_to_records(paths: list) -> list[dict]:
         rec.append(
             {
                 "tau_s": p.tau_s,
+                "path_length_m": float(p.path_length_m),
+                "segment_count": int(p.segment_count),
                 "A_f": p.A_f,
                 "J_f": p.J_f,
                 "scalar_gain_f": p.scalar_gain_f,

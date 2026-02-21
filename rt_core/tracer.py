@@ -29,6 +29,8 @@ from rt_core.polarization import DepolConfig, apply_depol, basis_change, depol_m
 @dataclass
 class PathResult:
     tau_s: float
+    path_length_m: float
+    segment_count: int
     A_f: NDArray[np.complex128]  # (Nf,2,2)
     J_f: NDArray[np.complex128]  # (Nf,2,2), propagation-only before antenna and FSPL
     scalar_gain_f: NDArray[np.float64]  # (Nf,)
@@ -50,6 +52,8 @@ class PathResult:
 
     def meta_dict(self) -> dict:
         return {
+            "path_length_m": float(self.path_length_m),
+            "segment_count": int(self.segment_count),
             "bounce_count": self.bounce_count,
             "interactions": self.interactions,
             "surface_ids": self.surface_ids,
@@ -340,6 +344,8 @@ def trace_paths(
             results.append(
                 PathResult(
                     tau_s=tau,
+                    path_length_m=float(total_len),
+                    segment_count=int(len(points) - 1),
                     A_f=A,
                     J_f=J.copy(),
                     scalar_gain_f=scalar_gain_f.astype(float),
