@@ -426,6 +426,41 @@ def _fit_normal_model(v: NDArray[np.float64]) -> dict[str, Any]:
     return {"status": "OK", "params": {"mu": mu, "sigma": sigma}, "k": 2, "loglik": ll}
 
 
+def _fit_lognormal_linear_model(v_db: NDArray[np.float64]) -> dict[str, Any]:
+    """Fit lognormal in linear XPD, where input samples are in dB."""
+
+    if len(v_db) == 0:
+        return {"status": "FAIL", "warning": "empty data", "params": {}, "k": 2, "loglik": -np.inf}
+    x = np.power(10.0, np.asarray(v_db, dtype=float) / 10.0)
+    x = x[np.isfinite(x) & (x > 0.0)]
+    if len(x) == 0:
+        return {"status": "FAIL", "warning": "non-positive linear data", "params": {}, "k": 2, "loglik": -np.inf}
+    y = np.log(x)
+    mu_ln = float(np.mean(y))
+    sigma_ln = _safe_std(y)
+    if sigma_ln <= 0.0 or not np.isfinite(mu_ln):
+        return {"status": "FAIL", "warning": "degenerate sigma", "params": {}, "k": 2, "loglik": -np.inf}
+    # p(v_db)=p(x)*|dx/dv_db|, x=10^(v_db/10)
+    # Include Jacobian for a proper log-likelihood in dB domain.
+    jac = (np.log(10.0) / 10.0) * x
+    ll = float(
+        np.sum(
+            stats.lognorm.logpdf(
+                x,
+                s=max(sigma_ln, 1e-9),
+                scale=np.exp(mu_ln),
+            )
+            + np.log(np.maximum(jac, EPS))
+        )
+    )
+    return {
+        "status": "OK",
+        "params": {"mu_ln": mu_ln, "sigma_ln": sigma_ln},
+        "k": 2,
+        "loglik": ll,
+    }
+
+
 def _fit_gmm2_model(v: NDArray[np.float64], seed: int = 0, restarts: int = 4, max_iter: int = 200) -> dict[str, Any]:
     if len(v) < 4:
         return {"status": "FAIL", "warning": "insufficient samples for gmm2", "params": {}, "k": 5, "loglik": -np.inf}
@@ -596,6 +631,13 @@ def _model_cdf(model: str, x: NDArray[np.float64], params: dict[str, float]) -> 
     xv = np.asarray(x, dtype=float)
     if model == "normal_db":
         return stats.norm.cdf(xv, loc=float(params["mu"]), scale=max(float(params["sigma"]), 1e-9))
+    if model == "lognormal_linear":
+        xl = np.power(10.0, xv / 10.0)
+        return stats.lognorm.cdf(
+            np.maximum(xl, 1e-300),
+            s=max(float(params["sigma_ln"]), 1e-9),
+            scale=np.exp(float(params["mu_ln"])),
+        )
     if model == "gmm2_db":
         w = float(params["weight"])
         c1 = stats.norm.cdf(xv, loc=float(params["mu1"]), scale=max(float(params["sigma1"]), 1e-9))
@@ -625,6 +667,14 @@ def _model_cdf(model: str, x: NDArray[np.float64], params: dict[str, float]) -> 
 def _model_sample(model: str, n: int, params: dict[str, float], rng: np.random.Generator) -> NDArray[np.float64]:
     if model == "normal_db":
         return rng.normal(float(params["mu"]), max(float(params["sigma"]), 1e-9), size=n).astype(float)
+    if model == "lognormal_linear":
+        x = stats.lognorm.rvs(
+            s=max(float(params["sigma_ln"]), 1e-9),
+            scale=np.exp(float(params["mu_ln"])),
+            size=n,
+            random_state=rng,
+        )
+        return (10.0 * np.log10(np.maximum(np.asarray(x, dtype=float), 1e-300))).astype(float)
     if model == "gmm2_db":
         w = float(params["weight"])
         m = rng.random(n) < w
@@ -679,6 +729,13 @@ def model_quantiles_db(model: str, params: dict[str, float], probs: NDArray[np.f
     q = np.clip(q, 1e-6, 1.0 - 1e-6)
     if model == "normal_db":
         return stats.norm.ppf(q, loc=float(params["mu"]), scale=max(float(params["sigma"]), 1e-9))
+    if model == "lognormal_linear":
+        x = stats.lognorm.ppf(
+            q,
+            s=max(float(params["sigma_ln"]), 1e-9),
+            scale=np.exp(float(params["mu_ln"])),
+        )
+        return 10.0 * np.log10(np.maximum(np.asarray(x, dtype=float), 1e-300))
     if model == "gmm2_db":
         lo = float(min(params["mu1"] - 8.0 * params["sigma1"], params["mu2"] - 8.0 * params["sigma2"]))
         hi = float(max(params["mu1"] + 8.0 * params["sigma1"], params["mu2"] + 8.0 * params["sigma2"]))
@@ -734,6 +791,8 @@ def _fit_candidate_model(
 ) -> dict[str, Any]:
     if model == "normal_db":
         return _fit_normal_model(values_db)
+    if model == "lognormal_linear":
+        return _fit_lognormal_linear_model(values_db)
     if model == "gmm2_db":
         return _fit_gmm2_model(values_db, seed=seed)
     if model == "truncnorm_db":
@@ -947,7 +1006,7 @@ def gof_model_selection_db(
             "gof_continuous": {"ks_p_boot": np.nan, "qq_r": np.nan},
         }
 
-    candidates = ["normal_db", "gmm2_db", "truncnorm_db", "spike_slab_db"]
+    candidates = ["normal_db", "lognormal_linear", "gmm2_db", "truncnorm_db", "spike_slab_db"]
     model_stats: dict[str, dict[str, Any]] = {}
     for i, model in enumerate(candidates):
         fit = _fit_candidate_model(model, v_fit, seed=seed + i * 13, floor_db=floor_db)

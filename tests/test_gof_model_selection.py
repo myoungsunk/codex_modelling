@@ -10,6 +10,15 @@ from analysis.xpd_stats import gof_model_selection_db
 
 
 class GOFModelSelectionTests(unittest.TestCase):
+    def test_lognormal_linear_candidate_is_available(self) -> None:
+        rng = np.random.default_rng(101)
+        x_lin = rng.lognormal(mean=np.log(10.0), sigma=0.35, size=800)
+        vals_db = 10.0 * np.log10(x_lin)
+        res = gof_model_selection_db(vals_db, min_n=200, bootstrap_B=20, seed=3)
+
+        self.assertIn("lognormal_linear", dict(res.get("models", {})))
+        self.assertIn(str(res.get("best_model", "")), {"normal_db", "lognormal_linear", "gmm2_db", "truncnorm_db", "spike_slab_db"})
+
     def test_selects_alternative_for_mixture_data(self) -> None:
         rng = np.random.default_rng(123)
         x1 = rng.normal(20.0, 1.0, size=320)

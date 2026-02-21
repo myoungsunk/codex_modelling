@@ -18,6 +18,11 @@ from typing import Any
 import numpy as np
 
 from analysis.reciprocity import reciprocity_sanity
+from analysis.measurement_compare import (
+    compare_measured_to_dataset,
+    load_measurement_four_csv,
+    load_measurement_matrix_csv,
+)
 from analysis.tap_path_consistency import (
     build_min_repro_bundle,
     evaluate_dataset_tap_path_consistency,
@@ -514,6 +519,7 @@ def build_quality_report(
     model_metrics: dict[str, Any] | None = None,
     reciprocity_metrics: dict[str, Any] | None = None,
     tap_path_metrics: dict[str, Any] | None = None,
+    measurement_metrics: dict[str, Any] | None = None,
 ) -> Path:
     lines = ["# RT Validation Report", ""]
     basis_now = str(data.get("meta", {}).get("basis", "NA"))
@@ -1104,6 +1110,46 @@ def build_quality_report(
                 )
         lines.append("")
 
+    if measurement_metrics is not None:
+        lines.append("## Measurement Compare (Step5)")
+        lines.append("")
+        lines.append(f"- channel_definition: {measurement_metrics.get('channel_definition', 'NA')}")
+        lines.append(f"- matrix_source: {measurement_metrics.get('matrix_source', 'NA')}")
+        lines.append(
+            f"- selected_case: {measurement_metrics.get('scenario_id', 'NA')}/{measurement_metrics.get('case_id', 'NA')}"
+        )
+        lines.append(f"- measurement_source: {measurement_metrics.get('measurement_source', 'NA')}")
+        lines.append(
+            f"- frequency_counts(meas,rt): {int(measurement_metrics.get('measurement_freq_count', 0))}, "
+            f"{int(measurement_metrics.get('rt_freq_count', 0))}"
+        )
+        lines.append(
+            f"- basis/convention(meas->eval): "
+            f"{measurement_metrics.get('measurement_basis', 'NA')}/{measurement_metrics.get('measurement_convention', 'NA')} "
+            f"-> {measurement_metrics.get('eval_basis', 'NA')}/{measurement_metrics.get('eval_convention', 'NA')}"
+        )
+        lines.append(
+            f"- rmse_mag_db(meas_vs_rt): {float(measurement_metrics.get('rmse_mag_db_meas_vs_rt', np.nan)):.3f}"
+        )
+        lines.append(
+            f"- rmse_mag_db(meas_vs_synth): {float(measurement_metrics.get('rmse_mag_db_meas_vs_synth', np.nan)):.3f}"
+        )
+        lines.append(
+            f"- xpd_mu_db(meas,rt,synth): {float(measurement_metrics.get('xpd_mu_measured_db', np.nan)):.3f}, "
+            f"{float(measurement_metrics.get('xpd_mu_rt_db', np.nan)):.3f}, "
+            f"{float(measurement_metrics.get('xpd_mu_synth_db', np.nan)):.3f}"
+        )
+        lines.append(
+            f"- xpd_ks2_p(meas_vs_rt): {float(measurement_metrics.get('xpd_ks2_p_meas_vs_rt', np.nan)):.4f}"
+        )
+        lines.append(
+            f"- xpd_ks2_p(meas_vs_synth): {float(measurement_metrics.get('xpd_ks2_p_meas_vs_synth', np.nan)):.4f}"
+        )
+        plots = measurement_metrics.get("plots", {}) or {}
+        for k, v in sorted(plots.items()):
+            lines.append(f"- plot_{k}: {v}")
+        lines.append("")
+
     lines.append("## Measurement Bridge (G2)")
     lines.append("")
     lines.append(f"- current_basis: {basis_now}")
@@ -1242,6 +1288,26 @@ def main() -> None:
     parser.add_argument("--model-phase-keep-common", action="store_true")
     parser.add_argument("--model-phase-all-freq-samples", action="store_true")
     parser.add_argument("--model-seed", type=int, default=0)
+    parser.add_argument("--measurement-compare", action="store_true")
+    parser.add_argument("--measurement-format", type=str, default="matrix_csv", choices=["matrix_csv", "four_csv"])
+    parser.add_argument("--measurement-matrix-csv", type=str, default=None)
+    parser.add_argument("--measurement-hh-csv", type=str, default=None)
+    parser.add_argument("--measurement-hv-csv", type=str, default=None)
+    parser.add_argument("--measurement-vh-csv", type=str, default=None)
+    parser.add_argument("--measurement-vv-csv", type=str, default=None)
+    parser.add_argument("--measurement-scenario", type=str, default=None)
+    parser.add_argument("--measurement-case", type=str, default=None)
+    parser.add_argument(
+        "--measurement-channel-definition",
+        type=str,
+        default="embedded",
+        choices=["embedded", "propagation"],
+    )
+    parser.add_argument("--measurement-basis", type=str, default=None, choices=["linear", "circular"])
+    parser.add_argument("--measurement-convention", type=str, default=None)
+    parser.add_argument("--measurement-eval-basis", type=str, default=None, choices=["linear", "circular"])
+    parser.add_argument("--measurement-eval-convention", type=str, default=None)
+    parser.add_argument("--measurement-plots-dir", type=str, default=None)
     parser.add_argument("--release-mode", action="store_true")
     parser.add_argument("--reciprocity-scenarios", type=str, default="all")
     parser.add_argument("--reciprocity-tau-tol-s", type=float, default=1e-12)
@@ -1363,6 +1429,7 @@ def main() -> None:
             raise SystemExit("HDF5 meta roundtrip self-test failed: saved artifact is not reproducible.")
         generate_all_plots(data, out_dir=out_plot, config=plot_config, exact_bounce_map=DEFAULT_EXACT_BOUNCE)
         model_metrics = None
+        model_res: dict[str, Any] | None = None
         if args.model_compare:
             model_num_paths_mode = str(args.model_num_paths_mode)
             if bool(args.release_mode) and model_num_paths_mode == "match_rt_total":
@@ -1400,6 +1467,48 @@ def main() -> None:
                 if k not in model_metrics:
                     model_metrics[k] = v
 
+        measurement_metrics = None
+        if bool(args.measurement_compare):
+            if args.measurement_format == "matrix_csv":
+                if not args.measurement_matrix_csv:
+                    raise SystemExit("--measurement-matrix-csv is required when --measurement-format matrix_csv")
+                measurement = load_measurement_matrix_csv(args.measurement_matrix_csv)
+            else:
+                req = [args.measurement_hh_csv, args.measurement_hv_csv, args.measurement_vh_csv, args.measurement_vv_csv]
+                if any(x is None for x in req):
+                    raise SystemExit(
+                        "--measurement-hh-csv/--measurement-hv-csv/--measurement-vh-csv/--measurement-vv-csv are required "
+                        "when --measurement-format four_csv"
+                    )
+                measurement = load_measurement_four_csv(
+                    args.measurement_hh_csv,
+                    args.measurement_hv_csv,
+                    args.measurement_vh_csv,
+                    args.measurement_vv_csv,
+                )
+            if args.measurement_plots_dir:
+                meas_plot_dir = _basis_output_dir(args.measurement_plots_dir, b, multi)
+            else:
+                meas_plot_dir = _basis_output_dir(Path(out_plot) / "measurement_compare", b, multi=False)
+
+            synth_paths = None
+            if model_res is not None:
+                synth_paths = model_res.get("synthetic_paths")
+            measurement_metrics = compare_measured_to_dataset(
+                dataset=data,
+                measurement=measurement,
+                channel_definition=str(args.measurement_channel_definition),
+                scenario_id=args.measurement_scenario,
+                case_id=args.measurement_case,
+                measurement_basis=args.measurement_basis,
+                measurement_convention=args.measurement_convention,
+                eval_basis=args.measurement_eval_basis or b,
+                eval_convention=args.measurement_eval_convention or args.convention,
+                synth_paths=synth_paths,
+                out_dir=meas_plot_dir,
+                create_plots=True,
+            )
+
         report_path = build_quality_report(
             data,
             out_rep,
@@ -1407,6 +1516,7 @@ def main() -> None:
             model_metrics=model_metrics,
             reciprocity_metrics=reciprocity_metrics,
             tap_path_metrics=tap_path_metrics,
+            measurement_metrics=measurement_metrics,
         )
         gate_summary = parse_hard_gate_summary(report_path)
         hard_fail_count = int(gate_summary.get("hard_fail_count", 0)) if isinstance(gate_summary, dict) else 0

@@ -2,7 +2,7 @@
 
 - basis: circular
 - convention: IEEE-RHCP
-- git_commit: f6d242076a161a76f3d64432130df0850fafc4e5
+- git_commit: fc2eac2037b00c632022506f9271d18ffc3a8645
 - git_dirty: False
 - release_mode: True
 - cmdline: /Users/kimmyoungsun/Documents/codex/scenarios/runner.py --basis circular --xpd-matrix-source J --physics-validation-mode --release-mode --model-compare --output outputs/rt_dataset_canonical_release.h5 --plots-dir outputs/plots_canonical_release --report outputs/report_canonical_release.md --nf 1024
@@ -15,6 +15,23 @@
 - physics_validation_mode: True
 - predicted_leakage_floor_db: 300.000 (eps_tx=0.00000, eps_rx=0.00000)
 - model_compare_enabled: True
+
+## Reproducibility & Provenance
+
+- schema_version: v2
+- git_commit: fc2eac2037b00c632022506f9271d18ffc3a8645
+- git_dirty: False
+- release_mode: True
+- cmdline: /Users/kimmyoungsun/Documents/codex/scenarios/runner.py --basis circular --xpd-matrix-source J --physics-validation-mode --release-mode --model-compare --output outputs/rt_dataset_canonical_release.h5 --plots-dir outputs/plots_canonical_release --report outputs/report_canonical_release.md --nf 1024
+- seed_json: {"model_seed":0}
+- basis: circular
+- convention: IEEE-RHCP
+- xpd_matrix_source: J
+- exact_bounce_defaults: {'A2': 1, 'A2R': 1, 'A3': 2, 'A3R': 2, 'A4': 1}
+- exact_bounce_applied: True
+- antenna_config: {'convention': 'IEEE-RHCP', 'tx_cross_pol_leakage_db': 120.0, 'rx_cross_pol_leakage_db': 120.0, 'tx_axial_ratio_db': 0.0, 'rx_axial_ratio_db': 0.0, 'enable_coupling': False}
+- physics_validation_mode: True
+- meta_roundtrip: True
 
 ## C0
 

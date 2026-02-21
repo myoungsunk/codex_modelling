@@ -26,3 +26,10 @@ make canonical_release
 ## Measurement Bridge
 
 - See `docs/measurement_bridge.md` for `A_f` vs `J_f` comparison rules and measurement mismatch diagnosis order.
+- Optional measurement compare mode (off by default):
+```bash
+python -m scenarios.runner \
+  --measurement-compare \
+  --measurement-format matrix_csv \
+  --measurement-matrix-csv /path/to/measured_2x2.csv
+```
