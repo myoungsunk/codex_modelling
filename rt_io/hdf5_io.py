@@ -365,7 +365,12 @@ def save_rt_dataset(path: str | Path, data: dict[str, Any]) -> Path:
                 max_sid = max((len(pp.get("meta", {}).get("surface_ids", [])) for pp in paths), default=0)
                 max_ang = max((len(pp.get("meta", {}).get("incidence_angles", [])) for pp in paths), default=0)
                 max_nrm = max((len(pp.get("meta", {}).get("bounce_normals", [])) for pp in paths), default=0)
-                max_ref = max((max(len(pp.get("points", [])) - 2, 0) for pp in paths), default=0)
+                def _ref_points(pp: dict[str, Any]) -> np.ndarray:
+                    if "reflection_points" in pp:
+                        return np.asarray(pp.get("reflection_points", []), dtype=float)
+                    return np.asarray(pp.get("points", [])[1:-1], dtype=float)
+
+                max_ref = max((len(_ref_points(pp)) for pp in paths), default=0)
                 sid = np.full((l, max_sid), -1, dtype=np.int32)
                 mid = np.full((l, max_sid), -1, dtype=np.int32)
                 ang = np.full((l, max_ang), np.nan, dtype=float)
@@ -377,7 +382,7 @@ def save_rt_dataset(path: str | Path, data: dict[str, Any]) -> Path:
                     mv = np.asarray(pp.get("meta", {}).get("material_ids", sv.tolist()), dtype=np.int32)
                     av = np.asarray(pp.get("meta", {}).get("incidence_angles", []), dtype=float)
                     nv = np.asarray(pp.get("meta", {}).get("bounce_normals", []), dtype=float)
-                    rp = np.asarray(pp.get("points", [])[1:-1], dtype=float)
+                    rp = _ref_points(pp)
                     sid[i, : len(sv)] = sv
                     mid[i, : min(len(mv), sid.shape[1])] = mv[: min(len(mv), sid.shape[1])]
                     ang[i, : len(av)] = av
