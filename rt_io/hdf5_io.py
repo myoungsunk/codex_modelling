@@ -479,7 +479,7 @@ def self_test_meta_roundtrip(path: str | Path, expected_meta: dict[str, Any] | N
         if missing:
             return False
     if expected_meta is not None:
-        exp = _normalize_meta_for_compare(expected_meta)
+        exp = _normalize_meta_for_compare(expected_meta, default_schema_version=SCHEMA_VERSION)
         for k in META_COMPARE_KEYS:
             if exp.get(k) != meta_loaded.get(k):
                 return False
