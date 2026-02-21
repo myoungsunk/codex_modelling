@@ -1,0 +1,1264 @@
+# RT Validation Report
+
+- basis: circular
+- convention: IEEE-RHCP
+- git_commit: f6d242076a161a76f3d64432130df0850fafc4e5
+- git_dirty: False
+- release_mode: True
+- cmdline: /Users/kimmyoungsun/Documents/codex/scenarios/runner.py --basis circular --xpd-matrix-source J --physics-validation-mode --release-mode --model-compare --output outputs/rt_dataset_canonical_release.h5 --plots-dir outputs/plots_canonical_release --report outputs/report_canonical_release.md --nf 1024
+- seed: {'model_seed': 0}
+- git_clean_check: PASS (git_dirty=False)
+- xpd_matrix_source: J
+- exact_bounce_defaults: {'A2': 1, 'A2R': 1, 'A3': 2, 'A3R': 2, 'A4': 1}
+- report_exact_bounce_applied: True (scenario-specific default map)
+- antenna_config: {'convention': 'IEEE-RHCP', 'tx_cross_pol_leakage_db': 120.0, 'rx_cross_pol_leakage_db': 120.0, 'tx_axial_ratio_db': 0.0, 'rx_axial_ratio_db': 0.0, 'enable_coupling': False}
+- physics_validation_mode: True
+- predicted_leakage_floor_db: 300.000 (eps_tx=0.00000, eps_rx=0.00000)
+- model_compare_enabled: True
+
+## C0
+
+- case 0: paths=1, bounce_dist={0: 1}
+- strongest path: tau=1.001e-08s, power=5.000e-01
+- LOS exists: True
+- case 1: paths=1, bounce_dist={0: 1}
+- strongest path: tau=2.001e-08s, power=5.000e-01
+- LOS exists: True
+- case 2: paths=1, bounce_dist={0: 1}
+- strongest path: tau=3.002e-08s, power=5.000e-01
+- LOS exists: True
+- avg_paths_per_case: 1.00 (cases=3)
+- WARNING: low path count per case; statistics may be unstable (single-path dominance likely).
+- cir_peak_match_ratio: 3/3
+- cir_peak_match_skipped_overlap_cases: 0
+- delay_ambiguity_period_ns: 255.750
+- wrap_detected_cases: 0
+- pdp_sum_consistency_max_abs: 0.000e+00
+- parity XPD stats (exact_bounce=None): {'even': {'mu': 123.00595918184662, 'sigma': 0.0, 'n': 3}}
+- leakage-limited check: median_xpd_db=123.006, sigma_db=0.000, delta_to_floor_db=176.994, floor_db=300.000
+- GOF[parity] (min_n=20, bootstrap_B=200):
+-   even: INSUFFICIENT (n=3, n_fit=3)
+-   censoring: floor_ratio=0.000, pinned_ratio=1.000, point_mass_ratio=0.000, point_mass_kind=right_censored_or_upper_spike
+-   WARNING: GOF skipped for parity=even due to insufficient samples.
+- GOF[material] (min_n=20, bootstrap_B=200):
+-   NA: INSUFFICIENT (n=3, n_fit=3)
+-   censoring: floor_ratio=0.000, pinned_ratio=1.000, point_mass_ratio=0.000, point_mass_kind=right_censored_or_upper_spike
+-   WARNING: GOF skipped for material=NA due to insufficient samples.
+- GOF[incidence_angle_bin] (min_n=20, bootstrap_B=200):
+-   NA: INSUFFICIENT (n=3, n_fit=3)
+-   censoring: floor_ratio=0.000, pinned_ratio=1.000, point_mass_ratio=0.000, point_mass_kind=right_censored_or_upper_spike
+-   WARNING: GOF skipped for incidence_angle_bin=NA due to insufficient samples.
+- GOF[delay_bin] (min_n=20, bootstrap_B=200):
+-   early: INSUFFICIENT (n=2, n_fit=2)
+-   censoring: floor_ratio=0.000, pinned_ratio=1.000, point_mass_ratio=0.000, point_mass_kind=right_censored_or_upper_spike
+-   WARNING: GOF skipped for delay_bin=early due to insufficient samples.
+-   late: INSUFFICIENT (n=1, n_fit=1)
+-   censoring: floor_ratio=0.000, pinned_ratio=1.000, point_mass_ratio=0.000, point_mass_kind=right_censored_or_upper_spike
+-   WARNING: GOF skipped for delay_bin=late due to insufficient samples.
+- early_late_xpd_mu_db: early=123.006, late=123.006, split_tau_s=2.001e-08
+- NOTE: early<=late observed (environment-dependent); do not over-claim early-tap advantage.
+- subband_mu_span_db: 0.000
+- NOTE: weak subband variation observed (may be physically weak frequency dependence).
+
+## A1
+
+- case 0: paths=1, bounce_dist={0: 1}
+- strongest path: tau=1.336e-08s, power=5.000e-01
+- LOS exists: True
+- case 1: paths=1, bounce_dist={0: 1}
+- strongest path: tau=2.002e-08s, power=5.000e-01
+- LOS exists: True
+- case 2: paths=1, bounce_dist={0: 1}
+- strongest path: tau=2.669e-08s, power=5.000e-01
+- LOS exists: True
+- avg_paths_per_case: 1.00 (cases=3)
+- WARNING: low path count per case; statistics may be unstable (single-path dominance likely).
+- cir_peak_match_ratio: 3/3
+- cir_peak_match_skipped_overlap_cases: 0
+- delay_ambiguity_period_ns: 255.750
+- wrap_detected_cases: 0
+- pdp_sum_consistency_max_abs: 0.000e+00
+- parity XPD stats (exact_bounce=None): {'even': {'mu': 123.00595918184662, 'sigma': 0.0, 'n': 3}}
+- leakage-limited check: median_xpd_db=123.006, sigma_db=0.000, delta_to_floor_db=176.994, floor_db=300.000
+- GOF[parity] (min_n=20, bootstrap_B=200):
+-   even: INSUFFICIENT (n=3, n_fit=3)
+-   censoring: floor_ratio=0.000, pinned_ratio=1.000, point_mass_ratio=0.000, point_mass_kind=right_censored_or_upper_spike
+-   WARNING: GOF skipped for parity=even due to insufficient samples.
+- GOF[material] (min_n=20, bootstrap_B=200):
+-   NA: INSUFFICIENT (n=3, n_fit=3)
+-   censoring: floor_ratio=0.000, pinned_ratio=1.000, point_mass_ratio=0.000, point_mass_kind=right_censored_or_upper_spike
+-   WARNING: GOF skipped for material=NA due to insufficient samples.
+- GOF[incidence_angle_bin] (min_n=20, bootstrap_B=200):
+-   NA: INSUFFICIENT (n=3, n_fit=3)
+-   censoring: floor_ratio=0.000, pinned_ratio=1.000, point_mass_ratio=0.000, point_mass_kind=right_censored_or_upper_spike
+-   WARNING: GOF skipped for incidence_angle_bin=NA due to insufficient samples.
+- GOF[delay_bin] (min_n=20, bootstrap_B=200):
+-   early: INSUFFICIENT (n=2, n_fit=2)
+-   censoring: floor_ratio=0.000, pinned_ratio=1.000, point_mass_ratio=0.000, point_mass_kind=right_censored_or_upper_spike
+-   WARNING: GOF skipped for delay_bin=early due to insufficient samples.
+-   late: INSUFFICIENT (n=1, n_fit=1)
+-   censoring: floor_ratio=0.000, pinned_ratio=1.000, point_mass_ratio=0.000, point_mass_kind=right_censored_or_upper_spike
+-   WARNING: GOF skipped for delay_bin=late due to insufficient samples.
+- early_late_xpd_mu_db: early=123.006, late=123.006, split_tau_s=2.002e-08
+- NOTE: early<=late observed (environment-dependent); do not over-claim early-tap advantage.
+- subband_mu_span_db: 0.000
+- NOTE: weak subband variation observed (may be physically weak frequency dependence).
+
+## A2
+
+- case 0: paths=1, bounce_dist={1: 1}
+- strongest path: tau=1.668e-08s, power=5.000e-01
+- LOS exists: False
+- case 1: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.238e-08s, power=5.000e-01
+- LOS exists: False
+- case 2: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.850e-08s, power=5.000e-01
+- LOS exists: False
+- case 3: paths=1, bounce_dist={1: 1}
+- strongest path: tau=1.887e-08s, power=5.000e-01
+- LOS exists: False
+- case 4: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.405e-08s, power=5.000e-01
+- LOS exists: False
+- case 5: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.983e-08s, power=5.000e-01
+- LOS exists: False
+- case 6: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.136e-08s, power=5.000e-01
+- LOS exists: False
+- case 7: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.605e-08s, power=5.000e-01
+- LOS exists: False
+- case 8: paths=1, bounce_dist={1: 1}
+- strongest path: tau=3.147e-08s, power=5.000e-01
+- LOS exists: False
+- avg_paths_per_case: 1.00 (cases=9)
+- WARNING: low path count per case; statistics may be unstable (single-path dominance likely).
+- cir_peak_match_ratio: 9/9
+- cir_peak_match_skipped_overlap_cases: 0
+- delay_ambiguity_period_ns: 255.750
+- wrap_detected_cases: 0
+- pdp_sum_consistency_max_abs: 0.000e+00
+- parity XPD stats (exact_bounce=1): {'odd': {'mu': 123.00595918184662, 'sigma': 0.0, 'n': 9}}
+- leakage-limited check: median_xpd_db=123.006, sigma_db=0.000, delta_to_floor_db=176.994, floor_db=300.000
+- GOF[parity] (min_n=20, bootstrap_B=200):
+-   odd: INSUFFICIENT (n=9, n_fit=9)
+-   censoring: floor_ratio=0.000, pinned_ratio=1.000, point_mass_ratio=0.000, point_mass_kind=right_censored_or_upper_spike
+-   WARNING: GOF skipped for parity=odd due to insufficient samples.
+- GOF[material] (min_n=20, bootstrap_B=200):
+-   NA: INSUFFICIENT (n=9, n_fit=9)
+-   censoring: floor_ratio=0.000, pinned_ratio=1.000, point_mass_ratio=0.000, point_mass_kind=right_censored_or_upper_spike
+-   WARNING: GOF skipped for material=NA due to insufficient samples.
+- GOF[incidence_angle_bin] (min_n=20, bootstrap_B=200):
+-   [20,40): INSUFFICIENT (n=1, n_fit=1)
+-   censoring: floor_ratio=0.000, pinned_ratio=1.000, point_mass_ratio=0.000, point_mass_kind=right_censored_or_upper_spike
+-   WARNING: GOF skipped for incidence_angle_bin=[20,40) due to insufficient samples.
+-   [40,60): INSUFFICIENT (n=5, n_fit=5)
+-   censoring: floor_ratio=0.000, pinned_ratio=1.000, point_mass_ratio=0.000, point_mass_kind=right_censored_or_upper_spike
+-   WARNING: GOF skipped for incidence_angle_bin=[40,60) due to insufficient samples.
+-   [60,90): INSUFFICIENT (n=3, n_fit=3)
+-   censoring: floor_ratio=0.000, pinned_ratio=1.000, point_mass_ratio=0.000, point_mass_kind=right_censored_or_upper_spike
+-   WARNING: GOF skipped for incidence_angle_bin=[60,90) due to insufficient samples.
+- GOF[delay_bin] (min_n=20, bootstrap_B=200):
+-   early: INSUFFICIENT (n=5, n_fit=5)
+-   censoring: floor_ratio=0.000, pinned_ratio=1.000, point_mass_ratio=0.000, point_mass_kind=right_censored_or_upper_spike
+-   WARNING: GOF skipped for delay_bin=early due to insufficient samples.
+-   late: INSUFFICIENT (n=4, n_fit=4)
+-   censoring: floor_ratio=0.000, pinned_ratio=1.000, point_mass_ratio=0.000, point_mass_kind=right_censored_or_upper_spike
+-   WARNING: GOF skipped for delay_bin=late due to insufficient samples.
+- early_late_xpd_mu_db: early=123.006, late=123.006, split_tau_s=2.405e-08
+- subband_mu_span_db: 0.000
+- NOTE: weak subband variation observed (may be physically weak frequency dependence).
+
+## A2R
+
+- case 0: paths=1, bounce_dist={1: 1}
+- strongest path: tau=1.296e-07s, power=5.000e-01
+- LOS exists: False
+- case 1: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.625e-08s, power=5.000e-01
+- LOS exists: False
+- case 2: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.542e-08s, power=5.000e-01
+- LOS exists: False
+- case 3: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.790e-08s, power=5.000e-01
+- LOS exists: False
+- case 4: paths=0, bounce_dist={}
+- WARNING: no paths matched exact_bounce=1 for stats
+- case 5: paths=1, bounce_dist={1: 1}
+- strongest path: tau=3.477e-08s, power=5.000e-01
+- LOS exists: False
+- case 6: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.406e-08s, power=5.000e-01
+- LOS exists: False
+- case 7: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.620e-08s, power=5.000e-01
+- LOS exists: False
+- case 8: paths=1, bounce_dist={1: 1}
+- strongest path: tau=9.925e-08s, power=5.000e-01
+- LOS exists: False
+- case 9: paths=1, bounce_dist={1: 1}
+- strongest path: tau=5.753e-08s, power=5.000e-01
+- LOS exists: False
+- case 10: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.277e-08s, power=5.000e-01
+- LOS exists: False
+- case 11: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.445e-08s, power=5.000e-01
+- LOS exists: False
+- case 12: paths=1, bounce_dist={1: 1}
+- strongest path: tau=5.134e-08s, power=5.000e-01
+- LOS exists: False
+- case 13: paths=0, bounce_dist={}
+- WARNING: no paths matched exact_bounce=1 for stats
+- case 14: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.173e-08s, power=5.000e-01
+- LOS exists: False
+- case 15: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.286e-08s, power=5.000e-01
+- LOS exists: False
+- avg_paths_per_case: 0.88 (cases=16)
+- WARNING: low path count per case; statistics may be unstable (single-path dominance likely).
+- cir_peak_match_ratio: 14/14
+- cir_peak_match_skipped_overlap_cases: 0
+- delay_ambiguity_period_ns: 255.750
+- wrap_detected_cases: 0
+- pdp_sum_consistency_max_abs: 0.000e+00
+- parity XPD stats (exact_bounce=1): {'odd': {'mu': 15.920768414614486, 'sigma': 18.93284086296915, 'n': 14}}
+- leakage-limited check: median_xpd_db=22.744, sigma_db=18.933, delta_to_floor_db=277.256, floor_db=300.000
+- GOF[parity] (min_n=20, bootstrap_B=200):
+-   odd: INSUFFICIENT (n=14, n_fit=14)
+-   censoring: floor_ratio=0.000, pinned_ratio=0.000, point_mass_ratio=0.000, point_mass_kind=none
+-   WARNING: GOF skipped for parity=odd due to insufficient samples.
+- GOF[material] (min_n=20, bootstrap_B=200):
+-   NA: INSUFFICIENT (n=14, n_fit=14)
+-   censoring: floor_ratio=0.000, pinned_ratio=0.000, point_mass_ratio=0.000, point_mass_kind=none
+-   WARNING: GOF skipped for material=NA due to insufficient samples.
+- GOF[incidence_angle_bin] (min_n=20, bootstrap_B=200):
+-   [40,60): INSUFFICIENT (n=4, n_fit=3)
+-   censoring: floor_ratio=0.000, pinned_ratio=0.250, point_mass_ratio=0.250, point_mass_kind=mode_spike
+-   WARNING: GOF skipped for incidence_angle_bin=[40,60) due to insufficient samples.
+-   [60,90): INSUFFICIENT (n=10, n_fit=10)
+-   censoring: floor_ratio=0.000, pinned_ratio=0.000, point_mass_ratio=0.000, point_mass_kind=none
+-   WARNING: GOF skipped for incidence_angle_bin=[60,90) due to insufficient samples.
+- GOF[delay_bin] (min_n=20, bootstrap_B=200):
+-   early: INSUFFICIENT (n=7, n_fit=7)
+-   censoring: floor_ratio=0.000, pinned_ratio=0.000, point_mass_ratio=0.000, point_mass_kind=none
+-   WARNING: GOF skipped for delay_bin=early due to insufficient samples.
+-   late: INSUFFICIENT (n=7, n_fit=7)
+-   censoring: floor_ratio=0.000, pinned_ratio=0.000, point_mass_ratio=0.000, point_mass_kind=none
+-   WARNING: GOF skipped for delay_bin=late due to insufficient samples.
+- early_late_xpd_mu_db: early=30.552, late=1.289, split_tau_s=2.623e-08
+- subband_mu_span_db: 0.000
+- NOTE: weak subband variation observed (may be physically weak frequency dependence).
+
+## A3
+
+- case 0: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.405e-08s, power=5.000e-01
+- LOS exists: False
+- case 1: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.405e-08s, power=5.000e-01
+- LOS exists: False
+- case 2: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 3: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.780e-08s, power=5.000e-01
+- LOS exists: False
+- avg_paths_per_case: 1.00 (cases=4)
+- WARNING: low path count per case; statistics may be unstable (single-path dominance likely).
+- cir_peak_match_ratio: 4/4
+- cir_peak_match_skipped_overlap_cases: 0
+- delay_ambiguity_period_ns: 255.750
+- wrap_detected_cases: 0
+- pdp_sum_consistency_max_abs: 0.000e+00
+- parity XPD stats (exact_bounce=2): {'even': {'mu': 123.00595918184662, 'sigma': 0.0, 'n': 4}}
+- leakage-limited check: median_xpd_db=123.006, sigma_db=0.000, delta_to_floor_db=176.994, floor_db=300.000
+- GOF[parity] (min_n=20, bootstrap_B=200):
+-   even: INSUFFICIENT (n=4, n_fit=4)
+-   censoring: floor_ratio=0.000, pinned_ratio=1.000, point_mass_ratio=0.000, point_mass_kind=right_censored_or_upper_spike
+-   WARNING: GOF skipped for parity=even due to insufficient samples.
+- GOF[material] (min_n=20, bootstrap_B=200):
+-   NA: INSUFFICIENT (n=4, n_fit=4)
+-   censoring: floor_ratio=0.000, pinned_ratio=1.000, point_mass_ratio=0.000, point_mass_kind=right_censored_or_upper_spike
+-   WARNING: GOF skipped for material=NA due to insufficient samples.
+- GOF[incidence_angle_bin] (min_n=20, bootstrap_B=200):
+-   [40,60): INSUFFICIENT (n=4, n_fit=4)
+-   censoring: floor_ratio=0.000, pinned_ratio=1.000, point_mass_ratio=0.000, point_mass_kind=right_censored_or_upper_spike
+-   WARNING: GOF skipped for incidence_angle_bin=[40,60) due to insufficient samples.
+- GOF[delay_bin] (min_n=20, bootstrap_B=200):
+-   early: INSUFFICIENT (n=2, n_fit=2)
+-   censoring: floor_ratio=0.000, pinned_ratio=1.000, point_mass_ratio=0.000, point_mass_kind=right_censored_or_upper_spike
+-   WARNING: GOF skipped for delay_bin=early due to insufficient samples.
+-   late: INSUFFICIENT (n=2, n_fit=2)
+-   censoring: floor_ratio=0.000, pinned_ratio=1.000, point_mass_ratio=0.000, point_mass_kind=right_censored_or_upper_spike
+-   WARNING: GOF skipped for delay_bin=late due to insufficient samples.
+- early_late_xpd_mu_db: early=123.006, late=123.006, split_tau_s=2.494e-08
+- NOTE: early<=late observed (environment-dependent); do not over-claim early-tap advantage.
+- subband_mu_span_db: 0.000
+- NOTE: weak subband variation observed (may be physically weak frequency dependence).
+
+## A3R
+
+- case 0: paths=1, bounce_dist={2: 1}
+- strongest path: tau=3.493e-08s, power=5.000e-01
+- LOS exists: False
+- case 1: paths=1, bounce_dist={2: 1}
+- strongest path: tau=4.691e-08s, power=5.000e-01
+- LOS exists: False
+- case 2: paths=1, bounce_dist={2: 1}
+- strongest path: tau=6.773e-08s, power=5.000e-01
+- LOS exists: False
+- case 3: paths=1, bounce_dist={2: 1}
+- strongest path: tau=8.357e-08s, power=5.000e-01
+- LOS exists: False
+- avg_paths_per_case: 1.00 (cases=4)
+- WARNING: low path count per case; statistics may be unstable (single-path dominance likely).
+- cir_peak_match_ratio: 4/4
+- cir_peak_match_skipped_overlap_cases: 0
+- delay_ambiguity_period_ns: 255.750
+- wrap_detected_cases: 0
+- pdp_sum_consistency_max_abs: 0.000e+00
+- parity XPD stats (exact_bounce=2): {'even': {'mu': 9.613998443828748, 'sigma': 3.301856413234934, 'n': 4}}
+- leakage-limited check: median_xpd_db=9.467, sigma_db=3.302, delta_to_floor_db=290.533, floor_db=300.000
+- GOF[parity] (min_n=20, bootstrap_B=200):
+-   even: INSUFFICIENT (n=4, n_fit=3)
+-   censoring: floor_ratio=0.000, pinned_ratio=0.250, point_mass_ratio=0.250, point_mass_kind=mode_spike
+-   WARNING: GOF skipped for parity=even due to insufficient samples.
+- GOF[material] (min_n=20, bootstrap_B=200):
+-   NA: INSUFFICIENT (n=4, n_fit=3)
+-   censoring: floor_ratio=0.000, pinned_ratio=0.250, point_mass_ratio=0.250, point_mass_kind=mode_spike
+-   WARNING: GOF skipped for material=NA due to insufficient samples.
+- GOF[incidence_angle_bin] (min_n=20, bootstrap_B=200):
+-   [40,60): INSUFFICIENT (n=4, n_fit=3)
+-   censoring: floor_ratio=0.000, pinned_ratio=0.250, point_mass_ratio=0.250, point_mass_kind=mode_spike
+-   WARNING: GOF skipped for incidence_angle_bin=[40,60) due to insufficient samples.
+- GOF[delay_bin] (min_n=20, bootstrap_B=200):
+-   early: INSUFFICIENT (n=2, n_fit=1)
+-   censoring: floor_ratio=0.000, pinned_ratio=0.500, point_mass_ratio=0.500, point_mass_kind=mode_spike
+-   WARNING: GOF skipped for delay_bin=early due to insufficient samples.
+-   late: INSUFFICIENT (n=2, n_fit=1)
+-   censoring: floor_ratio=0.000, pinned_ratio=0.500, point_mass_ratio=0.500, point_mass_kind=mode_spike
+-   WARNING: GOF skipped for delay_bin=late due to insufficient samples.
+- early_late_xpd_mu_db: early=12.261, late=6.967, split_tau_s=5.732e-08
+- subband_mu_span_db: 0.000
+- NOTE: weak subband variation observed (may be physically weak frequency dependence).
+
+## A4
+
+- case 0: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.238e-08s, power=1.195e-01
+- LOS exists: False
+- case 1: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.405e-08s, power=1.078e-01
+- LOS exists: False
+- case 2: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.605e-08s, power=1.022e-01
+- LOS exists: False
+- case 3: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.238e-08s, power=5.315e-02
+- LOS exists: False
+- case 4: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.405e-08s, power=3.573e-02
+- LOS exists: False
+- case 5: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.605e-08s, power=2.785e-02
+- LOS exists: False
+- case 6: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.238e-08s, power=6.842e-02
+- LOS exists: False
+- case 7: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.405e-08s, power=5.029e-02
+- LOS exists: False
+- case 8: paths=1, bounce_dist={1: 1}
+- strongest path: tau=2.605e-08s, power=4.180e-02
+- LOS exists: False
+- avg_paths_per_case: 1.00 (cases=9)
+- WARNING: low path count per case; statistics may be unstable (single-path dominance likely).
+- cir_peak_match_ratio: 9/9
+- cir_peak_match_skipped_overlap_cases: 0
+- delay_ambiguity_period_ns: 255.750
+- wrap_detected_cases: 0
+- pdp_sum_consistency_max_abs: 0.000e+00
+- parity XPD stats (exact_bounce=1): {'odd': {'mu': 113.79485821351136, 'sigma': 2.2533521840289312, 'n': 9}}
+- leakage-limited check: median_xpd_db=113.271, sigma_db=2.253, delta_to_floor_db=186.729, floor_db=300.000
+- GOF[parity] (min_n=20, bootstrap_B=200):
+-   odd: INSUFFICIENT (n=9, n_fit=7)
+-   censoring: floor_ratio=0.000, pinned_ratio=0.222, point_mass_ratio=0.222, point_mass_kind=mode_spike
+-   WARNING: GOF skipped for parity=odd due to insufficient samples.
+- GOF[material] (min_n=20, bootstrap_B=200):
+-   glass: INSUFFICIENT (n=3, n_fit=1)
+-   censoring: floor_ratio=0.000, pinned_ratio=0.667, point_mass_ratio=0.667, point_mass_kind=mode_spike
+-   WARNING: GOF skipped for material=glass due to insufficient samples.
+-   gypsum: INSUFFICIENT (n=3, n_fit=2)
+-   censoring: floor_ratio=0.000, pinned_ratio=0.333, point_mass_ratio=0.333, point_mass_kind=mode_spike
+-   WARNING: GOF skipped for material=gypsum due to insufficient samples.
+-   wood: INSUFFICIENT (n=3, n_fit=2)
+-   censoring: floor_ratio=0.000, pinned_ratio=0.333, point_mass_ratio=0.333, point_mass_kind=mode_spike
+-   WARNING: GOF skipped for material=wood due to insufficient samples.
+- GOF[incidence_angle_bin] (min_n=20, bootstrap_B=200):
+-   [40,60): INSUFFICIENT (n=6, n_fit=4)
+-   censoring: floor_ratio=0.000, pinned_ratio=0.333, point_mass_ratio=0.333, point_mass_kind=mode_spike
+-   WARNING: GOF skipped for incidence_angle_bin=[40,60) due to insufficient samples.
+-   [60,90): INSUFFICIENT (n=3, n_fit=2)
+-   censoring: floor_ratio=0.000, pinned_ratio=0.333, point_mass_ratio=0.333, point_mass_kind=mode_spike
+-   WARNING: GOF skipped for incidence_angle_bin=[60,90) due to insufficient samples.
+- GOF[delay_bin] (min_n=20, bootstrap_B=200):
+-   early: INSUFFICIENT (n=6, n_fit=4)
+-   censoring: floor_ratio=0.000, pinned_ratio=0.333, point_mass_ratio=0.333, point_mass_kind=mode_spike
+-   WARNING: GOF skipped for delay_bin=early due to insufficient samples.
+-   late: INSUFFICIENT (n=3, n_fit=2)
+-   censoring: floor_ratio=0.000, pinned_ratio=0.333, point_mass_ratio=0.333, point_mass_kind=mode_spike
+-   WARNING: GOF skipped for delay_bin=late due to insufficient samples.
+- early_late_xpd_mu_db: early=114.225, late=112.935, split_tau_s=2.405e-08
+- subband_mu_span_db: 0.000
+- NOTE: weak subband variation observed (may be physically weak frequency dependence).
+- material sub-summary: {'glass': {'mu': 116.41487615869353, 'sigma': 0.3455024426544337, 'n': 3}, 'wood': {'mu': 111.76070525991304, 'sigma': 1.415459307822358, 'n': 3}, 'gypsum': {'mu': 113.20899322192751, 'sigma': 1.0813057758937958, 'n': 3}}
+
+## A5
+
+- case 0: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 1: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 2: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 3: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 4: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 5: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 6: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 7: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 8: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 9: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 10: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 11: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 12: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 13: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 14: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 15: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 16: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 17: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 18: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 19: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 20: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 21: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 22: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 23: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 24: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 25: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 26: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 27: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 28: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- case 29: paths=1, bounce_dist={2: 1}
+- strongest path: tau=2.582e-08s, power=5.000e-01
+- LOS exists: False
+- avg_paths_per_case: 1.00 (cases=30)
+- WARNING: low path count per case; statistics may be unstable (single-path dominance likely).
+- cir_peak_match_ratio: 30/30
+- cir_peak_match_skipped_overlap_cases: 0
+- delay_ambiguity_period_ns: 255.750
+- wrap_detected_cases: 0
+- pdp_sum_consistency_max_abs: 0.000e+00
+- parity XPD stats (exact_bounce=None): {'even': {'mu': 2.543348326812149, 'sigma': 7.52545727149368, 'n': 30}}
+- leakage-limited check: median_xpd_db=3.126, sigma_db=7.525, delta_to_floor_db=296.874, floor_db=300.000
+- GOF[parity] (min_n=20, bootstrap_B=200):
+-   even: status=FAIL_MODEL, n=30, n_fit=30, excluded=0 (floor=0, pinned=0)
+-   censoring: floor_ratio=0.000, pinned_ratio=0.000, point_mass_ratio=0.000, point_mass_kind=none
+-   best_model=normal_db, AIC=209.234, BIC=212.036, qq_r=0.9777, ks_p_boot=0.7400
+-   normal_pre: qq_r=0.9758, ks_p_boot=0.7400; normal_post: qq_r=0.9758, ks_p_boot=0.7400
+-   model_decision: single_normal_fail=True, alternative_improved=False, reason=single-normal fail; no better candidate found
+-   WARNING: GOF failed on continuous part (model failure).
+- GOF[material] (min_n=20, bootstrap_B=200):
+-   NA: status=FAIL_MODEL, n=30, n_fit=30, excluded=0 (floor=0, pinned=0)
+-   censoring: floor_ratio=0.000, pinned_ratio=0.000, point_mass_ratio=0.000, point_mass_kind=none
+-   best_model=normal_db, AIC=209.234, BIC=212.036, qq_r=0.9777, ks_p_boot=0.7400
+-   normal_pre: qq_r=0.9758, ks_p_boot=0.7400; normal_post: qq_r=0.9758, ks_p_boot=0.7400
+-   model_decision: single_normal_fail=True, alternative_improved=False, reason=single-normal fail; no better candidate found
+-   WARNING: GOF failed on continuous part (model failure).
+- GOF[incidence_angle_bin] (min_n=20, bootstrap_B=200):
+-   [40,60): status=FAIL_MODEL, n=30, n_fit=30, excluded=0 (floor=0, pinned=0)
+-   censoring: floor_ratio=0.000, pinned_ratio=0.000, point_mass_ratio=0.000, point_mass_kind=none
+-   best_model=normal_db, AIC=209.234, BIC=212.036, qq_r=0.9777, ks_p_boot=0.7400
+-   normal_pre: qq_r=0.9758, ks_p_boot=0.7400; normal_post: qq_r=0.9758, ks_p_boot=0.7400
+-   model_decision: single_normal_fail=True, alternative_improved=False, reason=single-normal fail; no better candidate found
+-   WARNING: GOF failed on continuous part (model failure).
+- GOF[delay_bin] (min_n=20, bootstrap_B=200):
+-   early: status=FAIL_MODEL, n=30, n_fit=30, excluded=0 (floor=0, pinned=0)
+-   censoring: floor_ratio=0.000, pinned_ratio=0.000, point_mass_ratio=0.000, point_mass_kind=none
+-   best_model=normal_db, AIC=209.234, BIC=212.036, qq_r=0.9777, ks_p_boot=0.7400
+-   normal_pre: qq_r=0.9758, ks_p_boot=0.7400; normal_post: qq_r=0.9758, ks_p_boot=0.7400
+-   model_decision: single_normal_fail=True, alternative_improved=False, reason=single-normal fail; no better candidate found
+-   WARNING: GOF failed on continuous part (model failure).
+- subband_mu_span_db: 0.000
+- NOTE: weak subband variation observed (may be physically weak frequency dependence).
+
+## A6
+
+- case 0: paths=1, bounce_dist={1: 1}
+- strongest path: tau=1.336e-08s, power=5.000e-01
+- LOS exists: False
+- case 1: paths=1, bounce_dist={1: 1}
+- strongest path: tau=1.336e-08s, power=5.000e-01
+- LOS exists: False
+- case 2: paths=1, bounce_dist={1: 1}
+- strongest path: tau=1.336e-08s, power=5.000e-01
+- LOS exists: False
+- case 3: paths=1, bounce_dist={1: 1}
+- strongest path: tau=1.341e-08s, power=5.000e-01
+- LOS exists: False
+- case 4: paths=1, bounce_dist={1: 1}
+- strongest path: tau=1.341e-08s, power=5.000e-01
+- LOS exists: False
+- case 5: paths=1, bounce_dist={1: 1}
+- strongest path: tau=1.341e-08s, power=5.000e-01
+- LOS exists: False
+- case 6: paths=1, bounce_dist={1: 1}
+- strongest path: tau=1.350e-08s, power=5.000e-01
+- LOS exists: False
+- case 7: paths=1, bounce_dist={1: 1}
+- strongest path: tau=1.349e-08s, power=5.000e-01
+- LOS exists: False
+- case 8: paths=1, bounce_dist={1: 1}
+- strongest path: tau=1.350e-08s, power=5.000e-01
+- LOS exists: False
+- case 9: paths=2, bounce_dist={2: 2}
+- strongest path: tau=2.670e-08s, power=5.000e-01
+- LOS exists: False
+- case 10: paths=2, bounce_dist={2: 2}
+- strongest path: tau=2.669e-08s, power=5.000e-01
+- LOS exists: False
+- case 11: paths=2, bounce_dist={2: 2}
+- strongest path: tau=2.670e-08s, power=5.000e-01
+- LOS exists: False
+- case 12: paths=2, bounce_dist={2: 2}
+- strongest path: tau=2.672e-08s, power=5.000e-01
+- LOS exists: False
+- case 13: paths=2, bounce_dist={2: 2}
+- strongest path: tau=2.672e-08s, power=5.000e-01
+- LOS exists: False
+- case 14: paths=2, bounce_dist={2: 2}
+- strongest path: tau=2.672e-08s, power=5.000e-01
+- LOS exists: False
+- case 15: paths=2, bounce_dist={2: 2}
+- strongest path: tau=2.676e-08s, power=5.000e-01
+- LOS exists: False
+- case 16: paths=2, bounce_dist={2: 2}
+- strongest path: tau=2.676e-08s, power=5.000e-01
+- LOS exists: False
+- case 17: paths=2, bounce_dist={2: 2}
+- strongest path: tau=2.676e-08s, power=5.000e-01
+- LOS exists: False
+- avg_paths_per_case: 1.50 (cases=18)
+- WARNING: low path count per case; statistics may be unstable (single-path dominance likely).
+- cir_peak_match_ratio: 9/9
+- cir_peak_match_skipped_overlap_cases: 9
+- delay_ambiguity_period_ns: 255.750
+- wrap_detected_cases: 0
+- pdp_sum_consistency_max_abs: 0.000e+00
+- parity XPD stats (exact_bounce=None): {'odd': {'mu': 43.766082516167714, 'sigma': 59.583989935236616, 'n': 9}, 'even': {'mu': 123.00595918184662, 'sigma': 0.0, 'n': 18}}
+- leakage-limited check: median_xpd_db=123.006, sigma_db=50.412, delta_to_floor_db=176.994, floor_db=300.000
+- GOF[parity] (min_n=20, bootstrap_B=200):
+-   even: INSUFFICIENT (n=18, n_fit=18)
+-   censoring: floor_ratio=0.000, pinned_ratio=1.000, point_mass_ratio=0.000, point_mass_kind=right_censored_or_upper_spike
+-   WARNING: GOF skipped for parity=even due to insufficient samples.
+-   odd: INSUFFICIENT (n=9, n_fit=6)
+-   censoring: floor_ratio=0.000, pinned_ratio=0.333, point_mass_ratio=0.333, point_mass_kind=mode_spike
+-   WARNING: GOF skipped for parity=odd due to insufficient samples.
+- GOF[material] (min_n=20, bootstrap_B=200):
+-   NA: INSUFFICIENT (n=27, n_fit=6)
+-   censoring: floor_ratio=0.000, pinned_ratio=0.778, point_mass_ratio=0.778, point_mass_kind=mode_spike
+-   WARNING: GOF skipped for material=NA due to insufficient samples.
+- GOF[incidence_angle_bin] (min_n=20, bootstrap_B=200):
+-   [0,20): INSUFFICIENT (n=27, n_fit=6)
+-   censoring: floor_ratio=0.000, pinned_ratio=0.778, point_mass_ratio=0.778, point_mass_kind=mode_spike
+-   WARNING: GOF skipped for incidence_angle_bin=[0,20) due to insufficient samples.
+- GOF[delay_bin] (min_n=20, bootstrap_B=200):
+-   early: INSUFFICIENT (n=15, n_fit=6)
+-   censoring: floor_ratio=0.000, pinned_ratio=0.600, point_mass_ratio=0.600, point_mass_kind=mode_spike
+-   WARNING: GOF skipped for delay_bin=early due to insufficient samples.
+-   late: INSUFFICIENT (n=12, n_fit=12)
+-   censoring: floor_ratio=0.000, pinned_ratio=1.000, point_mass_ratio=0.000, point_mass_kind=right_censored_or_upper_spike
+-   WARNING: GOF skipped for delay_bin=late due to insufficient samples.
+- early_late_xpd_mu_db: early=75.462, late=123.006, split_tau_s=2.670e-08
+- NOTE: early<=late observed (environment-dependent); do not over-claim early-tap advantage.
+- subband_mu_span_db: 0.000
+- NOTE: weak subband variation observed (may be physically weak frequency dependence).
+- A6_near_normal_odd_max_deg: 8.647
+- A6_near_normal_even_max_deg: 4.348
+- note: A6 is a near-normal-incidence CP benchmark; odd/even trends from this setup should not be generalized to arbitrary oblique incidence.
+
+## B0
+
+- case 0: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=2.359e-08s, power=5.000e-01
+- LOS exists: True
+- case 1: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=2.090e-08s, power=5.000e-01
+- LOS exists: True
+- case 2: paths=21, bounce_dist={0: 1, 1: 6, 2: 14}
+- strongest path: tau=5.347e-08s, power=5.000e-01
+- LOS exists: True
+- case 3: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=2.090e-08s, power=5.000e-01
+- LOS exists: True
+- case 4: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=2.359e-08s, power=5.000e-01
+- LOS exists: True
+- case 5: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=4.401e-08s, power=5.000e-01
+- LOS exists: True
+- case 6: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=3.793e-08s, power=5.000e-01
+- LOS exists: True
+- case 7: paths=21, bounce_dist={0: 1, 1: 6, 2: 14}
+- strongest path: tau=2.313e-08s, power=5.000e-01
+- LOS exists: True
+- case 8: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=3.793e-08s, power=5.000e-01
+- LOS exists: True
+- case 9: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=4.401e-08s, power=5.000e-01
+- LOS exists: True
+- case 10: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=2.874e-08s, power=5.000e-01
+- LOS exists: True
+- case 11: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=2.370e-08s, power=5.000e-01
+- LOS exists: True
+- case 12: paths=21, bounce_dist={0: 1, 1: 6, 2: 14}
+- strongest path: tau=2.694e-08s, power=5.000e-01
+- LOS exists: True
+- case 13: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=2.370e-08s, power=5.000e-01
+- LOS exists: True
+- case 14: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=2.874e-08s, power=5.000e-01
+- LOS exists: True
+- case 15: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=2.742e-08s, power=5.000e-01
+- LOS exists: True
+- case 16: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=3.682e-08s, power=5.000e-01
+- LOS exists: True
+- case 17: paths=21, bounce_dist={0: 1, 1: 6, 2: 14}
+- strongest path: tau=5.567e-08s, power=5.000e-01
+- LOS exists: True
+- case 18: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=3.682e-08s, power=5.000e-01
+- LOS exists: True
+- case 19: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=2.742e-08s, power=5.000e-01
+- LOS exists: True
+- case 20: paths=24, bounce_dist={0: 1, 1: 6, 2: 17}
+- strongest path: tau=3.729e-08s, power=5.000e-01
+- LOS exists: True
+- case 21: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=3.518e-08s, power=5.000e-01
+- LOS exists: True
+- case 22: paths=21, bounce_dist={0: 1, 1: 6, 2: 14}
+- strongest path: tau=3.483e-08s, power=5.000e-01
+- LOS exists: True
+- case 23: paths=25, bounce_dist={0: 1, 1: 6, 2: 18}
+- strongest path: tau=3.518e-08s, power=5.000e-01
+- LOS exists: True
+- case 24: paths=24, bounce_dist={0: 1, 1: 6, 2: 17}
+- strongest path: tau=3.729e-08s, power=5.000e-01
+- LOS exists: True
+- avg_paths_per_case: 24.12 (cases=25)
+- cir_peak_match_ratio: 0/0
+- cir_peak_match_skipped_overlap_cases: 25
+- delay_ambiguity_period_ns: 255.750
+- wrap_detected_cases: 0
+- pdp_sum_consistency_max_abs: 0.000e+00
+- parity XPD stats (exact_bounce=None): {'even': {'mu': 76.47097837488461, 'sigma': 63.27981578595831, 'n': 453}, 'odd': {'mu': 123.0059591818466, 'sigma': 1.4258462402039764e-14, 'n': 150}}
+- leakage-limited check: median_xpd_db=123.006, sigma_db=58.412, delta_to_floor_db=176.994, floor_db=300.000
+- GOF[parity] (min_n=20, bootstrap_B=200):
+-   even: status=PASS_ALTERNATIVE, n=453, n_fit=160, excluded=293 (floor=0, pinned=293)
+-   censoring: floor_ratio=0.000, pinned_ratio=0.647, point_mass_ratio=0.647, point_mass_kind=mode_spike
+-   best_model=truncnorm_db, AIC=1092.280, BIC=1104.580, qq_r=0.9901, ks_p_boot=0.0000
+-   normal_pre: qq_r=0.8031, ks_p_boot=0.0000; normal_post: qq_r=0.9512, ks_p_boot=0.0000
+-   model_decision: single_normal_fail=True, alternative_improved=True, reason=single-normal fail; alternative selected but GOF still borderline
+-   PASS_ALTERNATIVE: single-normal failed; alternative model selected.
+-   NOTE: residual GOF is borderline but not treated as hard fail.
+-   odd: status=FAIL_MODEL, n=150, n_fit=150, excluded=0 (floor=0, pinned=150)
+-   censoring: floor_ratio=0.000, pinned_ratio=1.000, point_mass_ratio=0.000, point_mass_kind=right_censored_or_upper_spike
+-   best_model=normal_db, AIC=-9135.746, BIC=-9129.725, qq_r=0.0000, ks_p_boot=0.0000
+-   normal_pre: qq_r=0.0000, ks_p_boot=0.0000; normal_post: qq_r=0.0000, ks_p_boot=0.0000
+-   model_decision: single_normal_fail=True, alternative_improved=False, reason=single-normal fail; no better candidate found
+-   WARNING: GOF failed on continuous part (model failure).
+- GOF[material] (min_n=20, bootstrap_B=200):
+-   NA: status=PASS_ALTERNATIVE, n=603, n_fit=160, excluded=443 (floor=0, pinned=443)
+-   censoring: floor_ratio=0.000, pinned_ratio=0.735, point_mass_ratio=0.735, point_mass_kind=mode_spike
+-   best_model=truncnorm_db, AIC=1092.280, BIC=1104.580, qq_r=0.9901, ks_p_boot=0.0000
+-   normal_pre: qq_r=0.7611, ks_p_boot=0.0000; normal_post: qq_r=0.9512, ks_p_boot=0.0000
+-   model_decision: single_normal_fail=True, alternative_improved=True, reason=single-normal fail; alternative selected but GOF still borderline
+-   PASS_ALTERNATIVE: single-normal failed; alternative model selected.
+-   NOTE: residual GOF is borderline but not treated as hard fail.
+- GOF[incidence_angle_bin] (min_n=20, bootstrap_B=200):
+-   NA: status=FAIL_MODEL, n=25, n_fit=25, excluded=0 (floor=0, pinned=25)
+-   censoring: floor_ratio=0.000, pinned_ratio=1.000, point_mass_ratio=0.000, point_mass_kind=right_censored_or_upper_spike
+-   best_model=normal_db, AIC=-1519.271, BIC=-1516.833, qq_r=0.0000, ks_p_boot=0.0000
+-   normal_pre: qq_r=0.0000, ks_p_boot=0.0000; normal_post: qq_r=0.0000, ks_p_boot=0.0000
+-   model_decision: single_normal_fail=True, alternative_improved=False, reason=single-normal fail; no better candidate found
+-   WARNING: GOF failed on continuous part (model failure).
+-   [0,20): status=FAIL_MODEL, n=164, n_fit=164, excluded=0 (floor=0, pinned=164)
+-   censoring: floor_ratio=0.000, pinned_ratio=1.000, point_mass_ratio=0.000, point_mass_kind=right_censored_or_upper_spike
+-   best_model=normal_db, AIC=-10531.319, BIC=-10525.120, qq_r=0.4174, ks_p_boot=0.0000
+-   normal_pre: qq_r=0.4140, ks_p_boot=0.5650; normal_post: qq_r=0.4140, ks_p_boot=0.4750
+-   model_decision: single_normal_fail=True, alternative_improved=False, reason=single-normal fail; no better candidate found
+-   WARNING: GOF failed on continuous part (model failure).
+-   [20,40): status=FAIL_MODEL, n=74, n_fit=74, excluded=0 (floor=0, pinned=74)
+-   censoring: floor_ratio=0.000, pinned_ratio=1.000, point_mass_ratio=0.000, point_mass_kind=right_censored_or_upper_spike
+-   best_model=normal_db, AIC=-4504.936, BIC=-4500.328, qq_r=0.0000, ks_p_boot=0.0000
+-   normal_pre: qq_r=0.0000, ks_p_boot=0.0000; normal_post: qq_r=0.0000, ks_p_boot=0.0000
+-   model_decision: single_normal_fail=True, alternative_improved=False, reason=single-normal fail; no better candidate found
+-   WARNING: GOF failed on continuous part (model failure).
+-   [40,60): status=PASS_ALTERNATIVE, n=322, n_fit=156, excluded=166 (floor=0, pinned=166)
+-   censoring: floor_ratio=0.000, pinned_ratio=0.516, point_mass_ratio=0.516, point_mass_kind=mode_spike
+-   best_model=truncnorm_db, AIC=1038.947, BIC=1051.147, qq_r=0.9911, ks_p_boot=0.0000
+-   normal_pre: qq_r=0.8350, ks_p_boot=0.0000; normal_post: qq_r=0.9480, ks_p_boot=0.0000
+-   model_decision: single_normal_fail=True, alternative_improved=True, reason=single-normal fail; alternative selected but GOF still borderline
+-   PASS_ALTERNATIVE: single-normal failed; alternative model selected.
+-   NOTE: residual GOF is borderline but not treated as hard fail.
+-   [60,90): INSUFFICIENT (n=18, n_fit=4)
+-   censoring: floor_ratio=0.000, pinned_ratio=0.778, point_mass_ratio=0.778, point_mass_kind=mode_spike
+-   WARNING: GOF skipped for incidence_angle_bin=[60,90) due to insufficient samples.
+- GOF[delay_bin] (min_n=20, bootstrap_B=200):
+-   early: status=PASS_ALTERNATIVE, n=305, n_fit=84, excluded=221 (floor=0, pinned=221)
+-   censoring: floor_ratio=0.000, pinned_ratio=0.725, point_mass_ratio=0.725, point_mass_kind=mode_spike
+-   best_model=truncnorm_db, AIC=550.724, BIC=560.447, qq_r=0.9941, ks_p_boot=0.1167
+-   normal_pre: qq_r=0.7655, ks_p_boot=0.0000; normal_post: qq_r=0.9645, ks_p_boot=0.0000
+-   model_decision: single_normal_fail=True, alternative_improved=True, reason=single-normal fail; alternative model selected and passes GOF
+-   PASS_ALTERNATIVE: single-normal failed; alternative model selected.
+-   late: status=PASS_ALTERNATIVE, n=298, n_fit=76, excluded=222 (floor=0, pinned=222)
+-   censoring: floor_ratio=0.000, pinned_ratio=0.745, point_mass_ratio=0.745, point_mass_kind=mode_spike
+-   best_model=gmm2_db, AIC=514.242, BIC=525.896, qq_r=0.9846, ks_p_boot=0.0000
+-   normal_pre: qq_r=0.7560, ks_p_boot=0.0000; normal_post: qq_r=0.9279, ks_p_boot=0.0000
+-   model_decision: single_normal_fail=True, alternative_improved=True, reason=single-normal fail; alternative selected but GOF still borderline
+-   PASS_ALTERNATIVE: single-normal failed; alternative model selected.
+-   NOTE: residual GOF is borderline but not treated as hard fail.
+- early_late_xpd_mu_db: early=87.234, late=88.879, split_tau_s=3.518e-08
+- NOTE: early<=late observed (environment-dependent); do not over-claim early-tap advantage.
+- subband_mu_span_db: 0.000
+- NOTE: weak subband variation observed (may be physically weak frequency dependence).
+
+## Physics Mode Check
+
+- scenario_median_xpd_std_db: 53.350
+- non-pinned behavior observed across scenarios in physics mode.
+
+## Model Compare (F2-F6)
+
+- common_phase_removed: True
+- f2_pdp_peak_tau_rt_ns: 25.849731445315186
+- f2_pdp_peak_tau_synth_ns: 25.225341796877625
+- f3_continuous_only_primary: True
+- f3_continuous_rt_n: 223
+- f3_continuous_synth_n: 156
+- f3_floor_ratio_rt: 0.0
+- f3_floor_ratio_synth: 0.0
+- f3_gate_pass: True
+- f3_parity_frac_abs_diff: 0.14022662889518414
+- f3_pinned_ratio_rt: 0.6841359773371105
+- f3_pinned_ratio_synth: 0.7790368271954674
+- f3_xpd_ks2_D: 0.023333333333333334
+- f3_xpd_ks2_D_full: 0.6841359773371105
+- f3_xpd_ks2_D_global_cont: 0.023333333333333334
+- f3_xpd_ks2_D_global_full: 0.65
+- f3_xpd_ks2_D_stratified_cont: 0.22992210582863282
+- f3_xpd_ks2_D_stratified_full: 0.44339622641509435
+- f3_xpd_ks2_n_stratified_cont: 51
+- f3_xpd_ks2_n_stratified_full: 106
+- f3_xpd_ks2_n_used: 156
+- f3_xpd_ks2_p: 0.9999999959234145
+- f3_xpd_ks2_p_full: 7.709556857279447e-158
+- f3_xpd_ks2_p_global_cont: 0.9999999959234145
+- f3_xpd_ks2_p_global_full: 3.677261662618134e-40
+- f3_xpd_ks2_p_stratified_cont: 0.06918160692170866
+- f3_xpd_ks2_p_stratified_full: 9.444584941788624e-10
+- f3_xpd_ks2_reason: continuous-only KS pass with censoring; full-mixture KS fails
+- f3_xpd_ks2_status: PASS_WITH_CENSORING
+- f3_xpd_mu_delta_abs_db: 0.029805269233542552
+- f3_xpd_mu_rt_db: -0.05701814373307444
+- f3_xpd_mu_synth_db: -0.02721287449953189
+- f3_xpd_sigma_delta_abs_db: 0.02474628615488328
+- f3_xpd_sigma_rt_db: 26.25855181341758
+- f3_xpd_sigma_synth_db: 26.233805527262696
+- f4_parity_direction_match: True
+- f4_rt_even_mu_db: 74.17529418348373
+- f4_rt_odd_mu_db: 110.98893578159857
+- f4_synth_even_mu_db: 90.8566097216281
+- f4_synth_odd_mu_db: 110.9630696864253
+- f5_status: PASS_WITH_CENSORING
+- f5_subband_mu_rmse_db: 0.02980526923362517
+- f5_subband_mu_rmse_full_db: 9.34192286324555
+- f5_subband_mu_span_rt_db: 0.0
+- f5_subband_mu_span_synth_db: 1.2289973483348149e-08
+- f5_subband_sigma_rmse_db: 0.024746286154888174
+- f5_subband_sigma_rmse_full_db: 7.784549398607
+- f6_common_phase_removed: True
+- f6_per_ray_sampling: True
+- f6_phase_test_basis: J
+- f6_phase_uniformity_V_rt: 0.7710501634376082
+- f6_phase_uniformity_V_synth: 0.04630621239613558
+- f6_phase_uniformity_p: 0.046
+- f6_phase_uniformity_p_rt: 0.0
+- f6_phase_uniformity_p_synth: 0.046
+- per_ray_sampling: True
+- phase_test_basis: circular
+- phase_uniformity_V_rt: 0.7710501634376082
+- phase_uniformity_V_synth: 0.04630621239613558
+- phase_uniformity_p: 0.046
+- phase_uniformity_p_rt: 0.0
+- phase_uniformity_p_synth: 0.046
+- phase_uniformity_rt_status: INFO_DETERMINISTIC
+- phase_uniformity_synth_status: FAIL
+- rt_num_paths: 706
+- rt_parity_xpd: {'even': {'mu': 74.17529418348373, 'sigma': 63.17465067435628, 'n': 515}, 'odd': {'mu': 110.98893578159857, 'sigma': 34.28487330118832, 'n': 191}}
+- rt_subband_count: 2824
+- subband_mu_rmse: 0.02980526923362517
+- subband_mu_rmse_full: 9.34192286324555
+- subband_mu_rt_cont_db: [-0.05701814373307444, -0.05701814373307444, -0.05701814373307444, -0.05701814373307444]
+- subband_mu_rt_db: [84.13479212291705, 84.13479212291705, 84.13479212291705, 84.13479212291705]
+- subband_mu_span_rt: 0.0
+- subband_mu_span_rt_cont: 0.0
+- subband_mu_span_synth: 1.2289973483348149e-08
+- subband_mu_span_synth_cont: 5.561992111324798e-08
+- subband_mu_synth_cont_db: [-0.027212872930435904, -0.02721284501769024, -0.027212900637611354, -0.027212879412086083]
+- subband_mu_synth_db: [93.4767149865093, 93.47671499267699, 93.47671498038702, 93.4767149850771]
+- subband_sigma_rmse: 0.024746286154888174
+- subband_sigma_rmse_full: 7.784549398607
+- subband_sigma_rt_cont_db: [26.25855181341758, 26.25855181341758, 26.25855181341758, 26.25855181341758]
+- subband_sigma_rt_db: [59.11343958576588, 59.11343958576588, 59.11343958576588, 59.11343958576588]
+- subband_sigma_synth_cont_db: [26.233805544817727, 26.23380549929225, 26.233805532229685, 26.233805532711127]
+- subband_sigma_synth_db: [51.328890188499045, 51.328890172132056, 51.32889019825308, 51.32889018975135]
+- synthetic_kappa_clamp_count: 0
+- synthetic_kappa_clamp_rate: 0.0
+- synthetic_kappa_total: 722944
+- synthetic_kappa_truncation_count: 0
+- synthetic_kappa_truncation_rate: 0.0
+- synthetic_num_paths: 706
+- synthetic_num_paths_mode: match_rt_per_scenario
+- synthetic_parity_xpd: {'even': {'mu': 90.8566097216281, 'sigma': 53.397532548870515, 'n': 614}, 'odd': {'mu': 110.9630696864253, 'sigma': 29.134181641175125, 'n': 92}}
+- synthetic_resolved_num_paths: 706
+- synthetic_sample_slope: False
+- synthetic_subband_count: 2824
+- synthetic_xpd_freq_noise_sigma_db: 0.0
+- f3_xpd_mu_delta_abs_db: 0.030
+- f3_xpd_sigma_delta_abs_db: 0.025
+- f3_xpd_ks2_p: 1.0000
+- f3_xpd_ks2_p_global_cont: 1.0000
+- f3_xpd_ks2_p_stratified_cont: 0.0692
+- f3_xpd_ks2_p_global_full: 0.0000
+- f3_xpd_ks2_p_stratified_full: 0.0000
+- f3_xpd_ks2_status: PASS_WITH_CENSORING (continuous-only KS pass with censoring; full-mixture KS fails)
+- f3_pinned_ratio_rt_synth: rt=0.684, synth=0.779
+- synthetic_kappa_clamp_rate: 0.0000
+- synthetic_kappa_truncation_rate: 0.0000
+- F3 KS check: PASS_WITH_CENSORING (continuous-only passed; full-mixture mismatch due point-mass).
+- f5_subband_mu_rmse_db: 0.030
+- f5_status: PASS_WITH_CENSORING
+- phase_test_config: basis=circular, common_phase_removed=True, per_ray_sampling=True
+- phase_test_rt_status: INFO_DETERMINISTIC
+- phase_test_synth_status: FAIL
+
+## Reciprocity Sanity (C10)
+
+- matrix_source: J
+- covered_scenarios: ['A1', 'A2', 'A2R', 'A3', 'A3R', 'A4', 'A5', 'A6', 'B0', 'C0']
+- covered_cases: 119
+- checked_scenarios: ['A1', 'A2', 'A2R', 'A3', 'A3R', 'A4', 'A5', 'A6', 'B0', 'C0']
+- checked_cases: 119
+- require_bidirectional_paths: True, reverse_empty_cases=0
+- tolerance: tau_tol_s=1.000e-12, sigma_tol_db=1.000e-06
+- matched_ratio_global: 1.000000
+- delta_tau_max_s_global: 2.118e-22
+- delta_sigma_max_db_global: 7.715e-15
+- delta_fro_max_db_global: 3.857e-15
+- c10_coverage_pass: True
+- c10_hard_gate: checked_cases==covered_cases (119==119) AND reverse_empty_cases==0 (0==0)
+- type_counts: unmatched_count_total=0, unmatched_reverse_count_total=0, tau_mismatch_count_total=0, matrix_mismatch_count_total=0
+- type_counts_total: reverse_trace_empty=0, unmatched_forward=0, unmatched_reverse=0, tau_mismatch=0, matrix_mismatch=0
+- counts_by_scenario:
+-   A1: covered_cases=3, checked_cases=3, reverse_empty_cases=0, reverse_trace_empty=0, unmatched_forward=0, unmatched_reverse=0, tau_mismatch=0, matrix_mismatch=0, requirement_met=True
+-   A2: covered_cases=9, checked_cases=9, reverse_empty_cases=0, reverse_trace_empty=0, unmatched_forward=0, unmatched_reverse=0, tau_mismatch=0, matrix_mismatch=0, requirement_met=True
+-   A2R: covered_cases=14, checked_cases=14, reverse_empty_cases=0, reverse_trace_empty=0, unmatched_forward=0, unmatched_reverse=0, tau_mismatch=0, matrix_mismatch=0, requirement_met=True
+-   A3: covered_cases=4, checked_cases=4, reverse_empty_cases=0, reverse_trace_empty=0, unmatched_forward=0, unmatched_reverse=0, tau_mismatch=0, matrix_mismatch=0, requirement_met=True
+-   A3R: covered_cases=4, checked_cases=4, reverse_empty_cases=0, reverse_trace_empty=0, unmatched_forward=0, unmatched_reverse=0, tau_mismatch=0, matrix_mismatch=0, requirement_met=True
+-   A4: covered_cases=9, checked_cases=9, reverse_empty_cases=0, reverse_trace_empty=0, unmatched_forward=0, unmatched_reverse=0, tau_mismatch=0, matrix_mismatch=0, requirement_met=True
+-   A5: covered_cases=30, checked_cases=30, reverse_empty_cases=0, reverse_trace_empty=0, unmatched_forward=0, unmatched_reverse=0, tau_mismatch=0, matrix_mismatch=0, requirement_met=True
+-   A6: covered_cases=18, checked_cases=18, reverse_empty_cases=0, reverse_trace_empty=0, unmatched_forward=0, unmatched_reverse=0, tau_mismatch=0, matrix_mismatch=0, requirement_met=True
+-   B0: covered_cases=25, checked_cases=25, reverse_empty_cases=0, reverse_trace_empty=0, unmatched_forward=0, unmatched_reverse=0, tau_mismatch=0, matrix_mismatch=0, requirement_met=True
+-   C0: covered_cases=3, checked_cases=3, reverse_empty_cases=0, reverse_trace_empty=0, unmatched_forward=0, unmatched_reverse=0, tau_mismatch=0, matrix_mismatch=0, requirement_met=True
+- worst_5_violations:
+- C0/0: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=1, n_reverse=1
+- C0/1: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=1, n_reverse=1
+- C0/2: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=1, n_reverse=1
+- A1/0: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=1, n_reverse=1
+- A1/1: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=1, n_reverse=1
+- A1/2: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=1, n_reverse=1
+- A2/0: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=1, n_reverse=1
+- A2/1: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=1, n_reverse=1
+- A2/2: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=1, n_reverse=1
+- A2/3: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=1, n_reverse=1
+- A2/4: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=1, n_reverse=1
+- A2/5: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=1, n_reverse=1
+- A2/6: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=1, n_reverse=1
+- A2/7: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=1, n_reverse=1
+- A2/8: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=1, n_reverse=1
+- A2R/0: matched_ratio=1.000, delta_tau_max_s=2.118e-22, delta_sigma_max_db=1.929e-15, n_forward=1, n_reverse=1
+- A2R/1: matched_ratio=1.000, delta_tau_max_s=9.926e-24, delta_sigma_max_db=1.929e-15, n_forward=1, n_reverse=1
+- A2R/2: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=1, n_reverse=1
+- A2R/3: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=1.929e-15, n_forward=1, n_reverse=1
+- A2R/5: matched_ratio=1.000, delta_tau_max_s=1.323e-23, delta_sigma_max_db=0.000e+00, n_forward=1, n_reverse=1
+- A2R/6: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=1, n_reverse=1
+- A2R/7: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=1.929e-15, n_forward=1, n_reverse=1
+- A2R/8: matched_ratio=1.000, delta_tau_max_s=1.721e-22, delta_sigma_max_db=3.857e-15, n_forward=1, n_reverse=1
+- A2R/9: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=1.929e-15, n_forward=1, n_reverse=1
+- A2R/10: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=1, n_reverse=1
+- A2R/11: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=1, n_reverse=1
+- A2R/12: matched_ratio=1.000, delta_tau_max_s=5.956e-23, delta_sigma_max_db=1.929e-15, n_forward=1, n_reverse=1
+- A2R/14: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=1, n_reverse=1
+- A2R/15: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=1.929e-15, n_forward=1, n_reverse=1
+- A3/0: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=1, n_reverse=1
+- A3/1: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=1, n_reverse=1
+- A3/2: matched_ratio=1.000, delta_tau_max_s=6.617e-24, delta_sigma_max_db=5.786e-15, n_forward=1, n_reverse=1
+- A3/3: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=1, n_reverse=1
+- A3R/0: matched_ratio=1.000, delta_tau_max_s=1.323e-23, delta_sigma_max_db=0.000e+00, n_forward=1, n_reverse=1
+- A3R/1: matched_ratio=1.000, delta_tau_max_s=3.970e-23, delta_sigma_max_db=3.857e-15, n_forward=1, n_reverse=1
+- A3R/2: matched_ratio=1.000, delta_tau_max_s=5.294e-23, delta_sigma_max_db=1.929e-15, n_forward=1, n_reverse=1
+- A3R/3: matched_ratio=1.000, delta_tau_max_s=2.118e-22, delta_sigma_max_db=1.929e-15, n_forward=1, n_reverse=1
+- A4/0: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=1, n_reverse=1
+- A4/1: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=1, n_reverse=1
+- A4/2: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=1, n_reverse=1
+- A4/3: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=1, n_reverse=1
+- A4/4: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=1, n_reverse=1
+- A4/5: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=1, n_reverse=1
+- A4/6: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=1, n_reverse=1
+- A4/7: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=1, n_reverse=1
+- A4/8: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=1, n_reverse=1
+- A5/0: matched_ratio=1.000, delta_tau_max_s=6.617e-24, delta_sigma_max_db=5.786e-15, n_forward=1, n_reverse=1
+- A5/1: matched_ratio=1.000, delta_tau_max_s=6.617e-24, delta_sigma_max_db=5.786e-15, n_forward=1, n_reverse=1
+- A5/2: matched_ratio=1.000, delta_tau_max_s=6.617e-24, delta_sigma_max_db=5.786e-15, n_forward=1, n_reverse=1
+- A5/3: matched_ratio=1.000, delta_tau_max_s=6.617e-24, delta_sigma_max_db=5.786e-15, n_forward=1, n_reverse=1
+- A5/4: matched_ratio=1.000, delta_tau_max_s=6.617e-24, delta_sigma_max_db=5.786e-15, n_forward=1, n_reverse=1
+- A5/5: matched_ratio=1.000, delta_tau_max_s=6.617e-24, delta_sigma_max_db=5.786e-15, n_forward=1, n_reverse=1
+- A5/6: matched_ratio=1.000, delta_tau_max_s=6.617e-24, delta_sigma_max_db=5.786e-15, n_forward=1, n_reverse=1
+- A5/7: matched_ratio=1.000, delta_tau_max_s=6.617e-24, delta_sigma_max_db=5.786e-15, n_forward=1, n_reverse=1
+- A5/8: matched_ratio=1.000, delta_tau_max_s=6.617e-24, delta_sigma_max_db=5.786e-15, n_forward=1, n_reverse=1
+- A5/9: matched_ratio=1.000, delta_tau_max_s=6.617e-24, delta_sigma_max_db=5.786e-15, n_forward=1, n_reverse=1
+- A5/10: matched_ratio=1.000, delta_tau_max_s=6.617e-24, delta_sigma_max_db=5.786e-15, n_forward=1, n_reverse=1
+- A5/11: matched_ratio=1.000, delta_tau_max_s=6.617e-24, delta_sigma_max_db=5.786e-15, n_forward=1, n_reverse=1
+- A5/12: matched_ratio=1.000, delta_tau_max_s=6.617e-24, delta_sigma_max_db=5.786e-15, n_forward=1, n_reverse=1
+- A5/13: matched_ratio=1.000, delta_tau_max_s=6.617e-24, delta_sigma_max_db=5.786e-15, n_forward=1, n_reverse=1
+- A5/14: matched_ratio=1.000, delta_tau_max_s=6.617e-24, delta_sigma_max_db=5.786e-15, n_forward=1, n_reverse=1
+- A5/15: matched_ratio=1.000, delta_tau_max_s=6.617e-24, delta_sigma_max_db=5.786e-15, n_forward=1, n_reverse=1
+- A5/16: matched_ratio=1.000, delta_tau_max_s=6.617e-24, delta_sigma_max_db=5.786e-15, n_forward=1, n_reverse=1
+- A5/17: matched_ratio=1.000, delta_tau_max_s=6.617e-24, delta_sigma_max_db=5.786e-15, n_forward=1, n_reverse=1
+- A5/18: matched_ratio=1.000, delta_tau_max_s=6.617e-24, delta_sigma_max_db=5.786e-15, n_forward=1, n_reverse=1
+- A5/19: matched_ratio=1.000, delta_tau_max_s=6.617e-24, delta_sigma_max_db=5.786e-15, n_forward=1, n_reverse=1
+- A5/20: matched_ratio=1.000, delta_tau_max_s=6.617e-24, delta_sigma_max_db=5.786e-15, n_forward=1, n_reverse=1
+- A5/21: matched_ratio=1.000, delta_tau_max_s=6.617e-24, delta_sigma_max_db=5.786e-15, n_forward=1, n_reverse=1
+- A5/22: matched_ratio=1.000, delta_tau_max_s=6.617e-24, delta_sigma_max_db=5.786e-15, n_forward=1, n_reverse=1
+- A5/23: matched_ratio=1.000, delta_tau_max_s=6.617e-24, delta_sigma_max_db=5.786e-15, n_forward=1, n_reverse=1
+- A5/24: matched_ratio=1.000, delta_tau_max_s=6.617e-24, delta_sigma_max_db=5.786e-15, n_forward=1, n_reverse=1
+- A5/25: matched_ratio=1.000, delta_tau_max_s=6.617e-24, delta_sigma_max_db=5.786e-15, n_forward=1, n_reverse=1
+- A5/26: matched_ratio=1.000, delta_tau_max_s=6.617e-24, delta_sigma_max_db=5.786e-15, n_forward=1, n_reverse=1
+- A5/27: matched_ratio=1.000, delta_tau_max_s=6.617e-24, delta_sigma_max_db=5.786e-15, n_forward=1, n_reverse=1
+- A5/28: matched_ratio=1.000, delta_tau_max_s=6.617e-24, delta_sigma_max_db=5.786e-15, n_forward=1, n_reverse=1
+- A5/29: matched_ratio=1.000, delta_tau_max_s=6.617e-24, delta_sigma_max_db=5.786e-15, n_forward=1, n_reverse=1
+- A6/0: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=1, n_reverse=1
+- A6/1: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=1, n_reverse=1
+- A6/2: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=1, n_reverse=1
+- A6/3: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=1, n_reverse=1
+- A6/4: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=1, n_reverse=1
+- A6/5: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=1, n_reverse=1
+- A6/6: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=1, n_reverse=1
+- A6/7: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=1, n_reverse=1
+- A6/8: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=1, n_reverse=1
+- A6/9: matched_ratio=1.000, delta_tau_max_s=6.617e-24, delta_sigma_max_db=0.000e+00, n_forward=4, n_reverse=4
+- A6/10: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=4, n_reverse=4
+- A6/11: matched_ratio=1.000, delta_tau_max_s=6.617e-24, delta_sigma_max_db=0.000e+00, n_forward=4, n_reverse=4
+- A6/12: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=4, n_reverse=4
+- A6/13: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=4, n_reverse=4
+- A6/14: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=4, n_reverse=4
+- A6/15: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=1.929e-15, n_forward=4, n_reverse=4
+- A6/16: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=4, n_reverse=4
+- A6/17: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=1.929e-15, n_forward=4, n_reverse=4
+- B0/0: matched_ratio=1.000, delta_tau_max_s=6.617e-24, delta_sigma_max_db=3.857e-15, n_forward=25, n_reverse=25
+- B0/1: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=1.929e-15, n_forward=25, n_reverse=25
+- B0/2: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=0.000e+00, n_forward=21, n_reverse=21
+- B0/3: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=1.929e-15, n_forward=25, n_reverse=25
+- B0/4: matched_ratio=1.000, delta_tau_max_s=6.617e-24, delta_sigma_max_db=3.857e-15, n_forward=25, n_reverse=25
+- B0/5: matched_ratio=1.000, delta_tau_max_s=1.323e-23, delta_sigma_max_db=1.929e-15, n_forward=25, n_reverse=25
+- B0/6: matched_ratio=1.000, delta_tau_max_s=1.323e-23, delta_sigma_max_db=3.857e-15, n_forward=25, n_reverse=25
+- B0/7: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=5.786e-15, n_forward=21, n_reverse=21
+- B0/8: matched_ratio=1.000, delta_tau_max_s=1.323e-23, delta_sigma_max_db=3.857e-15, n_forward=25, n_reverse=25
+- B0/9: matched_ratio=1.000, delta_tau_max_s=1.323e-23, delta_sigma_max_db=1.929e-15, n_forward=25, n_reverse=25
+- B0/10: matched_ratio=1.000, delta_tau_max_s=1.323e-23, delta_sigma_max_db=5.786e-15, n_forward=25, n_reverse=25
+- B0/11: matched_ratio=1.000, delta_tau_max_s=6.617e-24, delta_sigma_max_db=5.786e-15, n_forward=25, n_reverse=25
+- B0/12: matched_ratio=1.000, delta_tau_max_s=1.323e-23, delta_sigma_max_db=3.857e-15, n_forward=21, n_reverse=21
+- B0/13: matched_ratio=1.000, delta_tau_max_s=6.617e-24, delta_sigma_max_db=5.786e-15, n_forward=25, n_reverse=25
+- B0/14: matched_ratio=1.000, delta_tau_max_s=1.323e-23, delta_sigma_max_db=5.786e-15, n_forward=25, n_reverse=25
+- B0/15: matched_ratio=1.000, delta_tau_max_s=1.323e-23, delta_sigma_max_db=3.857e-15, n_forward=25, n_reverse=25
+- B0/16: matched_ratio=1.000, delta_tau_max_s=6.617e-24, delta_sigma_max_db=7.715e-15, n_forward=25, n_reverse=25
+- B0/17: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=1.929e-15, n_forward=21, n_reverse=21
+- B0/18: matched_ratio=1.000, delta_tau_max_s=6.617e-24, delta_sigma_max_db=7.715e-15, n_forward=25, n_reverse=25
+- B0/19: matched_ratio=1.000, delta_tau_max_s=1.323e-23, delta_sigma_max_db=3.857e-15, n_forward=25, n_reverse=25
+- B0/20: matched_ratio=1.000, delta_tau_max_s=6.617e-24, delta_sigma_max_db=3.857e-15, n_forward=24, n_reverse=24
+- B0/21: matched_ratio=1.000, delta_tau_max_s=6.617e-24, delta_sigma_max_db=1.929e-15, n_forward=25, n_reverse=25
+- B0/22: matched_ratio=1.000, delta_tau_max_s=0.000e+00, delta_sigma_max_db=5.786e-15, n_forward=21, n_reverse=21
+- B0/23: matched_ratio=1.000, delta_tau_max_s=6.617e-24, delta_sigma_max_db=1.929e-15, n_forward=25, n_reverse=25
+- B0/24: matched_ratio=1.000, delta_tau_max_s=6.617e-24, delta_sigma_max_db=3.857e-15, n_forward=24, n_reverse=24
+
+## Tap-vs-Path Consistency (E12)
+
+- matrix_source: J
+- window_config: half_window_bins=2, overlap_policy=skip
+- n_cases: 121
+- delta_tau_median_s: 2.489e-11
+- delta_tau_max_s: 5.823e-11
+- delta_xpd_median_db: 0.000
+- delta_xpd_max_db: 0.000
+- delta_xpd_non_overlap_median_db: 0.000
+- delta_xpd_non_overlap_max_db: 0.000
+- wrap_detected_cases: 0
+- overlap_cases: 26
+- overlap_labeled_cases: 26
+- outlier_cases: 26
+- outlier_reason_counts: {'NONE': 93, 'EMPTY': 2, 'OVERLAP': 26}
+- outlier_csv: outputs/report_canonical_release_tap_path_outliers.csv
+- repro_bundle_json: outputs/report_canonical_release_tap_path_repro_bundle.json
+- repro_bundle_cases: 0
+- per-case (scenario/case): Δtau_s, ΔXPD_dB, overlap_count, reason, wrap, n_paths
+- C0/0: delta_tau_s=1.669e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- C0/1: delta_tau_s=3.338e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- C0/2: delta_tau_s=5.007e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A1/0: delta_tau_s=2.707e-12, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A1/1: delta_tau_s=4.449e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A1/2: delta_tau_s=3.041e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A2/0: delta_tau_s=5.544e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A2/1: delta_tau_s=2.301e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A2/2: delta_tau_s=2.756e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A2/3: delta_tau_s=1.267e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A2/4: delta_tau_s=4.779e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A2/5: delta_tau_s=1.095e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A2/6: delta_tau_s=4.397e-12, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A2/7: delta_tau_s=4.730e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A2/8: delta_tau_s=8.645e-13, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A2R/0: delta_tau_s=3.570e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A2R/1: delta_tau_s=2.611e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A2R/2: delta_tau_s=5.823e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A2R/3: delta_tau_s=5.215e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A2R/4: delta_tau_s=nan, delta_xpd_db=nan, overlap_count=0, reason=EMPTY, wrap=False, n_paths=0
+- A2R/5: delta_tau_s=5.489e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A2R/6: delta_tau_s=4.379e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A2R/7: delta_tau_s=2.123e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A2R/8: delta_tau_s=3.193e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A2R/9: delta_tau_s=3.463e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A2R/10: delta_tau_s=3.986e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A2R/11: delta_tau_s=2.847e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A2R/12: delta_tau_s=1.044e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A2R/13: delta_tau_s=nan, delta_xpd_db=nan, overlap_count=0, reason=EMPTY, wrap=False, n_paths=0
+- A2R/14: delta_tau_s=1.163e-12, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A2R/15: delta_tau_s=2.854e-12, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A3/0: delta_tau_s=4.779e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A3/1: delta_tau_s=4.779e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A3/2: delta_tau_s=2.489e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A3/3: delta_tau_s=5.077e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A3R/0: delta_tau_s=3.737e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A3R/1: delta_tau_s=4.025e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A3R/2: delta_tau_s=4.592e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A3R/3: delta_tau_s=2.787e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A4/0: delta_tau_s=2.301e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A4/1: delta_tau_s=4.779e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A4/2: delta_tau_s=4.730e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A4/3: delta_tau_s=2.301e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A4/4: delta_tau_s=4.779e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A4/5: delta_tau_s=4.730e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A4/6: delta_tau_s=2.301e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A4/7: delta_tau_s=4.779e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A4/8: delta_tau_s=4.730e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A5/0: delta_tau_s=2.489e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A5/1: delta_tau_s=2.489e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A5/2: delta_tau_s=2.489e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A5/3: delta_tau_s=2.489e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A5/4: delta_tau_s=2.489e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A5/5: delta_tau_s=2.489e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A5/6: delta_tau_s=2.489e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A5/7: delta_tau_s=2.489e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A5/8: delta_tau_s=2.489e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A5/9: delta_tau_s=2.489e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A5/10: delta_tau_s=2.489e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A5/11: delta_tau_s=2.489e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A5/12: delta_tau_s=2.489e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A5/13: delta_tau_s=2.489e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A5/14: delta_tau_s=2.489e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A5/15: delta_tau_s=2.489e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A5/16: delta_tau_s=2.489e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A5/17: delta_tau_s=2.489e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A5/18: delta_tau_s=2.489e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A5/19: delta_tau_s=2.489e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A5/20: delta_tau_s=2.489e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A5/21: delta_tau_s=2.489e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A5/22: delta_tau_s=2.489e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A5/23: delta_tau_s=2.489e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A5/24: delta_tau_s=2.489e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A5/25: delta_tau_s=2.489e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A5/26: delta_tau_s=2.489e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A5/27: delta_tau_s=2.489e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A5/28: delta_tau_s=2.489e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A5/29: delta_tau_s=2.489e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A6/0: delta_tau_s=1.457e-12, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A6/1: delta_tau_s=2.707e-12, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A6/2: delta_tau_s=1.457e-12, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A6/3: delta_tau_s=5.132e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A6/4: delta_tau_s=4.717e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A6/5: delta_tau_s=5.132e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A6/6: delta_tau_s=9.139e-12, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A6/7: delta_tau_s=5.016e-12, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A6/8: delta_tau_s=9.139e-12, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=1
+- A6/9: delta_tau_s=2.833e-11, delta_xpd_db=nan, overlap_count=2, reason=OVERLAP, wrap=False, n_paths=2
+-   NOTE: overlap-labeled case (A6/9); tap/path direct comparison limited.
+- A6/10: delta_tau_s=3.041e-11, delta_xpd_db=nan, overlap_count=2, reason=OVERLAP, wrap=False, n_paths=2
+-   NOTE: overlap-labeled case (A6/10); tap/path direct comparison limited.
+- A6/11: delta_tau_s=2.833e-11, delta_xpd_db=nan, overlap_count=2, reason=OVERLAP, wrap=False, n_paths=2
+-   NOTE: overlap-labeled case (A6/11); tap/path direct comparison limited.
+- A6/12: delta_tau_s=3.332e-12, delta_xpd_db=nan, overlap_count=2, reason=OVERLAP, wrap=False, n_paths=2
+-   NOTE: overlap-labeled case (A6/12); tap/path direct comparison limited.
+- A6/13: delta_tau_s=5.414e-12, delta_xpd_db=nan, overlap_count=2, reason=OVERLAP, wrap=False, n_paths=2
+-   NOTE: overlap-labeled case (A6/13); tap/path direct comparison limited.
+- A6/14: delta_tau_s=3.332e-12, delta_xpd_db=nan, overlap_count=2, reason=OVERLAP, wrap=False, n_paths=2
+-   NOTE: overlap-labeled case (A6/14); tap/path direct comparison limited.
+- A6/15: delta_tau_s=3.828e-11, delta_xpd_db=nan, overlap_count=2, reason=OVERLAP, wrap=False, n_paths=2
+-   NOTE: overlap-labeled case (A6/15); tap/path direct comparison limited.
+- A6/16: delta_tau_s=3.620e-11, delta_xpd_db=nan, overlap_count=2, reason=OVERLAP, wrap=False, n_paths=2
+-   NOTE: overlap-labeled case (A6/16); tap/path direct comparison limited.
+- A6/17: delta_tau_s=3.828e-11, delta_xpd_db=nan, overlap_count=2, reason=OVERLAP, wrap=False, n_paths=2
+-   NOTE: overlap-labeled case (A6/17); tap/path direct comparison limited.
+- B0/0: delta_tau_s=1.539e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=25
+- B0/1: delta_tau_s=4.312e-11, delta_xpd_db=nan, overlap_count=2, reason=OVERLAP, wrap=False, n_paths=25
+-   NOTE: overlap-labeled case (B0/1); tap/path direct comparison limited.
+- B0/2: delta_tau_s=2.664e-11, delta_xpd_db=nan, overlap_count=2, reason=OVERLAP, wrap=False, n_paths=21
+-   NOTE: overlap-labeled case (B0/2); tap/path direct comparison limited.
+- B0/3: delta_tau_s=4.312e-11, delta_xpd_db=nan, overlap_count=2, reason=OVERLAP, wrap=False, n_paths=25
+-   NOTE: overlap-labeled case (B0/3); tap/path direct comparison limited.
+- B0/4: delta_tau_s=1.539e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=25
+- B0/5: delta_tau_s=5.100e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=25
+- B0/6: delta_tau_s=3.143e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=25
+- B0/7: delta_tau_s=2.262e-11, delta_xpd_db=nan, overlap_count=2, reason=OVERLAP, wrap=False, n_paths=21
+-   NOTE: overlap-labeled case (B0/7); tap/path direct comparison limited.
+- B0/8: delta_tau_s=3.143e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=25
+- B0/9: delta_tau_s=5.100e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=25
+- B0/10: delta_tau_s=2.077e-11, delta_xpd_db=nan, overlap_count=2, reason=OVERLAP, wrap=False, n_paths=25
+-   NOTE: overlap-labeled case (B0/10); tap/path direct comparison limited.
+- B0/11: delta_tau_s=2.262e-11, delta_xpd_db=nan, overlap_count=2, reason=OVERLAP, wrap=False, n_paths=25
+-   NOTE: overlap-labeled case (B0/11); tap/path direct comparison limited.
+- B0/12: delta_tau_s=2.917e-11, delta_xpd_db=nan, overlap_count=2, reason=OVERLAP, wrap=False, n_paths=21
+-   NOTE: overlap-labeled case (B0/12); tap/path direct comparison limited.
+- B0/13: delta_tau_s=2.262e-11, delta_xpd_db=nan, overlap_count=2, reason=OVERLAP, wrap=False, n_paths=25
+-   NOTE: overlap-labeled case (B0/13); tap/path direct comparison limited.
+- B0/14: delta_tau_s=2.077e-11, delta_xpd_db=nan, overlap_count=2, reason=OVERLAP, wrap=False, n_paths=25
+-   NOTE: overlap-labeled case (B0/14); tap/path direct comparison limited.
+- B0/15: delta_tau_s=5.537e-11, delta_xpd_db=nan, overlap_count=2, reason=OVERLAP, wrap=False, n_paths=25
+-   NOTE: overlap-labeled case (B0/15); tap/path direct comparison limited.
+- B0/16: delta_tau_s=2.395e-11, delta_xpd_db=nan, overlap_count=2, reason=OVERLAP, wrap=False, n_paths=25
+-   NOTE: overlap-labeled case (B0/16); tap/path direct comparison limited.
+- B0/17: delta_tau_s=2.307e-11, delta_xpd_db=nan, overlap_count=2, reason=OVERLAP, wrap=False, n_paths=21
+-   NOTE: overlap-labeled case (B0/17); tap/path direct comparison limited.
+- B0/18: delta_tau_s=2.395e-11, delta_xpd_db=nan, overlap_count=2, reason=OVERLAP, wrap=False, n_paths=25
+-   NOTE: overlap-labeled case (B0/18); tap/path direct comparison limited.
+- B0/19: delta_tau_s=5.537e-11, delta_xpd_db=nan, overlap_count=2, reason=OVERLAP, wrap=False, n_paths=25
+-   NOTE: overlap-labeled case (B0/19); tap/path direct comparison limited.
+- B0/20: delta_tau_s=4.490e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=24
+- B0/21: delta_tau_s=3.286e-11, delta_xpd_db=nan, overlap_count=4, reason=OVERLAP, wrap=False, n_paths=25
+-   NOTE: overlap-labeled case (B0/21); tap/path direct comparison limited.
+- B0/22: delta_tau_s=1.583e-11, delta_xpd_db=nan, overlap_count=4, reason=OVERLAP, wrap=False, n_paths=21
+-   NOTE: overlap-labeled case (B0/22); tap/path direct comparison limited.
+- B0/23: delta_tau_s=3.286e-11, delta_xpd_db=nan, overlap_count=4, reason=OVERLAP, wrap=False, n_paths=25
+-   NOTE: overlap-labeled case (B0/23); tap/path direct comparison limited.
+- B0/24: delta_tau_s=4.490e-11, delta_xpd_db=0.000, overlap_count=1, reason=NONE, wrap=False, n_paths=24
+
+## Measurement Bridge (G2)
+
+- current_basis: circular
+- current_convention: IEEE-RHCP
+- current_matrix_source: J
+- current_antenna_coupling_enabled: False
+- comparison_rule: antenna-included S21/S12 -> A_f (embedded), antenna de-embedded propagation comparison -> J_f (propagation-only)
+- recommendation_for_this_run: compare to antenna de-embedded / propagation-only references.
+- if_target_is_embedded_s21: rerun with --xpd-matrix-source A and realistic coupling/leakage settings.
+- basis_convention_rule: measurement post-processing must match basis=circular, convention=IEEE-RHCP; do not mix linear CP interpretation without explicit conversion.
+- mismatch_diagnosis_order:
+-   1) geometry/delay/occlusion
+-   2) FSPL/scalar_gain
+-   3) Fresnel Gamma_s,Gamma_p
+-   4) polarization basis/parity interpretation
+-   5) antenna coupling/leakage/AR
+
+## Hard Gate Summary
+
+- hard_gates: {'A_git_clean_check': True, 'B_geometry_invariants': True, 'C10_full_coverage': True, 'D_wrap_zero': True, 'F3_model_compare': True}
+- hard_fail: []
+- hard_fail_count: 0
+- geometry_invariants: {'total_paths': 706, 'bad_bounce_count': 0, 'bad_interactions_len': 0, 'bad_surface_ids_len': 0, 'bad_incidence_angles_len': 0, 'bad_segment_basis_len': 0, 'bad_aod_shape': 0, 'bad_aoa_shape': 0, 'bad_tau': 0, 'bad_matrix_shape': 0, 'bad_matrix_nan': 0, 'violations_total': 0, 'pass': True}
+- wrap_detected_cases_total: 0
+- HARD_GATE_SUMMARY_JSON: {"geometry_stats": {"bad_aoa_shape": 0, "bad_aod_shape": 0, "bad_bounce_count": 0, "bad_incidence_angles_len": 0, "bad_interactions_len": 0, "bad_matrix_nan": 0, "bad_matrix_shape": 0, "bad_segment_basis_len": 0, "bad_surface_ids_len": 0, "bad_tau": 0, "pass": true, "total_paths": 706, "violations_total": 0}, "hard_fail": [], "hard_fail_count": 0, "hard_gates": {"A_git_clean_check": true, "B_geometry_invariants": true, "C10_full_coverage": true, "D_wrap_zero": true, "F3_model_compare": true}, "release_mode": true, "wrap_detected_cases_total": 0}
