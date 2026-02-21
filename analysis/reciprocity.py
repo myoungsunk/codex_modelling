@@ -20,6 +20,7 @@ from rt_core.tracer import PathResult, trace_paths
 
 
 EPS = 1e-15
+SIGNATURE_TOL_M = 1e-6
 
 
 @dataclass
@@ -92,13 +93,28 @@ def _surface_pattern(surface_ids: list[int]) -> str:
     return "-".join(str(int(x)) for x in surface_ids) if surface_ids else "none"
 
 
-def _path_key(path: PathResult, reverse_order: bool = False) -> tuple[int, str, tuple[tuple[float, float, float], ...]]:
+def _quantized_point(p: np.ndarray, tol_m: float) -> tuple[int, int, int]:
+    q = np.rint(np.asarray(p, dtype=float) / float(tol_m)).astype(np.int64)
+    return int(q[0]), int(q[1]), int(q[2])
+
+
+def path_signature(
+    path: PathResult,
+    reverse_order: bool = False,
+    tol_m: float = SIGNATURE_TOL_M,
+) -> tuple[int, str, tuple[tuple[int, int, int], ...]]:
+    """Robust path signature for forward/reverse matching.
+
+    Signature = (bounce_count, ordered_surface_ids, reflection_points_quantized).
+    Reflection points are quantized by `tol_m` to tolerate tiny numeric drifts.
+    """
+
     pts = [np.asarray(p, dtype=float) for p in path.points]
     sids = list(path.surface_ids)
     if reverse_order:
         pts = list(reversed(pts))
         sids = list(reversed(sids))
-    interior = tuple(tuple(np.round(p, 6).tolist()) for p in pts[1:-1])
+    interior = tuple(_quantized_point(p, tol_m=tol_m) for p in pts[1:-1])
     return int(path.bounce_count), _surface_pattern(sids), interior
 
 
@@ -164,6 +180,7 @@ def reciprocity_sanity(
     matrix_source: str = "J",
     tau_tol_s: float = 1e-12,
     sigma_tol_db: float = 1e-6,
+    signature_tol_m: float = SIGNATURE_TOL_M,
 ) -> dict[str, Any]:
     """Run forward/reverse traces and compare path invariants."""
 
@@ -190,9 +207,9 @@ def reciprocity_sanity(
         force_cp_swap_on_odd_reflection=force_cp_swap_on_odd_reflection,
     )
 
-    rev_map: dict[tuple[int, str, tuple[tuple[float, float, float], ...]], list[tuple[int, PathResult]]] = {}
+    rev_map: dict[tuple[int, str, tuple[tuple[int, int, int], ...]], list[tuple[int, PathResult]]] = {}
     for i_rev, p in enumerate(rev):
-        rev_map.setdefault(_path_key(p, reverse_order=True), []).append((i_rev, p))
+        rev_map.setdefault(path_signature(p, reverse_order=True, tol_m=signature_tol_m), []).append((i_rev, p))
     rev_items: list[tuple[int, PathResult, str]] = []
     for i_rev, p in enumerate(rev):
         rev_items.append((i_rev, p, _surface_pattern(list(reversed(p.surface_ids)))))
@@ -202,7 +219,7 @@ def reciprocity_sanity(
     used_rev_indices: set[int] = set()
 
     for i_fwd, pf in enumerate(fwd):
-        key = _path_key(pf, reverse_order=False)
+        key = path_signature(pf, reverse_order=False, tol_m=signature_tol_m)
         cand = rev_map.get(key, [])
         match_method = "exact_key"
         if not cand:
@@ -366,6 +383,7 @@ def reciprocity_sanity(
         "matrix_mismatch_count": int(matrix_mismatch_count),
         "tau_tol_s": float(tau_tol_s),
         "sigma_tol_db": float(sigma_tol_db),
+        "signature_tol_m": float(signature_tol_m),
         "matrix_source": str(matrix_source),
         "matches": [
             {
