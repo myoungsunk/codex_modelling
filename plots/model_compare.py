@@ -160,10 +160,17 @@ def generate_rt_vs_synth_plots(
             sg_sy.append(float(np.std(vsy, ddof=1)))
 
     x = np.arange(len(subbands), dtype=float)
+    a_rt = np.asarray(mu_rt, dtype=float)
+    a_sy = np.asarray(mu_sy, dtype=float)
+    valid = np.isfinite(a_rt) & np.isfinite(a_sy)
+    subband_mu_rmse_title = float(np.sqrt(np.mean((a_rt[valid] - a_sy[valid]) ** 2))) if np.any(valid) else np.nan
     fig, ax = plt.subplots(figsize=(8, 4))
     ax.errorbar(x - 0.05, mu_rt, yerr=sg_rt, fmt="o-", label=f"RT ({matrix_source})")
     ax.errorbar(x + 0.05, mu_sy, yerr=sg_sy, fmt="s--", label="Synthetic")
-    ax.set_title("F5 RT vs Synthetic subband XPD mean (mu±sigma)")
+    ax.set_title(
+        "F5 RT vs Synthetic subband XPD mean (mu±sigma)\n"
+        f"RMSE_mu={subband_mu_rmse_title:.3f} dB"
+    )
     ax.set_xlabel("subband index")
     ax.set_ylabel("XPD [dB]")
     ax.grid(True, alpha=0.3)
@@ -280,6 +287,7 @@ def generate_rt_vs_synth_plots(
         "f5_subband_mu_span_synth_db": float(np.nanmax(a_sy) - np.nanmin(a_sy)) if np.any(np.isfinite(a_sy)) else np.nan,
         "f5_subband_mu_rmse_db": subband_mu_rmse,
         "f5_subband_sigma_rmse_db": subband_sigma_rmse,
+        "f5_status": "PASS" if (np.isfinite(subband_mu_rmse) and subband_mu_rmse <= 3.0) else "FAIL",
         "f6_phase_test_basis": matrix_source,
         "f6_common_phase_removed": bool(phase_common_removed),
         "f6_per_ray_sampling": bool(phase_per_ray_sampling),

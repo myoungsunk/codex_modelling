@@ -81,7 +81,48 @@ class SVModelUpdatesTests(unittest.TestCase):
         self.assertIn("phase_test_basis", out)
         self.assertEqual(str(out["phase_uniformity_rt_status"]), "INFO_DETERMINISTIC")
 
+    def test_num_paths_mode_per_case_and_per_scenario(self) -> None:
+        nf = 8
+        f = np.linspace(6e9, 7e9, nf)
+        d = np.linspace(5e-9, 20e-9, 10)
+        p = np.linspace(1.0, 0.2, 10)
+        sids = ["S0"] * 6 + ["S1"] * 4
+        cids = ["c0"] * 3 + ["c1"] * 3 + ["c2"] * 2 + ["c3"] * 2
+
+        sy_case, dg_case = generate_synthetic_paths(
+            f_hz=f,
+            num_rays=3,
+            num_paths_mode="match_rt_per_case",
+            delay_samples_s=d,
+            power_samples=p,
+            rt_path_scenarios=sids,
+            rt_path_cases=cids,
+            parity_probs={"odd": 0.5, "even": 0.5},
+            parity_fit={"odd": {"mu": 8.0, "sigma": 1.0}, "even": {"mu": 9.0, "sigma": 1.0}},
+            matrix_source="J",
+            return_diagnostics=True,
+            seed=4,
+        )
+        self.assertEqual(len(sy_case), len(d))
+        self.assertEqual(str(dg_case["num_paths_mode"]), "match_rt_per_case")
+
+        sy_scn, dg_scn = generate_synthetic_paths(
+            f_hz=f,
+            num_rays=3,
+            num_paths_mode="match_rt_per_scenario",
+            delay_samples_s=d,
+            power_samples=p,
+            rt_path_scenarios=sids,
+            rt_path_cases=cids,
+            parity_probs={"odd": 0.5, "even": 0.5},
+            parity_fit={"odd": {"mu": 8.0, "sigma": 1.0}, "even": {"mu": 9.0, "sigma": 1.0}},
+            matrix_source="J",
+            return_diagnostics=True,
+            seed=4,
+        )
+        self.assertEqual(len(sy_scn), len(d))
+        self.assertEqual(str(dg_scn["num_paths_mode"]), "match_rt_per_scenario")
+
 
 if __name__ == "__main__":
     unittest.main()
-

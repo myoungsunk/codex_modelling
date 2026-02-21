@@ -18,12 +18,44 @@ from scipy import optimize, stats
 
 EPS = 1e-15
 MatrixSource = Literal["A", "J"]
+BasisName = Literal["linear", "circular"]
 
 
 def _matrix_from_path(path: dict[str, Any], matrix_source: MatrixSource = "A") -> NDArray[np.complex128]:
     if matrix_source == "J" and "J_f" in path:
         return np.asarray(path["J_f"], dtype=np.complex128)
     return np.asarray(path["A_f"], dtype=np.complex128)
+
+
+def _resolve_basis(
+    input_basis: BasisName | None,
+    eval_basis: BasisName | None,
+) -> tuple[BasisName | None, BasisName | None]:
+    src = str(input_basis).lower() if input_basis is not None else None
+    dst = str(eval_basis).lower() if eval_basis is not None else None
+    src_b = src if src in {"linear", "circular"} else None
+    dst_b = dst if dst in {"linear", "circular"} else src_b
+    return src_b, dst_b
+
+
+def _matrix_in_eval_basis(
+    M_f: NDArray[np.complex128],
+    input_basis: BasisName | None,
+    eval_basis: BasisName | None,
+    convention: str,
+) -> NDArray[np.complex128]:
+    src_b, dst_b = _resolve_basis(input_basis, eval_basis)
+    if src_b is None or dst_b is None or src_b == dst_b:
+        return M_f
+    from analysis.ctf_cir import convert_basis
+
+    return convert_basis(M_f, src=src_b, dst=dst_b, convention=convention)
+
+
+def xpd_variable_definition(eval_basis: BasisName | None) -> str:
+    if str(eval_basis).lower() == "circular":
+        return "XPD_circular_same_vs_opposite_hand_power_ratio_dB"
+    return "XPD_linear_copol_vs_crosspol_power_ratio_dB"
 
 
 def _co_cross_power_spectra(M_f: NDArray[np.complex128]) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
@@ -71,6 +103,9 @@ def pathwise_xpd(
     bounce_filter: set[int] | None = None,
     power_floor: float = 1e-12,
     matrix_source: MatrixSource = "A",
+    input_basis: BasisName | None = None,
+    eval_basis: BasisName | None = None,
+    convention: str = "IEEE-RHCP",
 ) -> list[dict[str, Any]]:
     """Compute path-wise XPD/XPR using mean POWER over frequency.
 
@@ -83,8 +118,11 @@ def pathwise_xpd(
     """
 
     out: list[dict[str, Any]] = []
+    src_b, dst_b = _resolve_basis(input_basis, eval_basis)
+    rv_name = xpd_variable_definition(dst_b)
     for i, p in enumerate(paths):
         M_f = _matrix_from_path(p, matrix_source=matrix_source)
+        M_f = _matrix_in_eval_basis(M_f, src_b, dst_b, convention=convention)
         meta = p.get("meta", {})
         bcnt = int(meta.get("bounce_count", 0))
 
@@ -100,6 +138,10 @@ def pathwise_xpd(
             "parity": "even" if bcnt % 2 == 0 else "odd",
             "tau_s": float(p.get("tau_s", 0.0)),
             "matrix_source": matrix_source,
+            "input_basis": src_b,
+            "eval_basis": dst_b,
+            "convention": str(convention),
+            "xpd_variable": rv_name,
         }
 
         if subbands is None:
@@ -119,6 +161,8 @@ def tapwise_xpd(
     tau_s: NDArray[np.float64],
     win_s: tuple[float, float] | None = None,
     power_floor: float = 1e-12,
+    eval_basis: BasisName | None = None,
+    convention: str = "IEEE-RHCP",
 ) -> dict[str, NDArray[np.float64]]:
     p = np.abs(h_tau) ** 2
     co = p[:, 0, 0] + p[:, 1, 1]
@@ -128,7 +172,52 @@ def tapwise_xpd(
         m = np.ones_like(tau_s, dtype=bool)
     else:
         m = (tau_s >= win_s[0]) & (tau_s <= win_s[1])
-    return {"tau_s": tau_s[m], "xpd_db": xpd[m], "co": co[m], "cross": cross[m]}
+    return {
+        "tau_s": tau_s[m],
+        "xpd_db": xpd[m],
+        "co": co[m],
+        "cross": cross[m],
+        "eval_basis": np.asarray([str(eval_basis or "linear")] * int(np.sum(m))),
+        "convention": np.asarray([str(convention)] * int(np.sum(m))),
+    }
+
+
+def tapwise_xpd_from_paths(
+    paths: list[dict[str, Any]],
+    f_hz: NDArray[np.float64],
+    matrix_source: MatrixSource = "A",
+    input_basis: BasisName | None = None,
+    eval_basis: BasisName | None = None,
+    convention: str = "IEEE-RHCP",
+    nfft: int = 2048,
+    window: str = "hann",
+    win_s: tuple[float, float] | None = None,
+    power_floor: float = 1e-12,
+) -> dict[str, NDArray[np.float64]]:
+    """Compute tap-wise XPD random variable from path list with explicit basis handling."""
+
+    from analysis.ctf_cir import ctf_to_cir, synthesize_ctf_with_basis
+
+    H_f = synthesize_ctf_with_basis(
+        paths,
+        f_hz=np.asarray(f_hz, dtype=float),
+        matrix_source=matrix_source,
+        input_basis=input_basis,
+        eval_basis=eval_basis,
+        convention=convention,
+    )
+    h_tau, tau = ctf_to_cir(H_f, np.asarray(f_hz, dtype=float), nfft=nfft, window=window)  # type: ignore[arg-type]
+    out = tapwise_xpd(
+        h_tau,
+        tau,
+        win_s=win_s,
+        power_floor=power_floor,
+        eval_basis=eval_basis,
+        convention=convention,
+    )
+    out["matrix_source"] = np.asarray([str(matrix_source)] * len(out["tau_s"]))
+    out["xpd_variable"] = np.asarray([xpd_variable_definition(eval_basis)] * len(out["tau_s"]))
+    return out
 
 
 def early_late_split(samples: list[dict[str, Any]], split_tau_s: float) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
@@ -739,6 +828,10 @@ def floor_pinned_exclusion_mask(
             "floor_db": np.nan,
             "pinned_center_db": np.nan,
             "pinned_fraction": 0.0,
+            "pinned_ratio": 0.0,
+            "floor_ratio": 0.0,
+            "point_mass_ratio": 0.0,
+            "point_mass_kind": "none",
         }
 
     tol = max(float(pinned_tol_db), 1e-6)
@@ -756,6 +849,20 @@ def floor_pinned_exclusion_mask(
     if np.all(mask_excluded):
         # Keep at least some samples for post-filter fit.
         mask_excluded = mask_floor.copy()
+    floor_count = int(np.sum(mask_floor))
+    pinned_count = int(np.sum(mask_pinned))
+    excluded_count = int(np.sum(mask_excluded))
+    floor_ratio = float(floor_count / max(n, 1))
+    pinned_ratio = float(pinned_count / max(n, 1))
+    point_mass_ratio = float(excluded_count / max(n, 1))
+    point_mass_kind = "none"
+    if floor_count > 0 and floor_count >= pinned_count:
+        point_mass_kind = "floor_spike"
+    elif pinned_count > 0:
+        if np.isfinite(pinned_center) and pinned_center >= float(np.quantile(v, 0.9)):
+            point_mass_kind = "right_censored_or_upper_spike"
+        else:
+            point_mass_kind = "mode_spike"
     return {
         "values": v,
         "mask_excluded": mask_excluded,
@@ -764,6 +871,10 @@ def floor_pinned_exclusion_mask(
         "floor_db": float(floor_db) if floor_db is not None and np.isfinite(floor_db) else np.nan,
         "pinned_center_db": pinned_center,
         "pinned_fraction": float(mode_frac),
+        "pinned_ratio": pinned_ratio,
+        "floor_ratio": floor_ratio,
+        "point_mass_ratio": point_mass_ratio,
+        "point_mass_kind": point_mass_kind,
     }
 
 
@@ -795,21 +906,32 @@ def gof_model_selection_db(
     v = np.asarray(excl["values"], dtype=float)
     mask_excluded = np.asarray(excl["mask_excluded"], dtype=bool)
     v_fit = v[~mask_excluded]
-    if len(v_fit) < int(min_n):
-        v_fit = v
-        mask_excluded = np.zeros_like(mask_excluded, dtype=bool)
 
     post_normal = gof_normal_db(v_fit, min_n=min_n, bootstrap_B=bootstrap_B, seed=seed + 97)
     n_fit = int(len(v_fit))
     n_excluded = int(np.sum(mask_excluded))
+    floor_count = int(np.sum(np.asarray(excl["mask_floor"], dtype=bool)))
+    pinned_count = int(np.sum(np.asarray(excl["mask_pinned"], dtype=bool)))
+    floor_ratio = float(excl.get("floor_ratio", floor_count / max(n_total, 1)))
+    pinned_ratio = float(excl.get("pinned_ratio", pinned_count / max(n_total, 1)))
+    point_mass_ratio = float(excl.get("point_mass_ratio", n_excluded / max(n_total, 1)))
+    point_mass_kind = str(excl.get("point_mass_kind", "none"))
     if n_fit < int(min_n):
+        diag = "INSUFFICIENT_N"
+        if point_mass_ratio >= 0.5:
+            diag = "POINT_MASS_DOMINANT_INSUFFICIENT"
         return {
             "status": "INSUFFICIENT",
             "n": n_total,
+            "n_total": n_total,
             "n_fit": n_fit,
             "n_excluded": n_excluded,
-            "excluded_floor_count": int(np.sum(np.asarray(excl["mask_floor"], dtype=bool))),
-            "excluded_pinned_count": int(np.sum(np.asarray(excl["mask_pinned"], dtype=bool))),
+            "excluded_floor_count": floor_count,
+            "excluded_pinned_count": pinned_count,
+            "floor_ratio": floor_ratio,
+            "pinned_ratio": pinned_ratio,
+            "point_mass_ratio": point_mass_ratio,
+            "point_mass_kind": point_mass_kind,
             "floor_db": excl["floor_db"],
             "pinned_center_db": excl["pinned_center_db"],
             "pinned_fraction": excl["pinned_fraction"],
@@ -820,6 +942,9 @@ def gof_model_selection_db(
             "warning": True,
             "single_normal_fail": True,
             "alternative_improved": False,
+            "diagnostic_class": diag,
+            "residual_borderline": False,
+            "gof_continuous": {"ks_p_boot": np.nan, "qq_r": np.nan},
         }
 
     candidates = ["normal_db", "gmm2_db", "truncnorm_db", "spike_slab_db"]
@@ -860,12 +985,32 @@ def gof_model_selection_db(
     best = model_stats.get(best_model, {})
     single_normal_fail = bool(pre_normal.get("status") == "OK" and pre_normal.get("warning", True))
     best_ok = bool(best.get("status") == "OK")
-    best_pass = bool(best_ok and (not best.get("warning", True)))
+    best_qq = float(best.get("qq_r", np.nan))
+    best_ks_boot = float(best.get("ks_p_boot", np.nan))
+    pass_strict = bool(np.isfinite(best_qq) and np.isfinite(best_ks_boot) and best_qq >= 0.98 and best_ks_boot >= 0.05)
+    best_pass = bool(best_ok and pass_strict)
     bic_norm = float(model_stats.get("normal_db", {}).get("bic", np.inf))
     bic_best = float(best.get("bic", np.inf))
     alternative_improved = bool(best_model != "normal_db" and np.isfinite(bic_norm) and np.isfinite(bic_best) and (bic_norm - bic_best > 10.0))
-    warning = not best_pass
-    status = "OK" if best_ok else "FAIL"
+    residual_borderline = bool(best_ok and not pass_strict)
+    if not best_ok:
+        status = "FAIL_MODEL"
+        warning = True
+        diagnostic_class = "MODEL_FAILURE"
+    elif pass_strict:
+        status = "PASS_ALTERNATIVE" if (best_model != "normal_db" and single_normal_fail) else "PASS"
+        warning = False
+        diagnostic_class = "MODEL_PASS_ALTERNATIVE" if status == "PASS_ALTERNATIVE" else "MODEL_PASS"
+    elif best_model != "normal_db" and alternative_improved:
+        status = "PASS_ALTERNATIVE"
+        warning = True
+        diagnostic_class = "MODEL_PASS_ALTERNATIVE"
+    else:
+        status = "FAIL_MODEL"
+        warning = True
+        diagnostic_class = "MODEL_FAILURE"
+    if point_mass_ratio >= 0.5 and status != "FAIL_MODEL":
+        diagnostic_class = "POINT_MASS_DOMINANT"
     model_reason = "single-normal adequate"
     if single_normal_fail and alternative_improved and best_pass:
         model_reason = "single-normal fail; alternative model selected and passes GOF"
@@ -880,10 +1025,15 @@ def gof_model_selection_db(
         "status": status,
         "warning": warning,
         "n": n_total,
+        "n_total": n_total,
         "n_fit": n_fit,
         "n_excluded": n_excluded,
-        "excluded_floor_count": int(np.sum(np.asarray(excl["mask_floor"], dtype=bool))),
-        "excluded_pinned_count": int(np.sum(np.asarray(excl["mask_pinned"], dtype=bool))),
+        "excluded_floor_count": floor_count,
+        "excluded_pinned_count": pinned_count,
+        "floor_ratio": floor_ratio,
+        "pinned_ratio": pinned_ratio,
+        "point_mass_ratio": point_mass_ratio,
+        "point_mass_kind": point_mass_kind,
         "floor_db": excl["floor_db"],
         "pinned_center_db": excl["pinned_center_db"],
         "pinned_fraction": excl["pinned_fraction"],
@@ -894,6 +1044,12 @@ def gof_model_selection_db(
         "models": model_stats,
         "single_normal_fail": single_normal_fail,
         "alternative_improved": alternative_improved,
+        "residual_borderline": residual_borderline,
+        "diagnostic_class": diagnostic_class,
+        "gof_continuous": {
+            "ks_p_boot": best_ks_boot,
+            "qq_r": best_qq,
+        },
         "model_reason": model_reason,
     }
 
@@ -976,3 +1132,39 @@ def leakage_limited_summary(
         "delta_floor_db": delta_floor_db,
         "is_leakage_limited": is_limited,
     }
+
+
+def censoring_profile_by_bucket(
+    samples: list[dict[str, Any]],
+    key_fields: list[str],
+    value_key: str = "xpd_db",
+    floor_db: float | None = None,
+    pinned_tol_db: float = 0.5,
+) -> dict[str, dict[str, Any]]:
+    """Estimate floor/pinned point-mass ratios per conditional bucket."""
+
+    buckets: dict[str, list[float]] = {}
+    for s in samples:
+        key = "|".join(str(s.get(k, "NA")) for k in key_fields)
+        buckets.setdefault(key, []).append(float(s.get(value_key, np.nan)))
+
+    out: dict[str, dict[str, Any]] = {}
+    for k, vals in buckets.items():
+        e = floor_pinned_exclusion_mask(vals, floor_db=floor_db, pinned_tol_db=pinned_tol_db)
+        v = np.asarray(e["values"], dtype=float)
+        m_ex = np.asarray(e["mask_excluded"], dtype=bool)
+        n_total = int(len(v))
+        n_fit = int(np.sum(~m_ex))
+        out[k] = {
+            "n_total": n_total,
+            "n_fit": n_fit,
+            "n_excluded": int(np.sum(m_ex)),
+            "floor_ratio": float(e.get("floor_ratio", 0.0)),
+            "pinned_ratio": float(e.get("pinned_ratio", 0.0)),
+            "point_mass_ratio": float(e.get("point_mass_ratio", 0.0)),
+            "point_mass_kind": str(e.get("point_mass_kind", "none")),
+            "floor_db": float(e.get("floor_db", np.nan)),
+            "pinned_center_db": float(e.get("pinned_center_db", np.nan)),
+            "pinned_fraction": float(e.get("pinned_fraction", 0.0)),
+        }
+    return out

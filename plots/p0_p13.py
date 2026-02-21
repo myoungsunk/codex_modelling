@@ -785,9 +785,19 @@ def p20_xpd_fit_gof(data: dict[str, Any], out: Path, config: PlotConfig, exact_b
             pinned_tol_db=0.5,
         )
         status = str(gr.get("status", "NA"))
-
-        if status != "OK" or str(gr.get("best_model", "NA")) == "NA":
-            ax.text(0.5, 0.5, f"{key}: {status}\nn={int(gr.get('n', 0))}", ha="center", va="center", transform=ax.transAxes)
+        pass_like = {"PASS", "PASS_ALTERNATIVE"}
+        if status not in pass_like or str(gr.get("best_model", "NA")) == "NA":
+            ax.text(
+                0.5,
+                0.5,
+                f"{key}: {status}\n"
+                f"n={int(gr.get('n', 0))}, n_fit={int(gr.get('n_fit', 0))}\n"
+                f"floor_ratio={float(gr.get('floor_ratio', np.nan)):.2f}, "
+                f"pinned_ratio={float(gr.get('pinned_ratio', np.nan)):.2f}",
+                ha="center",
+                va="center",
+                transform=ax.transAxes,
+            )
             ax.set_xlabel("theoretical quantile")
             ax.set_ylabel("sample quantile [dB]")
             ax.grid(True, alpha=0.3)
@@ -808,9 +818,10 @@ def p20_xpd_fit_gof(data: dict[str, Any], out: Path, config: PlotConfig, exact_b
         ax.set_ylabel("sample quantile [dB]")
         warn_tag = " [WARN]" if bool(best.get("warning", False) or gr.get("warning", False)) else ""
         ax.set_title(
-            f"{key}{warn_tag}: model={best_model}, n={int(gr['n'])}, n_fit={int(gr.get('n_fit', 0))}\n"
+            f"{key} [{status}]{warn_tag}: model={best_model}, n={int(gr['n'])}, n_fit={int(gr.get('n_fit', 0))}\n"
             f"qq_r={float(best.get('qq_r', np.nan)):.3f}, ks_D={float(best.get('ks_D', np.nan)):.3f}, "
-            f"ks_p_boot={float(best.get('ks_p_boot', np.nan)):.3f}",
+            f"ks_p_boot={float(best.get('ks_p_boot', np.nan)):.3f}, "
+            f"floor_ratio={float(gr.get('floor_ratio', np.nan)):.2f}, pinned_ratio={float(gr.get('pinned_ratio', np.nan)):.2f}",
             fontsize=9,
         )
         ax.grid(True, alpha=0.3)

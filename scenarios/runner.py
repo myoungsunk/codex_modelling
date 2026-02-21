@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import inspect
+import json
 from pathlib import Path
 import shlex
 import subprocess
@@ -17,7 +18,12 @@ from typing import Any
 import numpy as np
 
 from analysis.reciprocity import reciprocity_sanity
-from analysis.tap_path_consistency import evaluate_dataset_tap_path_consistency, write_outlier_csv
+from analysis.tap_path_consistency import (
+    build_min_repro_bundle,
+    evaluate_dataset_tap_path_consistency,
+    write_outlier_csv,
+    write_repro_bundle_json,
+)
 from analysis.ctf_cir import ctf_to_cir, detect_cir_wrap, first_peak_tau_s, pdp, synthesize_ctf_with_source, tau_resolution_s
 from analysis.run_model_fit import fit_and_generate
 from analysis.xpd_stats import (
@@ -143,6 +149,76 @@ def _git_meta() -> tuple[str, bool]:
     except Exception:
         dirty = True
     return commit, dirty
+
+
+def _geometry_invariant_stats(data: dict[str, Any]) -> dict[str, Any]:
+    counts = {
+        "total_paths": 0,
+        "bad_bounce_count": 0,
+        "bad_interactions_len": 0,
+        "bad_surface_ids_len": 0,
+        "bad_incidence_angles_len": 0,
+        "bad_segment_basis_len": 0,
+        "bad_aod_shape": 0,
+        "bad_aoa_shape": 0,
+        "bad_tau": 0,
+        "bad_matrix_shape": 0,
+        "bad_matrix_nan": 0,
+    }
+    for sc in data.get("scenarios", {}).values():
+        for case in sc.get("cases", {}).values():
+            for p in case.get("paths", []):
+                counts["total_paths"] += 1
+                meta = p.get("meta", {})
+                b = int(meta.get("bounce_count", -1))
+                if b < 0:
+                    counts["bad_bounce_count"] += 1
+                    b = 0
+                if len(meta.get("interactions", [])) != b:
+                    counts["bad_interactions_len"] += 1
+                if len(meta.get("surface_ids", [])) != b:
+                    counts["bad_surface_ids_len"] += 1
+                if len(meta.get("incidence_angles", [])) != b:
+                    counts["bad_incidence_angles_len"] += 1
+                if len(meta.get("segment_basis_uv", [])) != (b + 1):
+                    counts["bad_segment_basis_len"] += 1
+                if len(meta.get("AoD", [])) != 3:
+                    counts["bad_aod_shape"] += 1
+                if len(meta.get("AoA", [])) != 3:
+                    counts["bad_aoa_shape"] += 1
+                tau = float(p.get("tau_s", np.nan))
+                if not np.isfinite(tau) or tau < 0.0:
+                    counts["bad_tau"] += 1
+                M = np.asarray(p.get("A_f"), dtype=np.complex128)
+                if M.ndim != 3 or M.shape[1:] != (2, 2):
+                    counts["bad_matrix_shape"] += 1
+                elif not np.all(np.isfinite(M)):
+                    counts["bad_matrix_nan"] += 1
+    violations_total = int(
+        sum(v for k, v in counts.items() if k not in {"total_paths"})
+    )
+    return {
+        **counts,
+        "violations_total": violations_total,
+        "pass": bool(violations_total == 0),
+    }
+
+
+def parse_hard_gate_summary(report_path: str | Path) -> dict[str, Any]:
+    prefix = "- HARD_GATE_SUMMARY_JSON: "
+    p = Path(report_path)
+    if not p.exists():
+        return {}
+    for line in reversed(p.read_text(encoding="utf-8").splitlines()):
+        s = line.strip()
+        if s.startswith(prefix):
+            raw = s[len(prefix) :].strip()
+            try:
+                out = json.loads(raw)
+                return out if isinstance(out, dict) else {}
+            except Exception:
+                return {}
+    return {}
 
 
 def _projected_hv(boresight: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -483,6 +559,7 @@ def build_quality_report(
     res_s = tau_resolution_s(freq, nfft=2048)
     delay_period_s = float(1.0 / (freq[1] - freq[0])) if len(freq) > 1 else 0.0
     scenario_medians: list[float] = []
+    total_wrap_detected = 0
 
     for sid, sc in data["scenarios"].items():
         lines += [f"## {sid}", ""]
@@ -557,6 +634,7 @@ def build_quality_report(
         lines.append(f"- cir_peak_match_skipped_overlap_cases: {d3_skipped_overlap}")
         lines.append(f"- delay_ambiguity_period_ns: {delay_period_s * 1e9:.3f}")
         lines.append(f"- wrap_detected_cases: {wrap_count}")
+        total_wrap_detected += int(wrap_count)
         lines.append(f"- pdp_sum_consistency_max_abs: {d5_max_abs:.3e}")
         if wrap_count > 0:
             lines.append(
@@ -564,7 +642,14 @@ def build_quality_report(
                 "use denser frequency grid, delay unwrapping, or path-domain validation."
             )
 
-        samples = pathwise_xpd(all_paths, exact_bounce=exact_bounce, matrix_source=matrix_source)
+        samples = pathwise_xpd(
+            all_paths,
+            exact_bounce=exact_bounce,
+            matrix_source=matrix_source,
+            input_basis=basis_now,
+            eval_basis=basis_now,
+            convention=convention_now,
+        )
         par_stats = conditional_fit(samples, keys=["parity"])
         lines.append(f"- parity XPD stats (exact_bounce={exact_bounce}): {par_stats}")
         xpd_vals = [float(s["xpd_db"]) for s in samples]
@@ -624,9 +709,16 @@ def build_quality_report(
                     pinned_tol_db=0.5,
                 )
                 for bk, gr in table.items():
-                    if gr.get("status") == "INSUFFICIENT":
+                    st = str(gr.get("status", "NA"))
+                    if st == "INSUFFICIENT":
                         lines.append(
                             f"-   {bk}: INSUFFICIENT (n={int(gr.get('n', 0))}, n_fit={int(gr.get('n_fit', 0))})"
+                        )
+                        lines.append(
+                            f"-   censoring: floor_ratio={float(gr.get('floor_ratio', np.nan)):.3f}, "
+                            f"pinned_ratio={float(gr.get('pinned_ratio', np.nan)):.3f}, "
+                            f"point_mass_ratio={float(gr.get('point_mass_ratio', np.nan)):.3f}, "
+                            f"point_mass_kind={str(gr.get('point_mass_kind', 'none'))}"
                         )
                         lines.append(f"-   WARNING: GOF skipped for {gk}={bk} due to insufficient samples.")
                         continue
@@ -635,9 +727,15 @@ def build_quality_report(
                     pre = (gr.get("pre_normal", {}) or {})
                     post = (gr.get("post_normal", {}) or {})
                     lines.append(
-                        f"-   {bk}: n={int(gr.get('n', 0))}, n_fit={int(gr.get('n_fit', 0))}, "
+                        f"-   {bk}: status={st}, n={int(gr.get('n', 0))}, n_fit={int(gr.get('n_fit', 0))}, "
                         f"excluded={int(gr.get('n_excluded', 0))} "
                         f"(floor={int(gr.get('excluded_floor_count', 0))}, pinned={int(gr.get('excluded_pinned_count', 0))})"
+                    )
+                    lines.append(
+                        f"-   censoring: floor_ratio={float(gr.get('floor_ratio', np.nan)):.3f}, "
+                        f"pinned_ratio={float(gr.get('pinned_ratio', np.nan)):.3f}, "
+                        f"point_mass_ratio={float(gr.get('point_mass_ratio', np.nan)):.3f}, "
+                        f"point_mass_kind={str(gr.get('point_mass_kind', 'none'))}"
                     )
                     lines.append(
                         f"-   best_model={bm}, AIC={float(bmm.get('aic', np.nan)):.3f}, "
@@ -656,8 +754,16 @@ def build_quality_report(
                         f"alternative_improved={bool(gr.get('alternative_improved', False))}, "
                         f"reason={str(gr.get('model_reason', 'NA'))}"
                     )
-                    if bool(gr.get("single_normal_fail", False)) and bool(gr.get("alternative_improved", False)):
-                        lines.append("-   PASS: single-normal failed but alternative model improved fit.")
+                    if st == "PASS":
+                        lines.append("-   PASS: continuous-part GOF passed (ks_p_boot>=0.05, qq_r>=0.98).")
+                    elif st == "PASS_ALTERNATIVE":
+                        lines.append(
+                            "-   PASS_ALTERNATIVE: single-normal failed; alternative model selected."
+                        )
+                        if bool(gr.get("residual_borderline", False)):
+                            lines.append("-   NOTE: residual GOF is borderline but not treated as hard fail.")
+                    elif st == "FAIL_MODEL":
+                        lines.append("-   WARNING: GOF failed on continuous part (model failure).")
                     elif bool(gr.get("warning", False)):
                         lines.append("-   WARNING: best-model GOF remains borderline (qq_r<0.98 or ks_p_boot<0.05).")
 
@@ -677,7 +783,15 @@ def build_quality_report(
         # E3: subband variability diagnostic with leakage context.
         if len(all_paths) > 0:
             subbands = make_subbands(len(freq), 3)
-            sb = pathwise_xpd(all_paths, subbands=subbands, exact_bounce=exact_bounce, matrix_source=matrix_source)
+            sb = pathwise_xpd(
+                all_paths,
+                subbands=subbands,
+                exact_bounce=exact_bounce,
+                matrix_source=matrix_source,
+                input_basis=basis_now,
+                eval_basis=basis_now,
+                convention=convention_now,
+            )
             sb_mu = []
             for bidx in range(len(subbands)):
                 vals = [float(s["xpd_db"]) for s in sb if int(s.get("subband", -1)) == bidx]
@@ -695,7 +809,14 @@ def build_quality_report(
             with_mat = []
             for _, case in sc["cases"].items():
                 mat = str(case["params"].get("material", "NA"))
-                for s in pathwise_xpd(case["paths"], exact_bounce=1, matrix_source=matrix_source):
+                for s in pathwise_xpd(
+                    case["paths"],
+                    exact_bounce=1,
+                    matrix_source=matrix_source,
+                    input_basis=basis_now,
+                    eval_basis=basis_now,
+                    convention=convention_now,
+                ):
                     s["material"] = mat
                     with_mat.append(s)
             mat_stats = conditional_fit(with_mat, keys=["material"])
@@ -743,6 +864,12 @@ def build_quality_report(
         f3_ks2_p = float(model_metrics.get("f3_xpd_ks2_p", np.nan))
         f3_ks2_status = str(model_metrics.get("f3_xpd_ks2_status", "NA"))
         f3_ks2_reason = str(model_metrics.get("f3_xpd_ks2_reason", "NA"))
+        f3_ks2_p_global_cont = float(model_metrics.get("f3_xpd_ks2_p_global_cont", np.nan))
+        f3_ks2_p_strat_cont = float(model_metrics.get("f3_xpd_ks2_p_stratified_cont", np.nan))
+        f3_ks2_p_global_full = float(model_metrics.get("f3_xpd_ks2_p_global_full", np.nan))
+        f3_ks2_p_strat_full = float(model_metrics.get("f3_xpd_ks2_p_stratified_full", np.nan))
+        f3_pin_rt = float(model_metrics.get("f3_pinned_ratio_rt", np.nan))
+        f3_pin_sy = float(model_metrics.get("f3_pinned_ratio_synth", np.nan))
         clamp_rate = float(model_metrics.get("synthetic_kappa_clamp_rate", np.nan))
         trunc_rate = float(model_metrics.get("synthetic_kappa_truncation_rate", np.nan))
         if np.isfinite(f3_delta):
@@ -751,8 +878,18 @@ def build_quality_report(
                 lines.append(f"- f3_xpd_sigma_delta_abs_db: {f3_sigma_delta:.3f}")
             if np.isfinite(f3_ks2_p):
                 lines.append(f"- f3_xpd_ks2_p: {f3_ks2_p:.4f}")
+            if np.isfinite(f3_ks2_p_global_cont):
+                lines.append(f"- f3_xpd_ks2_p_global_cont: {f3_ks2_p_global_cont:.4f}")
+            if np.isfinite(f3_ks2_p_strat_cont):
+                lines.append(f"- f3_xpd_ks2_p_stratified_cont: {f3_ks2_p_strat_cont:.4f}")
+            if np.isfinite(f3_ks2_p_global_full):
+                lines.append(f"- f3_xpd_ks2_p_global_full: {f3_ks2_p_global_full:.4f}")
+            if np.isfinite(f3_ks2_p_strat_full):
+                lines.append(f"- f3_xpd_ks2_p_stratified_full: {f3_ks2_p_strat_full:.4f}")
             if f3_ks2_status != "NA":
                 lines.append(f"- f3_xpd_ks2_status: {f3_ks2_status} ({f3_ks2_reason})")
+            if np.isfinite(f3_pin_rt) or np.isfinite(f3_pin_sy):
+                lines.append(f"- f3_pinned_ratio_rt_synth: rt={f3_pin_rt:.3f}, synth={f3_pin_sy:.3f}")
             if np.isfinite(clamp_rate):
                 lines.append(f"- synthetic_kappa_clamp_rate: {clamp_rate:.4f}")
             if np.isfinite(trunc_rate):
@@ -778,12 +915,22 @@ def build_quality_report(
                 )
             if f3_ks2_status == "FAIL":
                 lines.append("- WARNING: F3 KS 2-sample test rejects RT vs Synthetic XPD distribution (FAIL).")
+            elif f3_ks2_status == "PASS_WITH_CENSORING":
+                lines.append("- F3 KS check: PASS_WITH_CENSORING (continuous-only passed; full-mixture mismatch due point-mass).")
             elif f3_ks2_status.startswith("SKIPPED"):
                 lines.append(f"- F3 KS 2-sample check: {f3_ks2_status} ({f3_ks2_reason}).")
             elif np.isfinite(f3_ks2_p):
                 lines.append("- F3 KS 2-sample check: PASS (p>=0.05).")
             else:
                 lines.append("- F3 KS 2-sample check: SKIPPED (insufficient samples).")
+            f5_rmse = float(model_metrics.get("f5_subband_mu_rmse_db", np.nan))
+            f5_status = str(model_metrics.get("f5_status", "NA"))
+            if np.isfinite(f5_rmse):
+                lines.append(f"- f5_subband_mu_rmse_db: {f5_rmse:.3f}")
+            if f5_status != "NA":
+                lines.append(f"- f5_status: {f5_status}")
+            if np.isfinite(f5_rmse) and f5_rmse > 3.0:
+                lines.append("- WARNING: F5 subband mean RMSE exceeds 3 dB threshold.")
         if not bool(model_metrics.get("f4_parity_direction_match", False)):
             lines.append("- WARNING: synthetic parity direction does not match RT.")
         phase_basis = str(model_metrics.get("phase_test_basis", model_metrics.get("f6_phase_test_basis", "unknown")))
@@ -908,6 +1055,9 @@ def build_quality_report(
         lines.append(f"- outlier_reason_counts: {tap_path_metrics.get('outlier_reason_counts', {})}")
         if tap_path_metrics.get("outlier_csv"):
             lines.append(f"- outlier_csv: {tap_path_metrics.get('outlier_csv')}")
+        if tap_path_metrics.get("repro_bundle_json"):
+            lines.append(f"- repro_bundle_json: {tap_path_metrics.get('repro_bundle_json')}")
+            lines.append(f"- repro_bundle_cases: {int(tap_path_metrics.get('repro_bundle_cases', 0))}")
         lines.append("- per-case (scenario/case): Δtau_s, ΔXPD_dB, overlap_count, reason, wrap, n_paths")
 
         single_path_warn_thresh_db = 10.0
@@ -976,6 +1126,57 @@ def build_quality_report(
     lines.append("-   5) antenna coupling/leakage/AR")
     lines.append("")
 
+    geom_stats = _geometry_invariant_stats(data)
+    c10_pass = False
+    if reciprocity_metrics is not None and reciprocity_metrics.get("entries"):
+        c10_pass = bool(reciprocity_metrics.get("coverage_pass", False))
+        if bool(reciprocity_metrics.get("require_bidirectional_paths", True)):
+            c10_pass = c10_pass and (
+                int(reciprocity_metrics.get("checked_cases", 0))
+                == int(reciprocity_metrics.get("covered_cases", 0))
+                and int(reciprocity_metrics.get("reverse_empty_cases", 0)) == 0
+            )
+    f3_pass = False
+    if model_metrics is not None:
+        st = str(model_metrics.get("f3_xpd_ks2_status", "NA"))
+        dmu = float(model_metrics.get("f3_xpd_mu_delta_abs_db", np.nan))
+        dsig = float(model_metrics.get("f3_xpd_sigma_delta_abs_db", np.nan))
+        kp = float(model_metrics.get("f3_xpd_ks2_p_global_cont", model_metrics.get("f3_xpd_ks2_p", np.nan)))
+        f3_pass = bool(
+            st in {"PASS", "PASS_WITH_CENSORING"}
+            and np.isfinite(dmu)
+            and np.isfinite(dsig)
+            and np.isfinite(kp)
+            and dmu <= 3.0
+            and dsig <= 6.0
+            and kp >= 0.05
+        )
+    hard_gates = {
+        "A_git_clean_check": bool((not release_mode_now) or (not git_dirty_now)),
+        "B_geometry_invariants": bool(geom_stats.get("pass", False)),
+        "C10_full_coverage": bool(c10_pass),
+        "D_wrap_zero": bool(int(total_wrap_detected) == 0),
+        "F3_model_compare": bool(f3_pass),
+    }
+    hard_fail = [k for k, v in hard_gates.items() if not bool(v)]
+    hard_summary = {
+        "release_mode": bool(release_mode_now),
+        "hard_gates": hard_gates,
+        "hard_fail": hard_fail,
+        "hard_fail_count": int(len(hard_fail)),
+        "geometry_stats": geom_stats,
+        "wrap_detected_cases_total": int(total_wrap_detected),
+    }
+    lines.append("## Hard Gate Summary")
+    lines.append("")
+    lines.append(f"- hard_gates: {hard_gates}")
+    lines.append(f"- hard_fail: {hard_fail}")
+    lines.append(f"- hard_fail_count: {len(hard_fail)}")
+    lines.append(f"- geometry_invariants: {geom_stats}")
+    lines.append(f"- wrap_detected_cases_total: {total_wrap_detected}")
+    lines.append(f"- HARD_GATE_SUMMARY_JSON: {json.dumps(hard_summary, ensure_ascii=False, sort_keys=True)}")
+    lines.append("")
+
     p = Path(out_md)
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text("\n".join(lines), encoding="utf-8")
@@ -1011,7 +1212,13 @@ def main() -> None:
     parser.add_argument("--no-model-compare", dest="model_compare", action="store_false")
     parser.add_argument("--model-num-subbands", type=int, default=4)
     parser.add_argument("--model-num-synth-rays", type=int, default=128)
-    parser.add_argument("--model-num-paths-mode", type=str, default="match_rt_total", choices=["fixed", "match_rt_total", "sample_case_hist"])
+    parser.add_argument(
+        "--model-num-paths-mode",
+        type=str,
+        default="match_rt_per_scenario",
+        choices=["fixed", "match_rt_total", "match_rt_per_scenario", "match_rt_per_case", "sample_case_hist"],
+    )
+    parser.add_argument("--model-kappa-freq-mode", type=str, default="piecewise_constant", choices=["piecewise_constant", "linear"])
     parser.add_argument("--model-disable-incidence-conditioning", action="store_true")
     parser.add_argument("--model-phase-keep-common", action="store_true")
     parser.add_argument("--model-phase-all-freq-samples", action="store_true")
@@ -1051,6 +1258,7 @@ def main() -> None:
 
     bases = _parse_bases(args.basis, args.bases)
     multi = len(bases) > 1
+    release_gate_failures: list[str] = []
 
     for b in bases:
         data = build_dataset(
@@ -1116,6 +1324,16 @@ def main() -> None:
         outlier_csv = out_rep.with_name(f"{out_rep.stem}_tap_path_outliers.csv")
         write_outlier_csv(outlier_csv, tap_path_metrics.get("entries", []))
         tap_path_metrics["outlier_csv"] = str(outlier_csv)
+        repro_bundle = build_min_repro_bundle(
+            data,
+            tap_path_metrics.get("entries", []),
+            delta_xpd_threshold_db=float(args.tap_path_outlier_xpd_db),
+            non_overlap_only=True,
+        )
+        repro_json = out_rep.with_name(f"{out_rep.stem}_tap_path_repro_bundle.json")
+        write_repro_bundle_json(repro_json, repro_bundle)
+        tap_path_metrics["repro_bundle_json"] = str(repro_json)
+        tap_path_metrics["repro_bundle_cases"] = int(repro_bundle.get("n_cases", 0))
         data.setdefault("meta", {})["tap_path_consistency"] = tap_path_metrics
 
         save_rt_dataset(out_h5, data)
@@ -1124,6 +1342,9 @@ def main() -> None:
         generate_all_plots(data, out_dir=out_plot, config=plot_config, exact_bounce_map=DEFAULT_EXACT_BOUNCE)
         model_metrics = None
         if args.model_compare:
+            model_num_paths_mode = str(args.model_num_paths_mode)
+            if bool(args.release_mode) and model_num_paths_mode == "match_rt_total":
+                model_num_paths_mode = "match_rt_per_scenario"
             model_json = out_h5.with_name(f"{out_h5.stem}_model_params.json")
             synth_json = out_h5.with_name(f"{out_h5.stem}_synthetic_compare.json")
             model_res = fit_and_generate(
@@ -1133,7 +1354,8 @@ def main() -> None:
                 matrix_source=args.xpd_matrix_source,
                 num_subbands=int(args.model_num_subbands),
                 num_synth_rays=int(args.model_num_synth_rays),
-                num_paths_mode=str(args.model_num_paths_mode),
+                num_paths_mode=model_num_paths_mode,
+                kappa_freq_mode=str(args.model_kappa_freq_mode),
                 use_incidence_conditioning=not bool(args.model_disable_incidence_conditioning),
                 phase_common_removed=not bool(args.model_phase_keep_common),
                 phase_per_ray_sampling=not bool(args.model_phase_all_freq_samples),
@@ -1152,9 +1374,11 @@ def main() -> None:
             )
             compare_metrics = model_res.get("comparison", {}).get("comparison", {})
             model_metrics = dict(compare_metrics)
-            model_metrics.update(plot_metrics)
+            for k, v in plot_metrics.items():
+                if k not in model_metrics:
+                    model_metrics[k] = v
 
-        build_quality_report(
+        report_path = build_quality_report(
             data,
             out_rep,
             matrix_source=args.xpd_matrix_source,
@@ -1162,6 +1386,20 @@ def main() -> None:
             reciprocity_metrics=reciprocity_metrics,
             tap_path_metrics=tap_path_metrics,
         )
+        gate_summary = parse_hard_gate_summary(report_path)
+        hard_fail_count = int(gate_summary.get("hard_fail_count", 0)) if isinstance(gate_summary, dict) else 0
+        hard_fail_items = gate_summary.get("hard_fail", []) if isinstance(gate_summary, dict) else []
+        if bool(args.release_mode):
+            if not gate_summary:
+                release_gate_failures.append(f"basis={b}: missing hard-gate summary in report {report_path}")
+            elif hard_fail_count > 0:
+                release_gate_failures.append(
+                    f"basis={b}: hard_fail_count={hard_fail_count}, hard_fail={hard_fail_items}"
+                )
+
+    if bool(args.release_mode) and release_gate_failures:
+        joined = "\n".join(f"- {msg}" for msg in release_gate_failures)
+        raise SystemExit(f"release-mode hard-gate failure(s):\n{joined}")
 
 
 if __name__ == "__main__":

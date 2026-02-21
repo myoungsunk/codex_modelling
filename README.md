@@ -20,6 +20,7 @@
 ```bash
 python -m unittest discover -s tests -p 'test_*.py'
 python -m scenarios.runner --output outputs/rt_dataset.h5 --plots-dir outputs/plots --report outputs/validation_report.md
+make canonical_release
 ```
 
 ## Measurement Bridge

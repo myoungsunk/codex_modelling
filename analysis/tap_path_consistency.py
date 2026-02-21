@@ -8,6 +8,7 @@ This module compares:
 from __future__ import annotations
 
 import csv
+import json
 from pathlib import Path
 from typing import Any
 
@@ -118,13 +119,16 @@ def evaluate_case_tap_path_consistency(
 
     # Path-overlap: multiple path delays landing in same analysis window.
     idx_all = []
+    alias_tau_all = []
     for p in paths:
         t = float(p.get("tau_s", 0.0))
         ta = t % delay_period_s if delay_period_s > 0.0 else t
+        alias_tau_all.append(float(ta))
         idx_all.append(int(np.argmin(np.abs(tau_s - ta))) if n_tau > 0 else 0)
     idx_all = np.asarray(idx_all, dtype=int)
     overlap_count = int(np.sum((idx_all >= s) & (idx_all < e))) if n_tau > 0 else 0
     overlap = bool(overlap_count > 1)
+    window_path_indices = [int(i) for i, idx in enumerate(idx_all.tolist()) if int(idx) >= s and int(idx) < e]
 
     # Window-center tap for delay mismatch metric.
     if e > s and n_tau > 0:
@@ -190,6 +194,9 @@ def evaluate_case_tap_path_consistency(
         "window_start_idx": int(s),
         "window_end_idx": int(max(s, e - 1)),
         "window_bins": int(max(0, e - s)),
+        "window_path_indices": window_path_indices,
+        "path_tau_s": [float(p.get("tau_s", np.nan)) for p in paths],
+        "path_alias_tau_s": alias_tau_all,
         "overlap": overlap,
         "overlap_count": int(overlap_count),
         "overlap_policy": str(overlap_policy),
@@ -301,4 +308,70 @@ def write_outlier_csv(path: str | Path, entries: list[dict[str, Any]]) -> Path:
                 continue
             row = {k: e.get(k, "") for k in cols}
             w.writerow(row)
+    return p
+
+
+def build_min_repro_bundle(
+    data: dict[str, Any],
+    entries: list[dict[str, Any]],
+    delta_xpd_threshold_db: float = 10.0,
+    non_overlap_only: bool = True,
+) -> dict[str, Any]:
+    """Build a minimal repro payload for large non-overlap tap/path mismatches."""
+
+    out_cases: list[dict[str, Any]] = []
+    scenarios = data.get("scenarios", {})
+    thr = float(delta_xpd_threshold_db)
+    for e in entries:
+        sid = str(e.get("scenario_id", ""))
+        cid = str(e.get("case_id", ""))
+        dx = float(e.get("delta_xpd_db", np.nan))
+        reason = str(e.get("outlier_reason", "NONE"))
+        if not np.isfinite(dx) or dx <= thr:
+            continue
+        if non_overlap_only and bool(e.get("overlap", False)):
+            continue
+        if reason in {"OVERLAP", "EMPTY"}:
+            continue
+        case = scenarios.get(sid, {}).get("cases", {}).get(cid, {})
+        paths = case.get("paths", [])
+        strongest_idx = int(e.get("strongest_path_index", -1))
+        strongest_path = paths[strongest_idx] if 0 <= strongest_idx < len(paths) else {}
+        meta = strongest_path.get("meta", {}) if isinstance(strongest_path, dict) else {}
+        out_cases.append(
+            {
+                "scenario_id": sid,
+                "case_id": cid,
+                "reason": reason,
+                "delta_xpd_db": dx,
+                "delta_tau_s": float(e.get("delta_tau_s", np.nan)),
+                "window_indices": [
+                    int(e.get("window_start_idx", 0)),
+                    int(e.get("window_end_idx", -1)),
+                ],
+                "window_path_indices": [int(x) for x in e.get("window_path_indices", [])],
+                "strongest_path_index": strongest_idx,
+                "strongest_tau_s": float(e.get("strongest_tau_s", np.nan)),
+                "tap_window_tau_s": float(e.get("tap_window_tau_s", np.nan)),
+                "path_tau_s": [float(x) for x in e.get("path_tau_s", [])],
+                "path_alias_tau_s": [float(x) for x in e.get("path_alias_tau_s", [])],
+                "strongest_path_meta": {
+                    "bounce_count": int(meta.get("bounce_count", 0)),
+                    "surface_ids": [int(x) for x in meta.get("surface_ids", [])],
+                    "incidence_angles": [float(x) for x in meta.get("incidence_angles", [])],
+                },
+            }
+        )
+    return {
+        "delta_xpd_threshold_db": thr,
+        "non_overlap_only": bool(non_overlap_only),
+        "n_cases": int(len(out_cases)),
+        "cases": out_cases,
+    }
+
+
+def write_repro_bundle_json(path: str | Path, bundle: dict[str, Any]) -> Path:
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(bundle, ensure_ascii=False, indent=2), encoding="utf-8")
     return p

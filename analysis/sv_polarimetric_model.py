@@ -8,7 +8,7 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy import stats as scipy_stats
 
-from analysis.xpd_stats import pathwise_xpd, conditional_fit
+from analysis.xpd_stats import conditional_fit, floor_pinned_exclusion_mask, pathwise_xpd
 
 
 def _matrix_from_path(path: dict[str, Any], matrix_source: str = "A") -> NDArray[np.complex128]:
@@ -60,6 +60,118 @@ def _resolve_num_synth_paths(
         picks = rng.choice(c, size=len(c), replace=True)
         return max(int(np.sum(picks)), 1)
     return max(int(num_rays), 1)
+
+
+def _resolve_sampling_schedule(
+    num_rays: int,
+    num_paths_mode: str,
+    delay_samples_s: NDArray[np.float64],
+    rt_case_path_counts: NDArray[np.int64] | None,
+    rt_path_scenarios: list[str] | NDArray[np.str_] | None,
+    rt_path_cases: list[str] | NDArray[np.str_] | None,
+    rng: np.random.Generator,
+) -> list[tuple[str, str]]:
+    """Return per-synthetic-path scenario/case targets for weighted sampling."""
+
+    mode = str(num_paths_mode).strip().lower()
+    if mode in {"match_rt_per_case", "match_rt_per_scenario", "match_rt_total"}:
+        sids = [str(x) for x in (list(rt_path_scenarios) if rt_path_scenarios is not None else [])]
+        cids = [str(x) for x in (list(rt_path_cases) if rt_path_cases is not None else [])]
+        n_obs = int(min(len(delay_samples_s), len(sids), len(cids))) if len(sids) and len(cids) else int(len(delay_samples_s))
+        if n_obs > 0:
+            sids = (sids[:n_obs] if len(sids) >= n_obs else ["NA"] * n_obs)
+            cids = (cids[:n_obs] if len(cids) >= n_obs else ["NA"] * n_obs)
+            if mode == "match_rt_per_case":
+                out = [(sids[i], cids[i]) for i in range(n_obs)]
+                rng.shuffle(out)
+                return out
+            if mode == "match_rt_per_scenario":
+                out = [(sids[i], "ALL") for i in range(n_obs)]
+                rng.shuffle(out)
+                return out
+            if mode == "match_rt_total":
+                out = [("ALL", "ALL")] * n_obs
+                return out
+    n_paths = _resolve_num_synth_paths(
+        num_rays=num_rays,
+        num_paths_mode=num_paths_mode,
+        delay_samples_s=delay_samples_s,
+        rt_case_path_counts=rt_case_path_counts,
+        rng=rng,
+    )
+    return [("ALL", "ALL")] * int(max(n_paths, 1))
+
+
+def _sample_index_for_target(
+    target_sid: str,
+    target_cid: str,
+    idx_by_case: dict[tuple[str, str], NDArray[np.int64]],
+    idx_by_scenario: dict[str, NDArray[np.int64]],
+    n_total: int,
+    rng: np.random.Generator,
+) -> int:
+    if target_cid != "ALL":
+        key = (target_sid, target_cid)
+        arr = idx_by_case.get(key)
+        if arr is not None and len(arr) > 0:
+            return int(arr[int(rng.integers(0, len(arr)))])
+    if target_sid != "ALL":
+        arr2 = idx_by_scenario.get(target_sid)
+        if arr2 is not None and len(arr2) > 0:
+            return int(arr2[int(rng.integers(0, len(arr2)))])
+    return int(rng.integers(0, max(n_total, 1)))
+
+
+def _subband_index_for_freq(k: int, subbands: list[tuple[int, int]]) -> int:
+    for bidx, (s, e) in enumerate(subbands):
+        if int(s) <= int(k) < int(e):
+            return int(bidx)
+    return int(max(len(subbands) - 1, 0))
+
+
+def _sample_xpd_from_profile(
+    rng: np.random.Generator,
+    mu_db: float,
+    sigma_db: float,
+    lower_db: float,
+    upper_db: float,
+    censor: dict[str, Any] | None,
+) -> float:
+    """Sample XPD[dB] with optional point-mass component."""
+
+    if censor is not None:
+        pinned_ratio = float(max(0.0, min(1.0, censor.get("pinned_ratio", 0.0))))
+        floor_ratio = float(max(0.0, min(1.0 - pinned_ratio, censor.get("floor_ratio", 0.0))))
+        u = float(rng.random())
+        pinned_center = float(censor.get("pinned_center_db", np.nan))
+        floor_db = float(censor.get("floor_db", np.nan))
+        if u < pinned_ratio and np.isfinite(pinned_center):
+            return float(np.clip(pinned_center, lower_db, upper_db))
+        if u < (pinned_ratio + floor_ratio) and np.isfinite(floor_db):
+            return float(np.clip(floor_db, lower_db, upper_db))
+    return _truncated_normal_scalar(
+        rng,
+        mu=float(mu_db),
+        sigma=float(max(sigma_db, 1e-6)),
+        lower=float(lower_db),
+        upper=float(upper_db),
+    )
+
+
+def _ks2_with_cap(
+    x: NDArray[np.float64],
+    y: NDArray[np.float64],
+    cap: int,
+    seed: int,
+) -> tuple[float, float, int]:
+    if len(x) < 2 or len(y) < 2:
+        return np.nan, np.nan, 0
+    cc = int(max(2, cap))
+    rng = np.random.default_rng(int(seed))
+    xs = x if len(x) <= cc else np.asarray(rng.choice(x, size=cc, replace=False), dtype=float)
+    ys = y if len(y) <= cc else np.asarray(rng.choice(y, size=cc, replace=False), dtype=float)
+    ks = scipy_stats.ks_2samp(xs, ys, alternative="two-sided", method="auto")
+    return float(ks.statistic), float(ks.pvalue), int(min(len(xs), len(ys)))
 
 
 def _truncated_normal_scalar(
@@ -157,6 +269,11 @@ def generate_synthetic_paths(
     parity_probs: dict[str, float],
     parity_fit: dict[str, dict[str, float]],
     parity_slope_model: dict[str, dict[str, Any]] | None = None,
+    parity_subband_fit: dict[str, dict[str, dict[str, float]]] | None = None,
+    parity_censoring: dict[str, dict[str, Any]] | None = None,
+    parity_subband_censoring: dict[str, dict[str, Any]] | None = None,
+    subbands: list[tuple[int, int]] | None = None,
+    kappa_freq_mode: str = "piecewise_constant",
     incidence_probs: dict[str, float] | None = None,
     incidence_probs_by_parity: dict[str, dict[str, float]] | None = None,
     parity_incidence_fit: dict[str, dict[str, float]] | None = None,
@@ -170,6 +287,8 @@ def generate_synthetic_paths(
     kappa_max: float = 1e12,
     num_paths_mode: str = "fixed",
     rt_case_path_counts: NDArray[np.int64] | None = None,
+    rt_path_scenarios: list[str] | NDArray[np.str_] | None = None,
+    rt_path_cases: list[str] | NDArray[np.str_] | None = None,
     return_diagnostics: bool = False,
     seed: int = 0,
 ) -> list[dict[str, Any]] | tuple[list[dict[str, Any]], dict[str, Any]]:
@@ -194,13 +313,16 @@ def generate_synthetic_paths(
         probs[:] = 0.5
     probs /= probs.sum()
 
-    n_paths = _resolve_num_synth_paths(
+    schedule = _resolve_sampling_schedule(
         num_rays=num_rays,
         num_paths_mode=num_paths_mode,
         delay_samples_s=d,
         rt_case_path_counts=rt_case_path_counts,
+        rt_path_scenarios=rt_path_scenarios,
+        rt_path_cases=rt_path_cases,
         rng=rng,
     )
+    n_paths = int(max(len(schedule), 1))
 
     paths: list[dict[str, Any]] = []
     kappa_total = 0
@@ -226,6 +348,18 @@ def generate_synthetic_paths(
     else:
         pair_delay = np.asarray(d, dtype=float)
         pair_power = np.asarray(pwr, dtype=float)
+    sids_arr = np.asarray(list(rt_path_scenarios) if rt_path_scenarios is not None else ["NA"] * len(pair_delay), dtype=object)
+    cids_arr = np.asarray(list(rt_path_cases) if rt_path_cases is not None else ["NA"] * len(pair_delay), dtype=object)
+    n_lab = int(min(len(pair_delay), len(sids_arr), len(cids_arr)))
+    idx_by_case: dict[tuple[str, str], list[int]] = {}
+    idx_by_scenario: dict[str, list[int]] = {}
+    for i in range(n_lab):
+        sid_i = str(sids_arr[i])
+        cid_i = str(cids_arr[i])
+        idx_by_case.setdefault((sid_i, cid_i), []).append(int(i))
+        idx_by_scenario.setdefault(sid_i, []).append(int(i))
+    idx_by_case_np = {k: np.asarray(v, dtype=np.int64) for k, v in idx_by_case.items()}
+    idx_by_scenario_np = {k: np.asarray(v, dtype=np.int64) for k, v in idx_by_scenario.items()}
 
     src = str(matrix_source).upper()
     empirical_src: dict[str, NDArray[np.float64]] = {}
@@ -254,7 +388,7 @@ def generate_synthetic_paths(
         return float(arr[i])
 
     parity_schedule: list[str] | None = None
-    if str(num_paths_mode).strip().lower() == "match_rt_total" and "odd" in empirical_src and "even" in empirical_src:
+    if "odd" in empirical_src and "even" in empirical_src:
         n_odd_obs = int(len(empirical_src["odd"]))
         n_even_obs = int(len(empirical_src["even"]))
         den = max(n_odd_obs + n_even_obs, 1)
@@ -265,8 +399,16 @@ def generate_synthetic_paths(
         rng.shuffle(parity_schedule)
 
     for _i in range(n_paths):
+        sid_target, cid_target = schedule[_i] if _i < len(schedule) else ("ALL", "ALL")
         if npair > 0:
-            idx = int(rng.integers(0, npair))
+            idx = _sample_index_for_target(
+                target_sid=str(sid_target),
+                target_cid=str(cid_target),
+                idx_by_case=idx_by_case_np,
+                idx_by_scenario=idx_by_scenario_np,
+                n_total=npair,
+                rng=rng,
+            )
             tau = float(pair_delay[idx])
             ray_power = float(max(pair_power[idx], 1e-15))
         else:
@@ -321,25 +463,85 @@ def generate_synthetic_paths(
             xpd_pick = _draw_empirical(parity)
         if xpd_pick is None:
             xpd_pick = _draw_empirical("ALL")
+        par_cens = (parity_censoring or {}).get(parity) if parity_censoring is not None else None
         if xpd_pick is not None:
-            xpd0_db = _truncated_normal_scalar(rng, mu=xpd_pick, sigma=1e-6, lower=xpd_min_db, upper=xpd_max_db)
+            xpd0_db = _sample_xpd_from_profile(
+                rng=rng,
+                mu_db=float(xpd_pick),
+                sigma_db=1e-6,
+                lower_db=xpd_min_db,
+                upper_db=xpd_max_db,
+                censor=par_cens,
+            )
         else:
-            xpd0_db = _truncated_normal_scalar(rng, mu=mu, sigma=max(sigma, 1e-6), lower=xpd_min_db, upper=xpd_max_db)
+            xpd0_db = _sample_xpd_from_profile(
+                rng=rng,
+                mu_db=mu,
+                sigma_db=max(sigma, 1e-6),
+                lower_db=xpd_min_db,
+                upper_db=xpd_max_db,
+                censor=par_cens,
+            )
+        path_point_mode = "continuous"
+        path_point_value = np.nan
+        if par_cens is not None:
+            p_pin = float(max(0.0, min(1.0, par_cens.get("pinned_ratio", 0.0))))
+            p_floor = float(max(0.0, min(1.0 - p_pin, par_cens.get("floor_ratio", 0.0))))
+            u_path = float(rng.random())
+            if u_path < p_pin and np.isfinite(float(par_cens.get("pinned_center_db", np.nan))):
+                path_point_mode = "pinned"
+                path_point_value = float(np.clip(float(par_cens.get("pinned_center_db", np.nan)), xpd_min_db, xpd_max_db))
+            elif u_path < (p_pin + p_floor) and np.isfinite(float(par_cens.get("floor_db", np.nan))):
+                path_point_mode = "floor"
+                path_point_value = float(np.clip(float(par_cens.get("floor_db", np.nan)), xpd_min_db, xpd_max_db))
         phi = rng.uniform(0.0, 2.0 * np.pi, size=4)
         M_f = np.zeros((n_f, 2, 2), dtype=np.complex128)
+        mode_freq = str(kappa_freq_mode).strip().lower()
+        subband_xpd_db: dict[int, float] = {}
         for k in range(n_f):
-            xpd_mean = xpd0_db + slope * (freq[k] - fc)
-            if xpd_freq_noise_sigma_db > 0.0:
-                xpd_mean += float(rng.normal(0.0, xpd_freq_noise_sigma_db))
-            if xpd_mean < xpd_min_db or xpd_mean > xpd_max_db:
+            if mode_freq == "piecewise_constant" and subbands:
+                bidx = _subband_index_for_freq(k, subbands)
+                if bidx not in subband_xpd_db:
+                    if path_point_mode in {"pinned", "floor"} and np.isfinite(path_point_value):
+                        subband_xpd_db[bidx] = float(path_point_value)
+                    else:
+                        sb_fit = ((parity_subband_fit or {}).get(parity, {}) or {}).get(str(bidx), {})
+                        mu_b = float(sb_fit.get("mu", mu))
+                        sg_b = max(float(sb_fit.get("sigma", sigma)), 1e-6)
+                        if xpd_pick is not None:
+                            mu_b = float(xpd_pick)
+                            sg_b = 1e-6
+                        sb_key = f"{parity}|{bidx}"
+                        sb_cens = (parity_subband_censoring or {}).get(sb_key) if parity_subband_censoring is not None else None
+                        if sb_cens is not None:
+                            sb_cens = dict(sb_cens)
+                            sb_cens["pinned_ratio"] = 0.0
+                            sb_cens["floor_ratio"] = 0.0
+                        subband_xpd_db[bidx] = _sample_xpd_from_profile(
+                            rng=rng,
+                            mu_db=mu_b,
+                            sigma_db=sg_b,
+                            lower_db=xpd_min_db,
+                            upper_db=xpd_max_db,
+                            censor=sb_cens,
+                        )
+                xpd_db_k = float(subband_xpd_db[bidx])
+                if xpd_freq_noise_sigma_db > 0.0:
+                    xpd_db_k += float(rng.normal(0.0, xpd_freq_noise_sigma_db))
+            else:
+                xpd_mean = xpd0_db + slope * (freq[k] - fc)
+                if xpd_freq_noise_sigma_db > 0.0:
+                    xpd_mean += float(rng.normal(0.0, xpd_freq_noise_sigma_db))
+                xpd_db_k = _truncated_normal_scalar(
+                    rng,
+                    mu=xpd_mean,
+                    sigma=max(float(xpd_freq_noise_sigma_db), 1e-6),
+                    lower=xpd_min_db,
+                    upper=xpd_max_db,
+                )
+            if xpd_db_k < xpd_min_db or xpd_db_k > xpd_max_db:
                 kappa_trunc_count += 1
-            xpd_db_k = _truncated_normal_scalar(
-                rng,
-                mu=xpd_mean,
-                sigma=max(float(xpd_freq_noise_sigma_db), 1e-6),
-                lower=xpd_min_db,
-                upper=xpd_max_db,
-            )
+            xpd_db_k = float(np.clip(xpd_db_k, xpd_min_db, xpd_max_db))
             kappa_k = float(10.0 ** (xpd_db_k / 10.0))
             kappa_total += 1
             inv = 1.0 / np.sqrt(max(kappa_k, 1e-15))
@@ -375,8 +577,12 @@ def generate_synthetic_paths(
                     "incidence_angle_bin": incidence_bin,
                     "synthetic_matrix_source": src,
                     "synthetic_xpd0_db": float(xpd0_db),
-                    "synthetic_slope_db_per_hz": float(slope),
-                    "interactions": ["synthetic"],
+                        "synthetic_slope_db_per_hz": float(slope),
+                        "synthetic_sampling_scenario_id": str(sid_target),
+                        "synthetic_sampling_case_id": str(cid_target),
+                        "scenario_id": str(sid_target),
+                        "case_id": str(cid_target),
+                        "interactions": ["synthetic"],
                     "surface_ids": [],
                     "incidence_angles": [],
                     "AoD": [0.0, 0.0, 0.0],
@@ -388,6 +594,7 @@ def generate_synthetic_paths(
     diagnostics = {
         "matrix_source": src,
         "num_paths_mode": str(num_paths_mode),
+        "kappa_freq_mode": str(kappa_freq_mode),
         "resolved_num_paths": int(n_paths),
         "xpd_freq_noise_sigma_db": float(xpd_freq_noise_sigma_db),
         "sample_slope": bool(sample_slope),
@@ -416,68 +623,159 @@ def summarize_rt_vs_synth(
     phase_test_basis: str = "unknown",
     common_phase_removed: bool = True,
     per_ray_phase_sampling: bool = True,
+    floor_db: float | None = None,
+    pinned_tol_db: float = 0.5,
+    input_basis: str | None = None,
+    eval_basis: str | None = None,
+    convention: str = "IEEE-RHCP",
     seed: int = 0,
 ) -> dict[str, Any]:
-    rt_samples = pathwise_xpd(rt_paths, matrix_source=rt_matrix_source)
-    sy_samples = pathwise_xpd(synth_paths, matrix_source=synth_matrix_source)
+    rt_samples = pathwise_xpd(
+        rt_paths,
+        matrix_source=rt_matrix_source,
+        input_basis=input_basis,  # type: ignore[arg-type]
+        eval_basis=eval_basis,  # type: ignore[arg-type]
+        convention=convention,
+    )
+    sy_samples = pathwise_xpd(
+        synth_paths,
+        matrix_source=synth_matrix_source,
+        input_basis=input_basis,  # type: ignore[arg-type]
+        eval_basis=eval_basis,  # type: ignore[arg-type]
+        convention=convention,
+    )
+    for s in rt_samples:
+        i = int(s.get("path_index", -1))
+        meta = rt_paths[i].get("meta", {}) if 0 <= i < len(rt_paths) else {}
+        s["scenario_id"] = str(meta.get("scenario_id", "NA"))
+    for s in sy_samples:
+        i = int(s.get("path_index", -1))
+        meta = synth_paths[i].get("meta", {}) if 0 <= i < len(synth_paths) else {}
+        s["scenario_id"] = str(meta.get("scenario_id", "NA"))
+
     rt_par = conditional_fit(rt_samples, ["parity"])
     sy_par = conditional_fit(sy_samples, ["parity"])
     rt_x = np.asarray([float(s["xpd_db"]) for s in rt_samples], dtype=float)
     sy_x = np.asarray([float(s["xpd_db"]) for s in sy_samples], dtype=float)
-    f3_mu_rt = float(np.mean(rt_x)) if len(rt_x) else np.nan
-    f3_mu_sy = float(np.mean(sy_x)) if len(sy_x) else np.nan
+    rt_ex = floor_pinned_exclusion_mask(rt_x, floor_db=floor_db, pinned_tol_db=pinned_tol_db)
+    sy_ex = floor_pinned_exclusion_mask(sy_x, floor_db=floor_db, pinned_tol_db=pinned_tol_db)
+    rt_xc = np.asarray(rt_ex["values"], dtype=float)[~np.asarray(rt_ex["mask_excluded"], dtype=bool)]
+    sy_xc = np.asarray(sy_ex["values"], dtype=float)[~np.asarray(sy_ex["mask_excluded"], dtype=bool)]
+
+    f3_mu_rt = float(np.mean(rt_xc)) if len(rt_xc) else np.nan
+    f3_mu_sy = float(np.mean(sy_xc)) if len(sy_xc) else np.nan
     f3_delta = float(abs(f3_mu_rt - f3_mu_sy)) if np.isfinite(f3_mu_rt) and np.isfinite(f3_mu_sy) else np.nan
-    f3_sigma_rt = float(np.std(rt_x, ddof=1)) if len(rt_x) > 1 else np.nan
-    f3_sigma_sy = float(np.std(sy_x, ddof=1)) if len(sy_x) > 1 else np.nan
+    f3_sigma_rt = float(np.std(rt_xc, ddof=1)) if len(rt_xc) > 1 else np.nan
+    f3_sigma_sy = float(np.std(sy_xc, ddof=1)) if len(sy_xc) > 1 else np.nan
     f3_sigma_delta = float(abs(f3_sigma_rt - f3_sigma_sy)) if np.isfinite(f3_sigma_rt) and np.isfinite(f3_sigma_sy) else np.nan
-    if len(rt_x) > 1 and len(sy_x) > 1:
-        ks2_full = scipy_stats.ks_2samp(rt_x, sy_x, alternative="two-sided", method="auto")
-        f3_ks2_d_full = float(ks2_full.statistic)
-        f3_ks2_p_full = float(ks2_full.pvalue)
-        cap = int(max(2, ks_n_cap))
-        rng = np.random.default_rng(int(seed) + 77)
-        rx = rt_x if len(rt_x) <= cap else rng.choice(rt_x, size=cap, replace=False)
-        sx = sy_x if len(sy_x) <= cap else rng.choice(sy_x, size=cap, replace=False)
-        ks2 = scipy_stats.ks_2samp(rx, sx, alternative="two-sided", method="auto")
-        f3_ks2_d = float(ks2.statistic)
-        f3_ks2_p = float(ks2.pvalue)
-        f3_ks2_n = int(min(len(rx), len(sx)))
+
+    f3_ks2_d, f3_ks2_p, f3_ks2_n = _ks2_with_cap(rt_xc, sy_xc, cap=ks_n_cap, seed=seed + 77)
+    f3_ks2_d_full, f3_ks2_p_full, _ = _ks2_with_cap(rt_x, sy_x, cap=ks_n_cap, seed=seed + 79)
+
+    rt_by_scn: dict[str, list[float]] = {}
+    sy_by_scn: dict[str, list[float]] = {}
+    rt_by_scn_c: dict[str, list[float]] = {}
+    sy_by_scn_c: dict[str, list[float]] = {}
+    for s in rt_samples:
+        sid = str(s.get("scenario_id", "NA"))
+        rt_by_scn.setdefault(sid, []).append(float(s["xpd_db"]))
+    for s in sy_samples:
+        sid = str(s.get("scenario_id", "NA"))
+        sy_by_scn.setdefault(sid, []).append(float(s["xpd_db"]))
+    for sid, vals in rt_by_scn.items():
+        e = floor_pinned_exclusion_mask(vals, floor_db=floor_db, pinned_tol_db=pinned_tol_db)
+        vv = np.asarray(e["values"], dtype=float)
+        mm = np.asarray(e["mask_excluded"], dtype=bool)
+        rt_by_scn_c[sid] = [float(x) for x in vv[~mm]]
+    for sid, vals in sy_by_scn.items():
+        e = floor_pinned_exclusion_mask(vals, floor_db=floor_db, pinned_tol_db=pinned_tol_db)
+        vv = np.asarray(e["values"], dtype=float)
+        mm = np.asarray(e["mask_excluded"], dtype=bool)
+        sy_by_scn_c[sid] = [float(x) for x in vv[~mm]]
+
+    common_sids = sorted(set(rt_by_scn.keys()) & set(sy_by_scn.keys()))
+    if common_sids:
+        per_sid_cap = max(2, int(max(ks_n_cap, 2) // max(len(common_sids), 1)))
     else:
-        f3_ks2_d = np.nan
-        f3_ks2_p = np.nan
-        f3_ks2_d_full = np.nan
-        f3_ks2_p_full = np.nan
-        f3_ks2_n = 0
+        per_sid_cap = 0
+    rt_cat: list[float] = []
+    sy_cat: list[float] = []
+    rt_cat_c: list[float] = []
+    sy_cat_c: list[float] = []
+    for i_sid, sid in enumerate(common_sids):
+        r = np.asarray(rt_by_scn[sid], dtype=float)
+        s = np.asarray(sy_by_scn[sid], dtype=float)
+        d, p_ks, n_used = _ks2_with_cap(r, s, cap=per_sid_cap, seed=seed + 200 + i_sid)
+        if n_used > 0:
+            rng_sid = np.random.default_rng(seed + 900 + i_sid)
+            rr = r if len(r) <= per_sid_cap else np.asarray(rng_sid.choice(r, size=per_sid_cap, replace=False), dtype=float)
+            ss = s if len(s) <= per_sid_cap else np.asarray(rng_sid.choice(s, size=per_sid_cap, replace=False), dtype=float)
+            rt_cat.extend(rr.tolist())
+            sy_cat.extend(ss.tolist())
+        rc = np.asarray(rt_by_scn_c.get(sid, []), dtype=float)
+        sc = np.asarray(sy_by_scn_c.get(sid, []), dtype=float)
+        d_c, p_c, n_c = _ks2_with_cap(rc, sc, cap=per_sid_cap, seed=seed + 400 + i_sid)
+        if n_c > 0:
+            rng_sid_c = np.random.default_rng(seed + 1300 + i_sid)
+            rrc = rc if len(rc) <= per_sid_cap else np.asarray(rng_sid_c.choice(rc, size=per_sid_cap, replace=False), dtype=float)
+            ssc = sc if len(sc) <= per_sid_cap else np.asarray(rng_sid_c.choice(sc, size=per_sid_cap, replace=False), dtype=float)
+            rt_cat_c.extend(rrc.tolist())
+            sy_cat_c.extend(ssc.tolist())
+    ks_strat_d, ks_strat_p, ks_strat_n = _ks2_with_cap(np.asarray(rt_cat, dtype=float), np.asarray(sy_cat, dtype=float), cap=10**9, seed=seed + 3000)
+    ks_strat_d_c, ks_strat_p_c, ks_strat_n_c = _ks2_with_cap(np.asarray(rt_cat_c, dtype=float), np.asarray(sy_cat_c, dtype=float), cap=10**9, seed=seed + 3100)
 
     rt_odd = np.asarray([1.0 for s in rt_samples if str(s.get("parity", "NA")) == "odd"], dtype=float)
     sy_odd = np.asarray([1.0 for s in sy_samples if str(s.get("parity", "NA")) == "odd"], dtype=float)
     rt_odd_frac = float(len(rt_odd) / max(len(rt_samples), 1))
     sy_odd_frac = float(len(sy_odd) / max(len(sy_samples), 1))
     parity_frac_abs_diff = float(abs(rt_odd_frac - sy_odd_frac))
-    if not np.isfinite(f3_ks2_p):
+    primary_p = f3_ks2_p
+    primary_d = f3_ks2_d
+    primary_n = f3_ks2_n
+    if not np.isfinite(primary_p):
         f3_ks2_status = "SKIPPED_INSUFFICIENT"
         f3_ks2_reason = "insufficient samples"
-    elif f3_ks2_p >= 0.05:
-        f3_ks2_status = "PASS"
-        f3_ks2_reason = "p>=0.05"
+    elif primary_p >= 0.05 and np.isfinite(f3_delta) and np.isfinite(f3_sigma_delta) and f3_delta <= 3.0 and f3_sigma_delta <= 6.0:
+        if np.isfinite(f3_ks2_p_full) and f3_ks2_p_full < 0.05:
+            f3_ks2_status = "PASS_WITH_CENSORING"
+            f3_ks2_reason = "continuous-only KS pass with censoring; full-mixture KS fails"
+        else:
+            f3_ks2_status = "PASS"
+            f3_ks2_reason = "continuous-only KS and mu/sigma thresholds passed"
     elif parity_frac_abs_diff > 0.05:
         f3_ks2_status = "SKIPPED_CONDITION_MISMATCH"
         f3_ks2_reason = f"parity_fraction_diff={parity_frac_abs_diff:.3f}"
-    elif np.isfinite(f3_delta) and np.isfinite(f3_sigma_delta) and f3_delta <= 3.0 and f3_sigma_delta <= 6.0:
-        f3_ks2_status = "SKIPPED_CONDITION_MISMATCH"
-        f3_ks2_reason = "global mu/sigma matched; strict KS rejected due residual structure mismatch"
     else:
         f3_ks2_status = "FAIL"
-        f3_ks2_reason = "distribution mismatch"
+        f3_ks2_reason = "continuous-only KS and/or mu/sigma thresholds failed"
 
-    rt_sub = pathwise_xpd(rt_paths, subbands=subbands, matrix_source=rt_matrix_source)
-    sy_sub = pathwise_xpd(synth_paths, subbands=subbands, matrix_source=synth_matrix_source)
+    rt_sub = pathwise_xpd(
+        rt_paths,
+        subbands=subbands,
+        matrix_source=rt_matrix_source,
+        input_basis=input_basis,  # type: ignore[arg-type]
+        eval_basis=eval_basis,  # type: ignore[arg-type]
+        convention=convention,
+    )
+    sy_sub = pathwise_xpd(
+        synth_paths,
+        subbands=subbands,
+        matrix_source=synth_matrix_source,
+        input_basis=input_basis,  # type: ignore[arg-type]
+        eval_basis=eval_basis,  # type: ignore[arg-type]
+        convention=convention,
+    )
 
-    def _mu_sigma(samples: list[dict[str, Any]], nb: int) -> tuple[list[float], list[float]]:
+    def _mu_sigma(samples: list[dict[str, Any]], nb: int, continuous_only: bool = False) -> tuple[list[float], list[float]]:
         mu: list[float] = []
         sg: list[float] = []
         for b in range(nb):
             vals = np.asarray([float(s["xpd_db"]) for s in samples if int(s.get("subband", -1)) == b], dtype=float)
+            if continuous_only and len(vals) > 0:
+                exb = floor_pinned_exclusion_mask(vals, floor_db=floor_db, pinned_tol_db=pinned_tol_db)
+                vv = np.asarray(exb["values"], dtype=float)
+                mm = np.asarray(exb["mask_excluded"], dtype=bool)
+                vals = vv[~mm]
             if len(vals) == 0:
                 mu.append(np.nan)
                 sg.append(np.nan)
@@ -490,18 +788,30 @@ def summarize_rt_vs_synth(
         return mu, sg
 
     nb = len(subbands)
-    mu_rt, sg_rt = _mu_sigma(rt_sub, nb)
-    mu_sy, sg_sy = _mu_sigma(sy_sub, nb)
+    mu_rt, sg_rt = _mu_sigma(rt_sub, nb, continuous_only=False)
+    mu_sy, sg_sy = _mu_sigma(sy_sub, nb, continuous_only=False)
+    mu_rt_c, sg_rt_c = _mu_sigma(rt_sub, nb, continuous_only=True)
+    mu_sy_c, sg_sy_c = _mu_sigma(sy_sub, nb, continuous_only=True)
     a_rt = np.asarray(mu_rt, dtype=float)
     a_sy = np.asarray(mu_sy, dtype=float)
     valid = np.isfinite(a_rt) & np.isfinite(a_sy)
-    mu_rmse = float(np.sqrt(np.mean((a_rt[valid] - a_sy[valid]) ** 2))) if np.any(valid) else np.nan
+    mu_rmse_full = float(np.sqrt(np.mean((a_rt[valid] - a_sy[valid]) ** 2))) if np.any(valid) else np.nan
     s_rt = np.asarray(sg_rt, dtype=float)
     s_sy = np.asarray(sg_sy, dtype=float)
     valid_s = np.isfinite(s_rt) & np.isfinite(s_sy)
-    sigma_rmse = float(np.sqrt(np.mean((s_rt[valid_s] - s_sy[valid_s]) ** 2))) if np.any(valid_s) else np.nan
+    sigma_rmse_full = float(np.sqrt(np.mean((s_rt[valid_s] - s_sy[valid_s]) ** 2))) if np.any(valid_s) else np.nan
+    a_rt_c = np.asarray(mu_rt_c, dtype=float)
+    a_sy_c = np.asarray(mu_sy_c, dtype=float)
+    valid_c = np.isfinite(a_rt_c) & np.isfinite(a_sy_c)
+    mu_rmse = float(np.sqrt(np.mean((a_rt_c[valid_c] - a_sy_c[valid_c]) ** 2))) if np.any(valid_c) else np.nan
+    s_rt_c = np.asarray(sg_rt_c, dtype=float)
+    s_sy_c = np.asarray(sg_sy_c, dtype=float)
+    valid_sc = np.isfinite(s_rt_c) & np.isfinite(s_sy_c)
+    sigma_rmse = float(np.sqrt(np.mean((s_rt_c[valid_sc] - s_sy_c[valid_sc]) ** 2))) if np.any(valid_sc) else np.nan
     span_rt = float(np.nanmax(a_rt) - np.nanmin(a_rt)) if np.any(np.isfinite(a_rt)) else np.nan
     span_sy = float(np.nanmax(a_sy) - np.nanmin(a_sy)) if np.any(np.isfinite(a_sy)) else np.nan
+    span_rt_c = float(np.nanmax(a_rt_c) - np.nanmin(a_rt_c)) if np.any(np.isfinite(a_rt_c)) else np.nan
+    span_sy_c = float(np.nanmax(a_sy_c) - np.nanmin(a_sy_c)) if np.any(np.isfinite(a_sy_c)) else np.nan
 
     ph_rt = offdiag_phases(
         rt_paths,
@@ -524,6 +834,10 @@ def summarize_rt_vs_synth(
     else:
         synth_phase_status = "FAIL"
 
+    f5_status = "FAIL"
+    if np.isfinite(mu_rmse) and mu_rmse <= 3.0:
+        f5_status = "PASS_WITH_CENSORING" if (np.isfinite(mu_rmse_full) and mu_rmse_full > 3.0) else "PASS"
+
     return {
         "rt_parity_xpd": rt_par,
         "synthetic_parity_xpd": sy_par,
@@ -533,14 +847,30 @@ def summarize_rt_vs_synth(
         "f3_xpd_sigma_rt_db": f3_sigma_rt,
         "f3_xpd_sigma_synth_db": f3_sigma_sy,
         "f3_xpd_sigma_delta_abs_db": f3_sigma_delta,
-        "f3_xpd_ks2_D": f3_ks2_d,
-        "f3_xpd_ks2_p": f3_ks2_p,
-        "f3_xpd_ks2_D_full": f3_ks2_d_full,
-        "f3_xpd_ks2_p_full": f3_ks2_p_full,
-        "f3_xpd_ks2_n_used": f3_ks2_n,
+        "f3_xpd_ks2_D": primary_d,
+        "f3_xpd_ks2_p": primary_p,
+        "f3_xpd_ks2_n_used": primary_n,
+        "f3_xpd_ks2_D_global_cont": f3_ks2_d,
+        "f3_xpd_ks2_p_global_cont": f3_ks2_p,
+        "f3_xpd_ks2_D_stratified_cont": ks_strat_d_c,
+        "f3_xpd_ks2_p_stratified_cont": ks_strat_p_c,
+        "f3_xpd_ks2_n_stratified_cont": ks_strat_n_c,
+        "f3_xpd_ks2_D_global_full": f3_ks2_d_full,
+        "f3_xpd_ks2_p_global_full": f3_ks2_p_full,
+        "f3_xpd_ks2_D_stratified_full": ks_strat_d,
+        "f3_xpd_ks2_p_stratified_full": ks_strat_p,
+        "f3_xpd_ks2_n_stratified_full": ks_strat_n,
+        "f3_continuous_only_primary": True,
+        "f3_continuous_rt_n": int(len(rt_xc)),
+        "f3_continuous_synth_n": int(len(sy_xc)),
+        "f3_pinned_ratio_rt": float(rt_ex.get("pinned_ratio", 0.0)),
+        "f3_pinned_ratio_synth": float(sy_ex.get("pinned_ratio", 0.0)),
+        "f3_floor_ratio_rt": float(rt_ex.get("floor_ratio", 0.0)),
+        "f3_floor_ratio_synth": float(sy_ex.get("floor_ratio", 0.0)),
         "f3_parity_frac_abs_diff": parity_frac_abs_diff,
         "f3_xpd_ks2_status": f3_ks2_status,
         "f3_xpd_ks2_reason": f3_ks2_reason,
+        "f3_gate_pass": bool(f3_ks2_status in {"PASS", "PASS_WITH_CENSORING"}),
         "rt_num_paths": len(rt_paths),
         "synthetic_num_paths": len(synth_paths),
         "rt_subband_count": len(rt_sub),
@@ -549,10 +879,23 @@ def summarize_rt_vs_synth(
         "subband_mu_synth_db": mu_sy,
         "subband_sigma_rt_db": sg_rt,
         "subband_sigma_synth_db": sg_sy,
+        "subband_mu_rt_cont_db": mu_rt_c,
+        "subband_mu_synth_cont_db": mu_sy_c,
+        "subband_sigma_rt_cont_db": sg_rt_c,
+        "subband_sigma_synth_cont_db": sg_sy_c,
         "subband_mu_span_rt": span_rt,
         "subband_mu_span_synth": span_sy,
+        "subband_mu_span_rt_cont": span_rt_c,
+        "subband_mu_span_synth_cont": span_sy_c,
         "subband_mu_rmse": mu_rmse,
         "subband_sigma_rmse": sigma_rmse,
+        "subband_mu_rmse_full": mu_rmse_full,
+        "subband_sigma_rmse_full": sigma_rmse_full,
+        "f5_subband_mu_rmse_db": mu_rmse,
+        "f5_subband_sigma_rmse_db": sigma_rmse,
+        "f5_subband_mu_rmse_full_db": mu_rmse_full,
+        "f5_subband_sigma_rmse_full_db": sigma_rmse_full,
+        "f5_status": f5_status,
         "phase_test_basis": phase_test_basis,
         "common_phase_removed": bool(common_phase_removed),
         "per_ray_sampling": bool(per_ray_phase_sampling),

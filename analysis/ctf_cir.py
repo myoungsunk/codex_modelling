@@ -75,6 +75,24 @@ def synthesize_ctf_with_source(paths: list[dict], f_hz: NDArray[np.float64], mat
     return h_f
 
 
+def synthesize_ctf_with_basis(
+    paths: list[dict],
+    f_hz: NDArray[np.float64],
+    matrix_source: str = "A",
+    input_basis: str | None = None,
+    eval_basis: str | None = None,
+    convention: str = "IEEE-RHCP",
+) -> NDArray[np.complex128]:
+    """Synthesize H(f) from A/J and convert basis explicitly if requested."""
+
+    H = synthesize_ctf_with_source(paths, f_hz=np.asarray(f_hz, dtype=float), matrix_source=matrix_source)
+    src = str(input_basis).lower() if input_basis is not None else None
+    dst = str(eval_basis).lower() if eval_basis is not None else src
+    if src in {"linear", "circular"} and dst in {"linear", "circular"} and src != dst:
+        H = convert_basis(H, src=src, dst=dst, convention=convention)
+    return H
+
+
 def ctf_to_cir(
     H_f: NDArray[np.complex128],
     f_hz: NDArray[np.float64],
