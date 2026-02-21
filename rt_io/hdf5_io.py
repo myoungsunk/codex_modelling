@@ -120,9 +120,9 @@ def _stringify_seed(seed_val: Any) -> str:
     return str(seed_val)
 
 
-def _normalize_meta_for_compare(meta: dict[str, Any]) -> dict[str, Any]:
+def _normalize_meta_for_compare(meta: dict[str, Any], default_schema_version: str = "v1") -> dict[str, Any]:
     out = dict(meta)
-    out["schema_version"] = str(out.get("schema_version", "v1"))
+    out["schema_version"] = str(out.get("schema_version", default_schema_version))
     out["git_commit"] = str(out.get("git_commit", "unknown"))
     out["git_dirty"] = bool(out.get("git_dirty", True))
     out["cmdline"] = str(out.get("cmdline", ""))
@@ -230,7 +230,7 @@ def save_rt_dataset(path: str | Path, data: dict[str, Any]) -> Path:
     with h5py.File(p, "w") as f:
         meta = f.create_group("meta")
         now = datetime.now(timezone.utc).isoformat()
-        src_meta = _normalize_meta_for_compare(data.get("meta", {}))
+        src_meta = _normalize_meta_for_compare(data.get("meta", {}), default_schema_version=SCHEMA_VERSION)
         git_commit, git_dirty = _git_meta()
         meta.attrs["created_at"] = src_meta.get("created_at", now)
         meta.attrs["basis"] = src_meta.get("basis", "linear")
