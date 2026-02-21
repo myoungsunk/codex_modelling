@@ -33,6 +33,8 @@ class ReciprocityMatch:
     delta_tau_s: float
     delta_sigma_max_db: float
     delta_sigma_median_db: float
+    delta_fro_max_db: float
+    delta_fro_median_db: float
     match_method: str
 
 
@@ -136,6 +138,20 @@ def _sv_delta_db(a_f: np.ndarray, b_f: np.ndarray) -> tuple[float, float]:
     return float(np.max(arr)), float(np.median(arr))
 
 
+def _fro_delta_db(a_f: np.ndarray, b_f: np.ndarray) -> tuple[float, float]:
+    dvals = []
+    n = min(len(a_f), len(b_f))
+    for k in range(n):
+        na = float(np.linalg.norm(a_f[k], ord="fro"))
+        nb = float(np.linalg.norm(b_f[k], ord="fro"))
+        dd = abs(20.0 * np.log10((na + EPS) / (nb + EPS)))
+        dvals.append(float(dd))
+    if not dvals:
+        return np.nan, np.nan
+    arr = np.asarray(dvals, dtype=float)
+    return float(np.max(arr)), float(np.median(arr))
+
+
 def reciprocity_sanity(
     scene: list,
     tx: Antenna,
@@ -183,7 +199,7 @@ def reciprocity_sanity(
 
     matches: list[ReciprocityMatch] = []
     unmatched_forward: list[dict[str, Any]] = []
-    used_rev_ids: set[int] = set()
+    used_rev_indices: set[int] = set()
 
     for i_fwd, pf in enumerate(fwd):
         key = _path_key(pf, reverse_order=False)
@@ -217,7 +233,7 @@ def reciprocity_sanity(
         best_pm = np.inf
         best_rev_idx = -1
         for i, (idx_rev, pr) in enumerate(cand):
-            if id(pr) in used_rev_ids:
+            if int(idx_rev) in used_rev_indices:
                 continue
             dt = abs(float(pf.tau_s) - float(pr.tau_s))
             pm = _point_mismatch_forward_reverse(pf, pr)
@@ -237,8 +253,9 @@ def reciprocity_sanity(
                 }
             )
             continue
-        used_rev_ids.add(id(best))
+        used_rev_indices.add(int(best_rev_idx))
         dmax, dmed = _sv_delta_db(_matrix_f(pf, matrix_source), _matrix_f(best, matrix_source))
+        fmax, fmed = _fro_delta_db(_matrix_f(pf, matrix_source), _matrix_f(best, matrix_source))
         matches.append(
             ReciprocityMatch(
                 path_index_forward=int(i_fwd),
@@ -250,8 +267,23 @@ def reciprocity_sanity(
                 delta_tau_s=float(abs(float(pf.tau_s) - float(best.tau_s))),
                 delta_sigma_max_db=float(dmax),
                 delta_sigma_median_db=float(dmed),
+                delta_fro_max_db=float(fmax),
+                delta_fro_median_db=float(fmed),
                 match_method=str(match_method),
             )
+        )
+
+    unmatched_reverse: list[dict[str, Any]] = []
+    for i_rev, pr in enumerate(rev):
+        if int(i_rev) in used_rev_indices:
+            continue
+        unmatched_reverse.append(
+            {
+                "path_index_reverse": int(i_rev),
+                "bounce_count": int(pr.bounce_count),
+                "surface_pattern": _surface_pattern(list(reversed(pr.surface_ids))),
+                "tau_s": float(pr.tau_s),
+            }
         )
 
     matched = len(matches)
@@ -260,6 +292,8 @@ def reciprocity_sanity(
     dtau_max = float(max((m.delta_tau_s for m in matches), default=np.nan))
     dsig_max = float(max((m.delta_sigma_max_db for m in matches), default=np.nan))
     dsig_med = float(np.nanmedian([m.delta_sigma_median_db for m in matches])) if matches else float("nan")
+    dfro_max = float(max((m.delta_fro_max_db for m in matches), default=np.nan))
+    dfro_med = float(np.nanmedian([m.delta_fro_median_db for m in matches])) if matches else float("nan")
     tau_mismatch_count = int(sum(1 for m in matches if np.isfinite(m.delta_tau_s) and m.delta_tau_s > float(tau_tol_s)))
     matrix_mismatch_count = int(
         sum(1 for m in matches if np.isfinite(m.delta_sigma_max_db) and m.delta_sigma_max_db > float(sigma_tol_db))
@@ -269,9 +303,21 @@ def reciprocity_sanity(
     for u in unmatched_forward:
         violations.append(
             {
-                "type": "unmatched_geometry",
+                "type": "unmatched_forward",
                 "path_index_forward": int(u.get("path_index_forward", -1)),
                 "path_index_reverse": -1,
+                "bounce_count": int(u.get("bounce_count", 0)),
+                "surface_pattern": str(u.get("surface_pattern", "none")),
+                "delta_tau_s": np.nan,
+                "delta_sigma_max_db": np.nan,
+            }
+        )
+    for u in unmatched_reverse:
+        violations.append(
+            {
+                "type": "unmatched_reverse",
+                "path_index_forward": -1,
+                "path_index_reverse": int(u.get("path_index_reverse", -1)),
                 "bounce_count": int(u.get("bounce_count", 0)),
                 "surface_pattern": str(u.get("surface_pattern", "none")),
                 "delta_tau_s": np.nan,
@@ -312,7 +358,10 @@ def reciprocity_sanity(
         "delta_tau_max_s": dtau_max,
         "delta_sigma_max_db": dsig_max,
         "delta_sigma_median_db": dsig_med,
+        "delta_fro_max_db": dfro_max,
+        "delta_fro_median_db": dfro_med,
         "unmatched_count": int(len(unmatched_forward)),
+        "unmatched_reverse_count": int(len(unmatched_reverse)),
         "tau_mismatch_count": int(tau_mismatch_count),
         "matrix_mismatch_count": int(matrix_mismatch_count),
         "tau_tol_s": float(tau_tol_s),
@@ -329,10 +378,13 @@ def reciprocity_sanity(
                 "delta_tau_s": m.delta_tau_s,
                 "delta_sigma_max_db": m.delta_sigma_max_db,
                 "delta_sigma_median_db": m.delta_sigma_median_db,
+                "delta_fro_max_db": m.delta_fro_max_db,
+                "delta_fro_median_db": m.delta_fro_median_db,
                 "match_method": m.match_method,
             }
             for m in matches
         ],
         "unmatched_forward": unmatched_forward,
+        "unmatched_reverse": unmatched_reverse,
         "violations": violations,
     }

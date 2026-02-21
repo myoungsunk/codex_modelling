@@ -38,6 +38,7 @@ class PathResult:
     interactions: list[str]
     surface_ids: list[int]
     incidence_angles: list[float]
+    bounce_normals: list[NDArray[np.float64]]
     AoD: NDArray[np.float64]
     AoA: NDArray[np.float64]
     points: list[NDArray[np.float64]]
@@ -53,6 +54,7 @@ class PathResult:
             "interactions": self.interactions,
             "surface_ids": self.surface_ids,
             "incidence_angles": self.incidence_angles,
+            "bounce_normals": [np.asarray(n, dtype=float).tolist() for n in self.bounce_normals],
             "AoD": self.AoD.tolist(),
             "AoA": self.AoA.tolist(),
             "segment_basis_uv": self.segment_basis_uv,
@@ -69,7 +71,11 @@ def _enumerate_sequences(num_planes: int, bounce: int) -> list[tuple[int, ...]]:
     return list(product(range(num_planes), repeat=bounce))
 
 
-def _construct_reflection_points(tx: NDArray[np.float64], rx: NDArray[np.float64], seq: Sequence[Plane]) -> list[NDArray[np.float64]] | None:
+def _construct_reflection_points_source_images(
+    tx: NDArray[np.float64],
+    rx: NDArray[np.float64],
+    seq: Sequence[Plane],
+) -> list[NDArray[np.float64]] | None:
     if not seq:
         return [tx, rx]
 
@@ -92,11 +98,74 @@ def _construct_reflection_points(tx: NDArray[np.float64], rx: NDArray[np.float64
     return out
 
 
+def _construct_reflection_points_receiver_images(
+    tx: NDArray[np.float64],
+    rx: NDArray[np.float64],
+    seq: Sequence[Plane],
+) -> list[NDArray[np.float64]] | None:
+    if not seq:
+        return [tx, rx]
+    n = len(seq)
+    rx_images: list[NDArray[np.float64]] = [np.asarray(rx, dtype=float)]
+    for j in range(n):
+        rx_images.append(reflect_point(rx_images[-1], seq[n - 1 - j]))
+
+    out: list[NDArray[np.float64]] = [np.asarray(tx, dtype=float)]
+    curr = out[0]
+    for i, pl in enumerate(seq):
+        target = rx_images[n - i]
+        p = line_plane_intersection(curr, target, pl)
+        if p is None:
+            return None
+        out.append(np.asarray(p, dtype=float))
+        curr = out[-1]
+    out.append(np.asarray(rx, dtype=float))
+    return out
+
+
+def _construct_reflection_points(tx: NDArray[np.float64], rx: NDArray[np.float64], seq: Sequence[Plane]) -> list[NDArray[np.float64]] | None:
+    """Solve specular reflection points for a plane sequence.
+
+    We try source-image and receiver-image formulations to avoid
+    directional degeneracies (important for reciprocity reversal).
+    """
+
+    pts = _construct_reflection_points_source_images(tx, rx, seq)
+    if pts is not None:
+        return pts
+    return _construct_reflection_points_receiver_images(tx, rx, seq)
+
+
 def _path_valid(points: list[NDArray[np.float64]]) -> bool:
     for i in range(len(points) - 1):
         if np.linalg.norm(points[i + 1] - points[i]) < 1e-7:
             return False
     return True
+
+
+def _fit_reflection_points_to_bounds(
+    points: list[NDArray[np.float64]],
+    seq: Sequence[Plane],
+    eps: float = 1e-6,
+    clamp_tol: float = 1e-6,
+) -> list[NDArray[np.float64]] | None:
+    """Clamp tiny out-of-bound reflection drift to finite plate bounds consistently."""
+
+    if len(seq) == 0:
+        return points
+    out: list[NDArray[np.float64]] = [np.asarray(points[0], dtype=float)]
+    for i, pl in enumerate(seq):
+        p = np.asarray(points[i + 1], dtype=float)
+        if pl.contains_point(p, eps=eps):
+            out.append(p)
+            continue
+        p_c, d_c = pl.clamp_to_bounds(p)
+        if d_c <= clamp_tol and pl.contains_point(p_c, eps=eps):
+            out.append(np.asarray(p_c, dtype=float))
+            continue
+        return None
+    out.append(np.asarray(points[-1], dtype=float))
+    return out
 
 
 def _default_rho(_: dict) -> float:
@@ -170,6 +239,7 @@ def trace_paths(
     n_f = len(freq)
     results: list[PathResult] = []
     seen: set[tuple] = set()
+    plate_eps = 1e-6
 
     for b in range(max_bounce + 1):
         if b == 0 and not los_enabled:
@@ -179,9 +249,12 @@ def trace_paths(
             points = _construct_reflection_points(tx.position, rx.position, seq)
             if points is None or not _path_valid(points):
                 continue
-            if any(not seq[i].contains_point(points[i + 1]) for i in range(len(seq))):
+            points = _fit_reflection_points_to_bounds(points, seq, eps=plate_eps, clamp_tol=plate_eps)
+            if points is None or not _path_valid(points):
                 continue
-            if _path_occluded(points, planes, seq):
+            if any(not seq[i].contains_point(points[i + 1], eps=plate_eps) for i in range(len(seq))):
+                continue
+            if _path_occluded(points, planes, seq, eps=plate_eps):
                 continue
 
             dirs = [normalize(points[i + 1] - points[i]) for i in range(len(points) - 1)]
@@ -207,14 +280,16 @@ def trace_paths(
             seg_basis_uv.append({"k": dirs[0].tolist(), "u": u0.tolist(), "v": v0.tolist()})
 
             incidence_angles: list[float] = []
+            bounce_normals: list[NDArray[np.float64]] = []
             interactions: list[str] = []
             surface_ids: list[int] = []
 
             for i, pl in enumerate(seq):
                 k_in = dirs[i]
                 k_out = dirs[i + 1]
-                s_in, p_in, s_out, p_out, theta_i, _ = local_sp_bases(k_in, k_out, pl.unit_normal())
+                s_in, p_in, s_out, p_out, theta_i, n_eff = local_sp_bases(k_in, k_out, pl.unit_normal())
                 incidence_angles.append(theta_i)
+                bounce_normals.append(np.asarray(n_eff, dtype=float))
                 interactions.append("reflection")
                 surface_ids.append(pl.id)
 
@@ -274,6 +349,7 @@ def trace_paths(
                     interactions=interactions,
                     surface_ids=surface_ids,
                     incidence_angles=incidence_angles,
+                    bounce_normals=bounce_normals,
                     AoD=dirs[0],
                     AoA=dirs[-1],
                     points=[np.asarray(p, dtype=float) for p in points],

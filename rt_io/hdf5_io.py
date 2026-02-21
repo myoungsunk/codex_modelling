@@ -150,6 +150,7 @@ def save_rt_dataset(path: str | Path, data: dict[str, Any]) -> Path:
         meta.attrs["created_at"] = src_meta.get("created_at", now)
         meta.attrs["basis"] = src_meta.get("basis", "linear")
         meta.attrs["convention"] = src_meta.get("convention", "IEEE-RHCP")
+        meta.attrs["matrix_source"] = src_meta.get("xpd_matrix_source", src_meta.get("matrix_source", ""))
         meta.attrs["schema_version"] = src_meta.get("schema_version", SCHEMA_VERSION)
         meta.attrs["git_commit"] = src_meta.get("git_commit", git_commit)
         meta.attrs["git_dirty"] = bool(src_meta.get("git_dirty", git_dirty))
@@ -268,6 +269,7 @@ def load_rt_dataset(path: str | Path) -> dict[str, Any]:
                 "created_at": meta_g.attrs.get("created_at", ""),
                 "basis": meta_g.attrs.get("basis", "linear"),
                 "convention": meta_g.attrs.get("convention", "IEEE-RHCP"),
+                "matrix_source": meta_g.attrs.get("matrix_source", ""),
                 "schema_version": meta_g.attrs.get("schema_version", "v1"),
                 "git_commit": meta_g.attrs.get("git_commit", "unknown"),
                 "git_dirty": bool(meta_g.attrs.get("git_dirty", True)),
@@ -281,6 +283,7 @@ def load_rt_dataset(path: str | Path) -> dict[str, Any]:
                 "created_at": "",
                 "basis": "linear",
                 "convention": "IEEE-RHCP",
+                "matrix_source": "",
                 "schema_version": "v1",
                 "git_commit": "unknown",
                 "git_dirty": True,

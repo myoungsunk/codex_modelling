@@ -73,7 +73,11 @@ def local_sp_bases(k_in: Vec3, k_out: Vec3, normal: Vec3) -> tuple[Vec3, Vec3, V
     kin = normalize(np.asarray(k_in, dtype=float))
     kout = normalize(np.asarray(k_out, dtype=float))
     n = normalize(np.asarray(normal, dtype=float))
-    if float(np.dot(kin, n)) > 0.0:
+    # Deterministically orient normal against incoming direction.
+    # Tie-break near grazing with outgoing direction to keep reversal stable.
+    dot_in = float(np.dot(kin, n))
+    dot_out = float(np.dot(kout, n))
+    if dot_in > 0.0 or (abs(dot_in) <= 1e-12 and dot_out > 0.0):
         n = -n
     cos_i = -float(np.dot(kin, n))
     cos_i = float(np.clip(cos_i, 0.0, 1.0))

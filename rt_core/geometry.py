@@ -18,6 +18,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 Vec3 = NDArray[np.float64]
+GEOM_EPS = 1e-12
 
 
 @dataclass(frozen=True)
@@ -75,16 +76,35 @@ class Plane:
             v = normalize(np.cross(n, u))
         return u, v
 
+    def in_plane_coordinates(self, point: Vec3) -> tuple[float, float]:
+        """Return local in-plane coordinates (u, v) of a point relative to p0."""
+
+        u, v = self.local_axes()
+        d = np.asarray(point, dtype=float) - np.asarray(self.p0, dtype=float)
+        return float(np.dot(d, u)), float(np.dot(d, v))
+
+    def clamp_to_bounds(self, point: Vec3) -> tuple[Vec3, float]:
+        """Clamp a point to finite plate bounds and return (clamped_point, clamp_distance)."""
+
+        p = np.asarray(point, dtype=float)
+        if self.half_extent_u is None or self.half_extent_v is None:
+            return p, 0.0
+        u, v = self.local_axes()
+        uu, vv = self.in_plane_coordinates(p)
+        uu_c = float(np.clip(uu, -float(self.half_extent_u), float(self.half_extent_u)))
+        vv_c = float(np.clip(vv, -float(self.half_extent_v), float(self.half_extent_v)))
+        p_c = np.asarray(self.p0, dtype=float) + uu_c * u + vv_c * v
+        return p_c, float(np.linalg.norm(p_c - p))
+
     def contains_point(self, point: Vec3, eps: float = 1e-7) -> bool:
         """Return True for infinite plane or if point is inside finite plate bounds."""
 
         if self.half_extent_u is None or self.half_extent_v is None:
             return True
-        u, v = self.local_axes()
-        d = np.asarray(point, dtype=float) - np.asarray(self.p0, dtype=float)
-        uu = float(np.dot(d, u))
-        vv = float(np.dot(d, v))
-        return abs(uu) <= float(self.half_extent_u) + eps and abs(vv) <= float(self.half_extent_v) + eps
+        uu, vv = self.in_plane_coordinates(point)
+        du = abs(uu) - float(self.half_extent_u)
+        dv = abs(vv) - float(self.half_extent_v)
+        return du <= eps and dv <= eps
 
 
 @dataclass(frozen=True)
@@ -118,15 +138,22 @@ def ray_plane_intersection(origin: Vec3, direction: Vec3, plane: Plane, eps: flo
 
 
 def line_plane_intersection(a: Vec3, b: Vec3, plane: Plane, eps: float = 1e-9) -> Optional[Vec3]:
-    """Intersection between infinite line through points a,b and a plane."""
+    """Intersection between infinite line through points a,b and a plane.
 
-    d = np.asarray(b, dtype=float) - np.asarray(a, dtype=float)
-    if np.linalg.norm(d) < eps:
+    Unlike ray intersection, this is direction-symmetric (t can be negative),
+    which is required for reciprocity checks under Tx/Rx reversal.
+    """
+
+    o = np.asarray(a, dtype=float)
+    d = np.asarray(b, dtype=float) - o
+    if np.linalg.norm(d) < max(eps, GEOM_EPS):
         return None
-    hit = ray_plane_intersection(np.asarray(a, dtype=float), d, plane, eps=eps)
-    if hit is None:
+    n = plane.unit_normal()
+    denom = float(np.dot(d, n))
+    if abs(denom) < eps:
         return None
-    return hit.point
+    t = float(np.dot(np.asarray(plane.p0, dtype=float) - o, n) / denom)
+    return o + t * d
 
 
 def reflect_point(point: Vec3, plane: Plane) -> Vec3:

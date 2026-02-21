@@ -281,7 +281,9 @@ def compute_reciprocity_checks(
                 "covered_cases": 0,
                 "checked_cases": 0,
                 "reverse_empty_cases": 0,
-                "unmatched_count": 0,
+                "reverse_trace_empty": 0,
+                "unmatched_forward": 0,
+                "unmatched_reverse": 0,
                 "tau_mismatch_count": 0,
                 "matrix_mismatch_count": 0,
             },
@@ -291,7 +293,8 @@ def compute_reciprocity_checks(
         n_r = int(e.get("n_reverse", 0))
         if (not require_bidirectional_paths) or (n_f > 0 and n_r > 0):
             by_scenario[sid]["checked_cases"] += 1
-            by_scenario[sid]["unmatched_count"] += int(e.get("unmatched_count", 0))
+            by_scenario[sid]["unmatched_forward"] += int(e.get("unmatched_count", 0))
+            by_scenario[sid]["unmatched_reverse"] += int(e.get("unmatched_reverse_count", 0))
             by_scenario[sid]["tau_mismatch_count"] += int(e.get("tau_mismatch_count", 0))
             by_scenario[sid]["matrix_mismatch_count"] += int(e.get("matrix_mismatch_count", 0))
             for v in e.get("violations", []):
@@ -301,6 +304,7 @@ def compute_reciprocity_checks(
                 worst.append(w)
         elif n_f > 0 and n_r == 0:
             by_scenario[sid]["reverse_empty_cases"] += 1
+            by_scenario[sid]["reverse_trace_empty"] += 1
             worst.append(
                 {
                     "scenario_id": sid,
@@ -317,7 +321,11 @@ def compute_reciprocity_checks(
 
     def _sev(v: dict[str, Any]) -> tuple[float, float, float]:
         t = str(v.get("type", ""))
-        pri = 3.0 if t == "unmatched_geometry" else (2.0 if t == "matrix_invariant_mismatch" else 1.0)
+        pri = (
+            3.0
+            if t in {"unmatched_forward", "unmatched_reverse", "reverse_trace_empty"}
+            else (2.0 if t == "matrix_invariant_mismatch" else 1.0)
+        )
         ds = float(v.get("delta_sigma_max_db", np.nan))
         dt = float(v.get("delta_tau_s", np.nan))
         return (
@@ -327,6 +335,25 @@ def compute_reciprocity_checks(
         )
 
     worst_sorted = sorted(worst, key=_sev, reverse=True)[:5]
+    requirement_flags: dict[str, bool] = {}
+    for sid, cnt in by_scenario.items():
+        if require_bidirectional_paths:
+            requirement_flags[sid] = bool(
+                int(cnt.get("covered_cases", 0)) == int(cnt.get("checked_cases", 0))
+                and int(cnt.get("reverse_empty_cases", 0)) == 0
+            )
+        else:
+            requirement_flags[sid] = True
+
+    reverse_trace_empty_total = int(sum(int(c.get("reverse_trace_empty", 0)) for c in by_scenario.values()))
+    unmatched_forward_total = int(sum(int(c.get("unmatched_forward", 0)) for c in by_scenario.values()))
+    unmatched_reverse_total = int(sum(int(c.get("unmatched_reverse", 0)) for c in by_scenario.values()))
+    tau_mismatch_total = int(sum(int(c.get("tau_mismatch_count", 0)) for c in by_scenario.values()))
+    matrix_mismatch_total = int(sum(int(c.get("matrix_mismatch_count", 0)) for c in by_scenario.values()))
+    coverage_pass = bool(
+        (not require_bidirectional_paths)
+        or (int(len(checked_entries)) == int(len(entries)) and int(len(reverse_empty_entries)) == 0)
+    )
 
     return {
         "entries": entries,
@@ -337,14 +364,31 @@ def compute_reciprocity_checks(
         "matched_ratio_global": float(np.sum(n_m) / max(np.sum(n_fwd), 1.0)) if len(checked_entries) else np.nan,
         "delta_tau_max_s_global": float(np.nanmax(dt)) if len(checked_entries) else np.nan,
         "delta_sigma_max_db_global": float(np.nanmax(ds)) if len(checked_entries) else np.nan,
+        "delta_fro_max_db_global": float(
+            np.nanmax(np.asarray([float(e.get("delta_fro_max_db", np.nan)) for e in checked_entries], dtype=float))
+        )
+        if len(checked_entries)
+        else np.nan,
         "require_bidirectional_paths": bool(require_bidirectional_paths),
         "reverse_empty_cases": int(len(reverse_empty_entries)),
         "unmatched_count_total": int(np.sum(unmatched)),
+        "unmatched_reverse_count_total": int(
+            np.sum(np.asarray([int(e.get("unmatched_reverse_count", 0)) for e in checked_entries], dtype=int))
+        ),
         "tau_mismatch_count_total": int(np.sum(tau_mm)),
         "matrix_mismatch_count_total": int(np.sum(mat_mm)),
+        "type_counts_total": {
+            "reverse_trace_empty": reverse_trace_empty_total,
+            "unmatched_forward": unmatched_forward_total,
+            "unmatched_reverse": unmatched_reverse_total,
+            "tau_mismatch": tau_mismatch_total,
+            "matrix_mismatch": matrix_mismatch_total,
+        },
         "tau_tol_s": float(tau_tol_s),
         "sigma_tol_db": float(sigma_tol_db),
         "counts_by_scenario": by_scenario,
+        "requirement_flags_by_scenario": requirement_flags,
+        "coverage_pass": coverage_pass,
         "worst_violations": worst_sorted,
         "matrix_source": matrix_source,
     }
@@ -766,21 +810,47 @@ def build_quality_report(
         lines.append(f"- matched_ratio_global: {float(reciprocity_metrics.get('matched_ratio_global', np.nan)):.6f}")
         lines.append(f"- delta_tau_max_s_global: {float(reciprocity_metrics.get('delta_tau_max_s_global', np.nan)):.3e}")
         lines.append(f"- delta_sigma_max_db_global: {float(reciprocity_metrics.get('delta_sigma_max_db_global', np.nan)):.3e}")
+        lines.append(f"- delta_fro_max_db_global: {float(reciprocity_metrics.get('delta_fro_max_db_global', np.nan)):.3e}")
+        lines.append(f"- c10_coverage_pass: {bool(reciprocity_metrics.get('coverage_pass', False))}")
+        if bool(reciprocity_metrics.get("require_bidirectional_paths", True)):
+            cc = int(reciprocity_metrics.get("checked_cases", 0))
+            cv = int(reciprocity_metrics.get("covered_cases", 0))
+            re = int(reciprocity_metrics.get("reverse_empty_cases", 0))
+            lines.append(
+                f"- c10_hard_gate: checked_cases==covered_cases ({cc}=={cv}) "
+                f"AND reverse_empty_cases==0 ({re}==0)"
+            )
+            if not (cc == cv and re == 0):
+                lines.append("- FAIL: C10 bidirectional coverage gate not satisfied.")
         lines.append(
             "- type_counts: "
             f"unmatched_count_total={int(reciprocity_metrics.get('unmatched_count_total', 0))}, "
+            f"unmatched_reverse_count_total={int(reciprocity_metrics.get('unmatched_reverse_count_total', 0))}, "
             f"tau_mismatch_count_total={int(reciprocity_metrics.get('tau_mismatch_count_total', 0))}, "
             f"matrix_mismatch_count_total={int(reciprocity_metrics.get('matrix_mismatch_count_total', 0))}"
         )
+        tct = reciprocity_metrics.get("type_counts_total", {}) or {}
+        lines.append(
+            "- type_counts_total: "
+            f"reverse_trace_empty={int(tct.get('reverse_trace_empty', 0))}, "
+            f"unmatched_forward={int(tct.get('unmatched_forward', 0))}, "
+            f"unmatched_reverse={int(tct.get('unmatched_reverse', 0))}, "
+            f"tau_mismatch={int(tct.get('tau_mismatch', 0))}, "
+            f"matrix_mismatch={int(tct.get('matrix_mismatch', 0))}"
+        )
         lines.append("- counts_by_scenario:")
+        req_flags = reciprocity_metrics.get("requirement_flags_by_scenario", {}) or {}
         for sid, c in sorted((reciprocity_metrics.get("counts_by_scenario", {}) or {}).items()):
             lines.append(
                 f"-   {sid}: covered_cases={int(c.get('covered_cases', 0))}, "
                 f"checked_cases={int(c.get('checked_cases', 0))}, "
                 f"reverse_empty_cases={int(c.get('reverse_empty_cases', 0))}, "
-                f"unmatched={int(c.get('unmatched_count', 0))}, "
+                f"reverse_trace_empty={int(c.get('reverse_trace_empty', 0))}, "
+                f"unmatched_forward={int(c.get('unmatched_forward', 0))}, "
+                f"unmatched_reverse={int(c.get('unmatched_reverse', 0))}, "
                 f"tau_mismatch={int(c.get('tau_mismatch_count', 0))}, "
-                f"matrix_mismatch={int(c.get('matrix_mismatch_count', 0))}"
+                f"matrix_mismatch={int(c.get('matrix_mismatch_count', 0))}, "
+                f"requirement_met={bool(req_flags.get(sid, False))}"
             )
         lines.append("- worst_5_violations:")
         for v in reciprocity_metrics.get("worst_violations", []) or []:
@@ -986,6 +1056,7 @@ def main() -> None:
         data.setdefault("meta", {})["cmdline"] = " ".join(shlex.quote(a) for a in sys.argv)
         data.setdefault("meta", {})["seed"] = {"model_seed": int(args.model_seed)}
         data.setdefault("meta", {})["release_mode"] = bool(args.release_mode)
+        data.setdefault("meta", {})["xpd_matrix_source"] = str(args.xpd_matrix_source)
         out_h5 = _basis_output_path(args.output, b, multi)
         out_plot = _basis_output_dir(args.plots_dir, b, multi)
         out_rep = _basis_output_path(args.report, b, multi)
