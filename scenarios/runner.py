@@ -34,7 +34,7 @@ from plots.plot_config import PlotConfig
 from plots.p0_p13 import generate_all_plots
 from rt_core.antenna import Antenna
 from rt_core.geometry import normalize
-from rt_io.hdf5_io import save_rt_dataset
+from rt_io.hdf5_io import save_rt_dataset, self_test_meta_roundtrip
 from scenarios import (
     A1_los_only,
     A2_pec_plane,
@@ -457,12 +457,19 @@ def build_quality_report(
         lines.append("- git_clean_check: PASS (git_dirty=False)")
     if release_mode_now and git_dirty_now:
         lines.append("- FAIL: release_mode requires git_dirty=False.")
-    lines.append(f"- xpd_matrix_source: {matrix_source}")
-    lines.append(f"- exact_bounce_defaults: {DEFAULT_EXACT_BOUNCE}")
+    xpd_src_now = str(data.get("meta", {}).get("xpd_matrix_source", matrix_source))
+    exact_bounce_now = data.get("meta", {}).get("exact_bounce_defaults", DEFAULT_EXACT_BOUNCE)
+    lines.append(f"- xpd_matrix_source: {xpd_src_now}")
+    lines.append(f"- exact_bounce_defaults: {exact_bounce_now}")
     lines.append("- report_exact_bounce_applied: True (scenario-specific default map)")
     antenna_config = data.get("meta", {}).get("antenna_config", {})
     lines.append(f"- antenna_config: {antenna_config}")
-    physics_mode = not bool(antenna_config.get("enable_coupling", True))
+    physics_mode = bool(
+        data.get("meta", {}).get(
+            "physics_validation_mode",
+            not bool(antenna_config.get("enable_coupling", True)),
+        )
+    )
     lines.append(f"- physics_validation_mode: {physics_mode}")
     floor_info = estimate_leakage_floor_from_antenna_config(antenna_config)
     lines.append(
@@ -1055,8 +1062,12 @@ def main() -> None:
         )
         data.setdefault("meta", {})["cmdline"] = " ".join(shlex.quote(a) for a in sys.argv)
         data.setdefault("meta", {})["seed"] = {"model_seed": int(args.model_seed)}
+        data.setdefault("meta", {})["seed_json"] = "{\"model_seed\":%d}" % int(args.model_seed)
         data.setdefault("meta", {})["release_mode"] = bool(args.release_mode)
         data.setdefault("meta", {})["xpd_matrix_source"] = str(args.xpd_matrix_source)
+        data.setdefault("meta", {})["exact_bounce_defaults"] = dict(DEFAULT_EXACT_BOUNCE)
+        data.setdefault("meta", {})["physics_validation_mode"] = not bool(antenna_config.get("enable_coupling", True))
+        data.setdefault("meta", {})["antenna_config"] = dict(antenna_config)
         out_h5 = _basis_output_path(args.output, b, multi)
         out_plot = _basis_output_dir(args.plots_dir, b, multi)
         out_rep = _basis_output_path(args.report, b, multi)
@@ -1108,6 +1119,8 @@ def main() -> None:
         data.setdefault("meta", {})["tap_path_consistency"] = tap_path_metrics
 
         save_rt_dataset(out_h5, data)
+        if not self_test_meta_roundtrip(out_h5, expected_meta=data.get("meta", {})):
+            raise SystemExit("HDF5 meta roundtrip self-test failed: saved artifact is not reproducible.")
         generate_all_plots(data, out_dir=out_plot, config=plot_config, exact_bounce_map=DEFAULT_EXACT_BOUNCE)
         model_metrics = None
         if args.model_compare:

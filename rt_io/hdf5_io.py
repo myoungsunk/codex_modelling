@@ -33,6 +33,34 @@ from analysis.ctf_cir import synthesize_ctf
 
 
 SCHEMA_VERSION = "v2"
+V2_REQUIRED_META_ATTRS = (
+    "schema_version",
+    "git_commit",
+    "git_dirty",
+    "cmdline",
+    "seed_json",
+    "basis",
+    "convention",
+    "xpd_matrix_source",
+    "exact_bounce_defaults_json",
+    "physics_validation_mode",
+    "antenna_config_json",
+    "release_mode",
+)
+META_COMPARE_KEYS = (
+    "schema_version",
+    "git_commit",
+    "git_dirty",
+    "cmdline",
+    "basis",
+    "convention",
+    "xpd_matrix_source",
+    "exact_bounce_defaults",
+    "physics_validation_mode",
+    "antenna_config",
+    "release_mode",
+    "seed_json",
+)
 
 
 def _git_meta() -> tuple[str, bool]:
@@ -69,6 +97,63 @@ def _git_diff(max_chars: int = 200_000) -> str:
 def _write_string_array(group: h5py.Group, name: str, values: list[str]) -> None:
     dt = h5py.string_dtype(encoding="utf-8")
     group.create_dataset(name, data=np.asarray(values, dtype=object), dtype=dt)
+
+
+def _json_dumps_canonical(value: Any) -> str:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"))
+
+
+def _json_loads_safe(text: str, fallback: Any) -> Any:
+    try:
+        return json.loads(text)
+    except Exception:
+        return fallback
+
+
+def _stringify_seed(seed_val: Any) -> str:
+    if isinstance(seed_val, str):
+        return seed_val
+    if seed_val is None:
+        return ""
+    if isinstance(seed_val, (dict, list, tuple, int, float, bool)):
+        return _json_dumps_canonical(seed_val)
+    return str(seed_val)
+
+
+def _normalize_meta_for_compare(meta: dict[str, Any]) -> dict[str, Any]:
+    out = dict(meta)
+    out["schema_version"] = str(out.get("schema_version", "v1"))
+    out["git_commit"] = str(out.get("git_commit", "unknown"))
+    out["git_dirty"] = bool(out.get("git_dirty", True))
+    out["cmdline"] = str(out.get("cmdline", ""))
+    out["basis"] = str(out.get("basis", "linear"))
+    out["convention"] = str(out.get("convention", "IEEE-RHCP"))
+    out["xpd_matrix_source"] = str(out.get("xpd_matrix_source", out.get("matrix_source", "")))
+    out["release_mode"] = bool(out.get("release_mode", False))
+    out["physics_validation_mode"] = bool(
+        out.get(
+            "physics_validation_mode",
+            not bool((out.get("antenna_config", {}) or {}).get("enable_coupling", True)),
+        )
+    )
+    ac = out.get("antenna_config", {})
+    if isinstance(ac, str):
+        ac = _json_loads_safe(ac, {})
+    out["antenna_config"] = ac if isinstance(ac, dict) else {}
+    eb = out.get("exact_bounce_defaults", {})
+    if isinstance(eb, str):
+        eb = _json_loads_safe(eb, {})
+    out["exact_bounce_defaults"] = eb if isinstance(eb, dict) else {}
+    out["seed_json"] = str(out.get("seed_json", _stringify_seed(out.get("seed", ""))))
+    return out
+
+
+def _require_v2_meta_attrs(meta_g: h5py.Group) -> None:
+    missing = [k for k in V2_REQUIRED_META_ATTRS if k not in meta_g.attrs]
+    if missing:
+        raise ValueError(
+            "Missing required v2 meta attrs: " + ", ".join(missing)
+        )
 
 
 def _json_dataset_value(ds: h5py.Dataset) -> dict[str, Any]:
@@ -145,25 +230,26 @@ def save_rt_dataset(path: str | Path, data: dict[str, Any]) -> Path:
     with h5py.File(p, "w") as f:
         meta = f.create_group("meta")
         now = datetime.now(timezone.utc).isoformat()
-        src_meta = data.get("meta", {})
+        src_meta = _normalize_meta_for_compare(data.get("meta", {}))
         git_commit, git_dirty = _git_meta()
         meta.attrs["created_at"] = src_meta.get("created_at", now)
         meta.attrs["basis"] = src_meta.get("basis", "linear")
         meta.attrs["convention"] = src_meta.get("convention", "IEEE-RHCP")
-        meta.attrs["matrix_source"] = src_meta.get("xpd_matrix_source", src_meta.get("matrix_source", ""))
+        meta.attrs["xpd_matrix_source"] = src_meta.get("xpd_matrix_source", src_meta.get("matrix_source", ""))
+        meta.attrs["matrix_source"] = src_meta.get("xpd_matrix_source", src_meta.get("matrix_source", ""))  # compat
         meta.attrs["schema_version"] = src_meta.get("schema_version", SCHEMA_VERSION)
         meta.attrs["git_commit"] = src_meta.get("git_commit", git_commit)
         meta.attrs["git_dirty"] = bool(src_meta.get("git_dirty", git_dirty))
         meta.attrs["cmdline"] = str(src_meta.get("cmdline", ""))
-        seed_val = src_meta.get("seed", None)
-        if isinstance(seed_val, (dict, list, tuple)):
-            meta.attrs["seed"] = json.dumps(seed_val)
-        elif seed_val is None:
-            meta.attrs["seed"] = ""
-        else:
-            meta.attrs["seed"] = str(seed_val)
-        if "release_mode" in src_meta:
-            meta.attrs["release_mode"] = bool(src_meta.get("release_mode", False))
+        seed_json = str(src_meta.get("seed_json", _stringify_seed(src_meta.get("seed", ""))))
+        meta.attrs["seed_json"] = seed_json
+        meta.attrs["seed"] = seed_json  # compat
+        exact_bounce_defaults = src_meta.get("exact_bounce_defaults", {})
+        antenna_cfg = src_meta.get("antenna_config", {})
+        meta.attrs["exact_bounce_defaults_json"] = _json_dumps_canonical(exact_bounce_defaults)
+        meta.attrs["antenna_config_json"] = _json_dumps_canonical(antenna_cfg)
+        meta.attrs["physics_validation_mode"] = bool(src_meta.get("physics_validation_mode", False))
+        meta.attrs["release_mode"] = bool(src_meta.get("release_mode", False))
         git_diff = src_meta.get("git_diff", None)
         if git_diff is None:
             git_diff = _git_diff()
@@ -265,16 +351,29 @@ def load_rt_dataset(path: str | Path) -> dict[str, Any]:
     with h5py.File(path, "r") as f:
         if "meta" in f:
             meta_g = f["meta"]
+            schema_version = str(meta_g.attrs.get("schema_version", "v1"))
+            if schema_version == SCHEMA_VERSION:
+                _require_v2_meta_attrs(meta_g)
+            seed_json = str(meta_g.attrs.get("seed_json", meta_g.attrs.get("seed", "")))
+            exact_json = str(meta_g.attrs.get("exact_bounce_defaults_json", "{}"))
+            antenna_json = str(meta_g.attrs.get("antenna_config_json", "{}"))
             out["meta"] = {
                 "created_at": meta_g.attrs.get("created_at", ""),
                 "basis": meta_g.attrs.get("basis", "linear"),
                 "convention": meta_g.attrs.get("convention", "IEEE-RHCP"),
-                "matrix_source": meta_g.attrs.get("matrix_source", ""),
-                "schema_version": meta_g.attrs.get("schema_version", "v1"),
+                "xpd_matrix_source": meta_g.attrs.get("xpd_matrix_source", meta_g.attrs.get("matrix_source", "")),
+                "matrix_source": meta_g.attrs.get("xpd_matrix_source", meta_g.attrs.get("matrix_source", "")),
+                "schema_version": schema_version,
                 "git_commit": meta_g.attrs.get("git_commit", "unknown"),
                 "git_dirty": bool(meta_g.attrs.get("git_dirty", True)),
                 "cmdline": meta_g.attrs.get("cmdline", ""),
-                "seed": meta_g.attrs.get("seed", ""),
+                "seed_json": seed_json,
+                "seed": _json_loads_safe(seed_json, seed_json),
+                "exact_bounce_defaults_json": exact_json,
+                "exact_bounce_defaults": _json_loads_safe(exact_json, {}),
+                "physics_validation_mode": bool(meta_g.attrs.get("physics_validation_mode", False)),
+                "antenna_config_json": antenna_json,
+                "antenna_config": _json_loads_safe(antenna_json, {}),
                 "release_mode": bool(meta_g.attrs.get("release_mode", False)),
                 "git_diff": meta_g.attrs.get("git_diff", ""),
             }
@@ -283,12 +382,19 @@ def load_rt_dataset(path: str | Path) -> dict[str, Any]:
                 "created_at": "",
                 "basis": "linear",
                 "convention": "IEEE-RHCP",
+                "xpd_matrix_source": "",
                 "matrix_source": "",
                 "schema_version": "v1",
                 "git_commit": "unknown",
                 "git_dirty": True,
                 "cmdline": "",
+                "seed_json": "",
                 "seed": "",
+                "exact_bounce_defaults_json": "{}",
+                "exact_bounce_defaults": {},
+                "physics_validation_mode": False,
+                "antenna_config_json": "{}",
+                "antenna_config": {},
                 "release_mode": False,
                 "git_diff": "",
             }
@@ -355,6 +461,45 @@ def load_rt_dataset(path: str | Path) -> dict[str, Any]:
                 sc["cases"][case_id] = {"params": params, "paths": paths}
             out["scenarios"][scenario_id] = sc
     return out
+
+
+def self_test_meta_roundtrip(path: str | Path, expected_meta: dict[str, Any] | None = None) -> bool:
+    """Validate HDF5 meta contract + array shapes after save/load.
+
+    Checks:
+    - v2 required attrs exist and are loadable
+    - optional expected_meta matches loaded meta on stable keys
+    - all path arrays have expected shapes
+    """
+
+    loaded = load_rt_dataset(path)
+    meta_loaded = _normalize_meta_for_compare(loaded.get("meta", {}))
+    if str(meta_loaded.get("schema_version", "")) == SCHEMA_VERSION:
+        missing = [k for k in V2_REQUIRED_META_ATTRS if k not in meta_loaded and k != "seed_json"]
+        if missing:
+            return False
+    if expected_meta is not None:
+        exp = _normalize_meta_for_compare(expected_meta)
+        for k in META_COMPARE_KEYS:
+            if exp.get(k) != meta_loaded.get(k):
+                return False
+
+    freq = np.asarray(loaded.get("frequency", []), dtype=float)
+    nf = len(freq)
+    for sc in loaded.get("scenarios", {}).values():
+        for case in sc.get("cases", {}).values():
+            for p in case.get("paths", []):
+                if np.asarray(p.get("A_f", np.zeros((0, 2, 2)))).shape != (nf, 2, 2):
+                    return False
+                if np.asarray(p.get("J_f", np.zeros((0, 2, 2)))).shape != (nf, 2, 2):
+                    return False
+                if np.asarray(p.get("G_tx_f", np.zeros((0, 2, 2)))).shape != (nf, 2, 2):
+                    return False
+                if np.asarray(p.get("G_rx_f", np.zeros((0, 2, 2)))).shape != (nf, 2, 2):
+                    return False
+                if np.asarray(p.get("scalar_gain_f", np.zeros((0,)))).shape != (nf,):
+                    return False
+    return True
 
 
 def self_test_reproducibility(path: str | Path, scenario_id: str, case_id: str, atol: float = 1e-9) -> bool:
