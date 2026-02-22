@@ -2,7 +2,7 @@
 
 - basis: circular
 - convention: IEEE-RHCP
-- git_commit: cfc0aa8c51aee2384442af32e3dc66a0f9fbc717
+- git_commit: 6885350de3193fb339a6cd1387339b14c93d8179
 - git_dirty: False
 - release_mode: True
 - cmdline: /Users/kimmyoungsun/Documents/codex/scenarios/runner.py --basis circular --xpd-matrix-source J --physics-validation-mode --release-mode --model-compare --output outputs/rt_dataset_canonical_release.h5 --plots-dir outputs/plots_canonical_release --report outputs/report_canonical_release.md --nf 1024
@@ -11,6 +11,13 @@
 - xpd_matrix_source: J
 - exact_bounce_defaults: {'A2': 1, 'A2R': 1, 'A3': 2, 'A3R': 2, 'A4': 1}
 - report_exact_bounce_applied: True (scenario-specific default map)
+- material_dispersion: off
+- materials_db_path: 
+- materials_db_hash: 
+- max_bounce_override: None
+- diffuse_config: {'diffuse_enabled': False, 'diffuse_model': 'lambertian', 'diffuse_factor': 0.0, 'diffuse_lobe_alpha': 8.0, 'diffuse_rays_per_hit': 0, 'diffuse_seed': 0, 'min_path_power_db': None, 'max_paths_per_case': None}
+- rich_mode: False
+- scenario_ids: ['C0', 'A1', 'A2', 'A2R', 'A3', 'A3R', 'A4', 'A5', 'A6', 'B0']
 - antenna_config: {'convention': 'IEEE-RHCP', 'tx_cross_pol_leakage_db': 120.0, 'rx_cross_pol_leakage_db': 120.0, 'tx_axial_ratio_db': 0.0, 'rx_axial_ratio_db': 0.0, 'enable_coupling': False}
 - physics_validation_mode: True
 - predicted_leakage_floor_db: 300.000 (eps_tx=0.00000, eps_rx=0.00000)
@@ -19,7 +26,7 @@
 ## Reproducibility & Provenance
 
 - schema_version: v2
-- git_commit: cfc0aa8c51aee2384442af32e3dc66a0f9fbc717
+- git_commit: 6885350de3193fb339a6cd1387339b14c93d8179
 - git_dirty: False
 - release_mode: True
 - cmdline: /Users/kimmyoungsun/Documents/codex/scenarios/runner.py --basis circular --xpd-matrix-source J --physics-validation-mode --release-mode --model-compare --output outputs/rt_dataset_canonical_release.h5 --plots-dir outputs/plots_canonical_release --report outputs/report_canonical_release.md --nf 1024
@@ -29,6 +36,13 @@
 - xpd_matrix_source: J
 - exact_bounce_defaults: {'A2': 1, 'A2R': 1, 'A3': 2, 'A3R': 2, 'A4': 1}
 - exact_bounce_applied: True
+- material_dispersion: off
+- materials_db_path: 
+- materials_db_hash: 
+- max_bounce_override: None
+- diffuse_config: {'diffuse_enabled': False, 'diffuse_model': 'lambertian', 'diffuse_factor': 0.0, 'diffuse_lobe_alpha': 8.0, 'diffuse_rays_per_hit': 0, 'diffuse_seed': 0, 'min_path_power_db': None, 'max_paths_per_case': None}
+- rich_mode: False
+- scenario_ids: ['C0', 'A1', 'A2', 'A2R', 'A3', 'A3R', 'A4', 'A5', 'A6', 'B0']
 - antenna_config: {'convention': 'IEEE-RHCP', 'tx_cross_pol_leakage_db': 120.0, 'rx_cross_pol_leakage_db': 120.0, 'tx_axial_ratio_db': 0.0, 'rx_axial_ratio_db': 0.0, 'enable_coupling': False}
 - physics_validation_mode: True
 - meta_roundtrip: True
@@ -1276,6 +1290,8 @@
 - hard_gates: {'A_git_clean_check': True, 'B_geometry_invariants': True, 'C10_full_coverage': True, 'D_wrap_zero': True, 'F3_model_compare': True}
 - hard_fail: []
 - hard_fail_count: 0
+- rich_mode: False
+- rich_multipath_gate: True
 - geometry_invariants: {'total_paths': 706, 'bad_bounce_count': 0, 'bad_interactions_len': 0, 'bad_surface_ids_len': 0, 'bad_incidence_angles_len': 0, 'bad_segment_basis_len': 0, 'bad_aod_shape': 0, 'bad_aoa_shape': 0, 'bad_tau': 0, 'bad_matrix_shape': 0, 'bad_matrix_nan': 0, 'violations_total': 0, 'pass': True}
 - wrap_detected_cases_total: 0
-- HARD_GATE_SUMMARY_JSON: {"geometry_stats": {"bad_aoa_shape": 0, "bad_aod_shape": 0, "bad_bounce_count": 0, "bad_incidence_angles_len": 0, "bad_interactions_len": 0, "bad_matrix_nan": 0, "bad_matrix_shape": 0, "bad_segment_basis_len": 0, "bad_surface_ids_len": 0, "bad_tau": 0, "pass": true, "total_paths": 706, "violations_total": 0}, "hard_fail": [], "hard_fail_count": 0, "hard_gates": {"A_git_clean_check": true, "B_geometry_invariants": true, "C10_full_coverage": true, "D_wrap_zero": true, "F3_model_compare": true}, "release_mode": true, "wrap_detected_cases_total": 0}
+- HARD_GATE_SUMMARY_JSON: {"geometry_stats": {"bad_aoa_shape": 0, "bad_aod_shape": 0, "bad_bounce_count": 0, "bad_incidence_angles_len": 0, "bad_interactions_len": 0, "bad_matrix_nan": 0, "bad_matrix_shape": 0, "bad_segment_basis_len": 0, "bad_surface_ids_len": 0, "bad_tau": 0, "pass": true, "total_paths": 706, "violations_total": 0}, "hard_fail": [], "hard_fail_count": 0, "hard_gates": {"A_git_clean_check": true, "B_geometry_invariants": true, "C10_full_coverage": true, "D_wrap_zero": true, "F3_model_compare": true}, "release_mode": true, "rich_avg_paths_per_case": {"A1": 1.0, "A2": 1.0, "A2R": 0.875, "A3": 1.0, "A3R": 1.0, "A4": 1.0, "A5": 1.0, "A6": 1.5, "B0": 24.12, "C0": 1.0}, "rich_mode": false, "rich_multipath_gate": true, "wrap_detected_cases_total": 0}
