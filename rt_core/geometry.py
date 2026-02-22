@@ -26,17 +26,81 @@ class Material:
     """Surface material model for reflection coefficients."""
 
     kind: str
+    name: str = ""
     eps_r: float = 1.0
     tan_delta: float = 0.0
     complex_eps_r: complex | None = None
+    dispersion_model: str = "const"  # const|table|debye
+    table_f_hz: tuple[float, ...] | None = None
+    table_eps_r: tuple[float, ...] | None = None
+    table_tan_delta: tuple[float, ...] | None = None
+    debye_eps_inf: float | None = None
+    debye_delta_eps: tuple[float, ...] | None = None
+    debye_tau_s: tuple[float, ...] | None = None
 
     @staticmethod
     def pec() -> "Material":
         return Material(kind="PEC")
 
     @staticmethod
-    def dielectric(eps_r: float, tan_delta: float = 0.0, complex_eps_r: complex | None = None) -> "Material":
-        return Material(kind="dielectric", eps_r=eps_r, tan_delta=tan_delta, complex_eps_r=complex_eps_r)
+    def dielectric(
+        eps_r: float,
+        tan_delta: float = 0.0,
+        complex_eps_r: complex | None = None,
+        name: str = "",
+    ) -> "Material":
+        return Material(kind="dielectric", name=name, eps_r=eps_r, tan_delta=tan_delta, complex_eps_r=complex_eps_r)
+
+    @staticmethod
+    def dielectric_table(
+        f_hz: Iterable[float],
+        eps_r: Iterable[float],
+        tan_delta: Iterable[float] | None = None,
+        name: str = "",
+    ) -> "Material":
+        f = tuple(float(x) for x in f_hz)
+        e = tuple(float(x) for x in eps_r)
+        if len(f) != len(e) or len(f) == 0:
+            raise ValueError("table f_hz and eps_r must be same non-zero length")
+        if tan_delta is None:
+            t = tuple(0.0 for _ in f)
+        else:
+            t = tuple(float(x) for x in tan_delta)
+            if len(t) != len(f):
+                raise ValueError("table tan_delta must match f_hz length")
+        return Material(
+            kind="dielectric",
+            name=name,
+            eps_r=float(np.mean(e)),
+            tan_delta=float(np.mean(t)),
+            dispersion_model="table",
+            table_f_hz=f,
+            table_eps_r=e,
+            table_tan_delta=t,
+        )
+
+    @staticmethod
+    def dielectric_debye(
+        eps_inf: float,
+        delta_eps: Iterable[float],
+        tau_s: Iterable[float],
+        tan_delta: float = 0.0,
+        name: str = "",
+    ) -> "Material":
+        de = tuple(float(x) for x in delta_eps)
+        ts = tuple(float(x) for x in tau_s)
+        if len(de) == 0 or len(de) != len(ts):
+            raise ValueError("debye delta_eps and tau_s must be same non-zero length")
+        return Material(
+            kind="dielectric",
+            name=name,
+            eps_r=float(eps_inf + float(np.sum(np.asarray(de, dtype=float)))),
+            tan_delta=float(tan_delta),
+            dispersion_model="debye",
+            debye_eps_inf=float(eps_inf),
+            debye_delta_eps=de,
+            debye_tau_s=ts,
+        )
 
 
 @dataclass(frozen=True)

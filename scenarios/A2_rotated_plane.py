@@ -56,6 +56,8 @@ def run_case(
     basis: str = "linear",
     antenna_config: dict[str, Any] | None = None,
     force_cp_swap_on_odd_reflection: bool = False,
+    max_bounce_override: int | None = None,
+    diffuse_config: dict[str, Any] | None = None,
 ):
     tx, rx = default_antennas(basis=basis, **(antenna_config or {}))
     tx.position[:] = [0.0, -1.0, 1.5]
@@ -65,12 +67,14 @@ def run_case(
         tilt_x_deg=float(params["tilt_x_deg"]),
         yaw_z_deg=float(params["yaw_z_deg"]),
     )
+    trace_kwargs = dict(diffuse_config or {})
     return trace_paths(
         scene,
         tx,
         rx,
         f_hz,
-        max_bounce=1,
+        max_bounce=int(max_bounce_override) if max_bounce_override is not None else 1,
         los_enabled=False,
         force_cp_swap_on_odd_reflection=force_cp_swap_on_odd_reflection,
+        **trace_kwargs,
     )

@@ -21,6 +21,18 @@
 python -m unittest discover -s tests -p 'test_*.py'
 python -m scenarios.runner --output outputs/rt_dataset.h5 --plots-dir outputs/plots --report outputs/validation_report.md
 make canonical_release
+make rich_release
+make parity_map
+```
+
+Optional dispersive material mode (defaults keep legacy behavior):
+```bash
+python -m scenarios.runner \
+  --materials-db materials/materials_db.json \
+  --material-dispersion on \
+  --output outputs/rt_dataset_dispersion.h5 \
+  --plots-dir outputs/plots_dispersion \
+  --report outputs/report_dispersion.md
 ```
 
 ## Measurement Bridge

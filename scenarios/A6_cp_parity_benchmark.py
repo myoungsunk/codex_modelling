@@ -107,12 +107,14 @@ def run_case(
     basis: str = "linear",
     antenna_config: dict[str, Any] | None = None,
     force_cp_swap_on_odd_reflection: bool = False,
+    max_bounce_override: int | None = None,
+    diffuse_config: dict[str, Any] | None = None,
 ):
     tx, rx = default_antennas(basis=basis, **(antenna_config or {}))
     mode = str(params["mode"])
     scene = build_scene(mode)
     target_bounce = int(params["target_bounce"])
-    max_bounce = target_bounce
+    max_bounce = int(max_bounce_override) if max_bounce_override is not None else target_bounce
 
     if mode == "odd":
         tx.position[:] = [2.0, -2.0, 1.5]
@@ -129,6 +131,7 @@ def run_case(
         max_bounce=max_bounce,
         los_enabled=False,
         force_cp_swap_on_odd_reflection=force_cp_swap_on_odd_reflection,
+        **dict(diffuse_config or {}),
     )
 
     # Keep only target bounce and near-normal incidence paths.
@@ -141,4 +144,3 @@ def run_case(
             continue
         out.append(p)
     return out
-

@@ -2,7 +2,7 @@
 
 - basis: circular
 - convention: IEEE-RHCP
-- git_commit: fc2eac2037b00c632022506f9271d18ffc3a8645
+- git_commit: cfc0aa8c51aee2384442af32e3dc66a0f9fbc717
 - git_dirty: False
 - release_mode: True
 - cmdline: /Users/kimmyoungsun/Documents/codex/scenarios/runner.py --basis circular --xpd-matrix-source J --physics-validation-mode --release-mode --model-compare --output outputs/rt_dataset_canonical_release.h5 --plots-dir outputs/plots_canonical_release --report outputs/report_canonical_release.md --nf 1024
@@ -19,7 +19,7 @@
 ## Reproducibility & Provenance
 
 - schema_version: v2
-- git_commit: fc2eac2037b00c632022506f9271d18ffc3a8645
+- git_commit: cfc0aa8c51aee2384442af32e3dc66a0f9fbc717
 - git_dirty: False
 - release_mode: True
 - cmdline: /Users/kimmyoungsun/Documents/codex/scenarios/runner.py --basis circular --xpd-matrix-source J --physics-validation-mode --release-mode --model-compare --output outputs/rt_dataset_canonical_release.h5 --plots-dir outputs/plots_canonical_release --report outputs/report_canonical_release.md --nf 1024
@@ -539,30 +539,30 @@
 - GOF[parity] (min_n=20, bootstrap_B=200):
 -   even: status=FAIL_MODEL, n=30, n_fit=30, excluded=0 (floor=0, pinned=0)
 -   censoring: floor_ratio=0.000, pinned_ratio=0.000, point_mass_ratio=0.000, point_mass_kind=none
--   best_model=normal_db, AIC=209.234, BIC=212.036, qq_r=0.9777, ks_p_boot=0.7400
+-   best_model=lognormal_linear, AIC=209.234, BIC=212.036, qq_r=0.9777, ks_p_boot=0.8000
 -   normal_pre: qq_r=0.9758, ks_p_boot=0.7400; normal_post: qq_r=0.9758, ks_p_boot=0.7400
--   model_decision: single_normal_fail=True, alternative_improved=False, reason=single-normal fail; no better candidate found
+-   model_decision: single_normal_fail=True, alternative_improved=False, reason=single-normal fail; alternative selected but GOF still borderline
 -   WARNING: GOF failed on continuous part (model failure).
 - GOF[material] (min_n=20, bootstrap_B=200):
 -   NA: status=FAIL_MODEL, n=30, n_fit=30, excluded=0 (floor=0, pinned=0)
 -   censoring: floor_ratio=0.000, pinned_ratio=0.000, point_mass_ratio=0.000, point_mass_kind=none
--   best_model=normal_db, AIC=209.234, BIC=212.036, qq_r=0.9777, ks_p_boot=0.7400
+-   best_model=lognormal_linear, AIC=209.234, BIC=212.036, qq_r=0.9777, ks_p_boot=0.8000
 -   normal_pre: qq_r=0.9758, ks_p_boot=0.7400; normal_post: qq_r=0.9758, ks_p_boot=0.7400
--   model_decision: single_normal_fail=True, alternative_improved=False, reason=single-normal fail; no better candidate found
+-   model_decision: single_normal_fail=True, alternative_improved=False, reason=single-normal fail; alternative selected but GOF still borderline
 -   WARNING: GOF failed on continuous part (model failure).
 - GOF[incidence_angle_bin] (min_n=20, bootstrap_B=200):
 -   [40,60): status=FAIL_MODEL, n=30, n_fit=30, excluded=0 (floor=0, pinned=0)
 -   censoring: floor_ratio=0.000, pinned_ratio=0.000, point_mass_ratio=0.000, point_mass_kind=none
--   best_model=normal_db, AIC=209.234, BIC=212.036, qq_r=0.9777, ks_p_boot=0.7400
+-   best_model=lognormal_linear, AIC=209.234, BIC=212.036, qq_r=0.9777, ks_p_boot=0.8000
 -   normal_pre: qq_r=0.9758, ks_p_boot=0.7400; normal_post: qq_r=0.9758, ks_p_boot=0.7400
--   model_decision: single_normal_fail=True, alternative_improved=False, reason=single-normal fail; no better candidate found
+-   model_decision: single_normal_fail=True, alternative_improved=False, reason=single-normal fail; alternative selected but GOF still borderline
 -   WARNING: GOF failed on continuous part (model failure).
 - GOF[delay_bin] (min_n=20, bootstrap_B=200):
 -   early: status=FAIL_MODEL, n=30, n_fit=30, excluded=0 (floor=0, pinned=0)
 -   censoring: floor_ratio=0.000, pinned_ratio=0.000, point_mass_ratio=0.000, point_mass_kind=none
--   best_model=normal_db, AIC=209.234, BIC=212.036, qq_r=0.9777, ks_p_boot=0.7400
+-   best_model=lognormal_linear, AIC=209.234, BIC=212.036, qq_r=0.9777, ks_p_boot=0.8000
 -   normal_pre: qq_r=0.9758, ks_p_boot=0.7400; normal_post: qq_r=0.9758, ks_p_boot=0.7400
--   model_decision: single_normal_fail=True, alternative_improved=False, reason=single-normal fail; no better candidate found
+-   model_decision: single_normal_fail=True, alternative_improved=False, reason=single-normal fail; alternative selected but GOF still borderline
 -   WARNING: GOF failed on continuous part (model failure).
 - subband_mu_span_db: 0.000
 - NOTE: weak subband variation observed (may be physically weak frequency dependence).

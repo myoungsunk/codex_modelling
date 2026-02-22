@@ -64,6 +64,8 @@ def run_case(
     basis: str = "linear",
     antenna_config: dict[str, Any] | None = None,
     force_cp_swap_on_odd_reflection: bool = False,
+    max_bounce_override: int | None = None,
+    diffuse_config: dict[str, Any] | None = None,
 ):
     tx, rx = default_antennas(basis=basis, **(antenna_config or {}))
     rx.position[:] = [params["rx_x"], params["rx_y"], 1.5]
@@ -80,13 +82,15 @@ def run_case(
         rho_func=rho_hook,
         seed=int(params.get("seed", BASE_SEED)),
     )
+    trace_kwargs = dict(diffuse_config or {})
     return trace_paths(
         scene,
         tx,
         rx,
         f_hz,
-        max_bounce=2,
+        max_bounce=int(max_bounce_override) if max_bounce_override is not None else 2,
         los_enabled=False,
         depol=dep,
         force_cp_swap_on_odd_reflection=force_cp_swap_on_odd_reflection,
+        **trace_kwargs,
     )

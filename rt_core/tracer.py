@@ -229,14 +229,23 @@ def trace_paths(
     force_cp_swap_on_odd_reflection: bool = False,
     c0: float = 299_792_458.0,
     depol: DepolConfig | None = None,
+    diffuse_enabled: bool = False,
+    diffuse_model: str = "lambertian",
+    diffuse_factor: float = 0.0,
+    diffuse_lobe_alpha: float = 8.0,
+    diffuse_rays_per_hit: int = 0,
+    diffuse_seed: int = 0,
+    min_path_power_db: float | None = None,
+    max_paths_per_case: int | None = None,
 ) -> list[PathResult]:
     """Trace paths and return per-path delay and 2x2 transfer matrix over frequency."""
 
-    if max_bounce not in (0, 1, 2):
-        raise ValueError("max_bounce must be 0, 1, or 2")
+    if int(max_bounce) < 0:
+        raise ValueError("max_bounce must be >= 0")
 
     dep = depol or DepolConfig(enabled=False)
     rng = np.random.default_rng(dep.seed)
+    drng = np.random.default_rng(int(diffuse_seed))
     rho_fn: Callable[[dict], float] = dep.rho_func or _default_rho
 
     freq = np.asarray(f_hz, dtype=float)
@@ -362,6 +371,63 @@ def trace_paths(
                     segment_basis_uv=seg_basis_uv,
                 )
             )
+            if diffuse_enabled and b > 0 and diffuse_factor > 0.0 and diffuse_rays_per_hit > 0:
+                nrho = float(np.clip(diffuse_factor, 0.0, 1.0))
+                if str(diffuse_model).lower() == "directive":
+                    jitter_ns = 0.08 / np.sqrt(max(diffuse_lobe_alpha, 1e-6))
+                elif str(diffuse_model).lower() == "directive_backscatter":
+                    jitter_ns = 0.12 / np.sqrt(max(diffuse_lobe_alpha, 1e-6))
+                else:
+                    jitter_ns = 0.2
+                n_spawn = int(max(1, diffuse_rays_per_hit * b))
+                for _ in range(n_spawn):
+                    D_in = depol_matrix(nrho, drng)
+                    D_out = depol_matrix(nrho, drng)
+                    Jd = apply_depol(J, D_in=D_in, D_out=D_out, side_mode="both")
+                    # Keep diffuse energy controlled relative to parent path.
+                    sg_scale = np.sqrt(max(diffuse_factor, 0.0) / float(n_spawn))
+                    scalar_d = scalar_gain_f * float(sg_scale)
+                    A_d = np.einsum("kab,kbc,kcd->kad", g_rx_h, Jd, g_tx).astype(np.complex128)
+                    A_d *= scalar_d[:, None, None]
+                    tau_jitter = abs(float(drng.normal(loc=0.0, scale=jitter_ns))) * 1e-9
+                    tau_d = float(tau + tau_jitter)
+                    results.append(
+                        PathResult(
+                            tau_s=tau_d,
+                            path_length_m=float(tau_d * c0),
+                            segment_count=int(len(points) - 1),
+                            A_f=A_d,
+                            J_f=Jd.copy(),
+                            scalar_gain_f=scalar_d.astype(float),
+                            G_tx_f=g_tx.copy(),
+                            G_rx_f=g_rx_h.copy(),
+                            bounce_count=b,
+                            interactions=["diffuse"] * b,
+                            surface_ids=surface_ids.copy(),
+                            incidence_angles=incidence_angles.copy(),
+                            bounce_normals=[np.asarray(nv, dtype=float) for nv in bounce_normals],
+                            AoD=dirs[0],
+                            AoA=dirs[-1],
+                            points=[np.asarray(p, dtype=float) for p in points],
+                            segment_basis_uv=seg_basis_uv,
+                        )
+                    )
+
+    if min_path_power_db is not None:
+        pmin = float(min_path_power_db)
+        keep: list[PathResult] = []
+        for p in results:
+            pd = 10.0 * np.log10(float(np.mean(np.abs(p.A_f) ** 2)) + 1e-18)
+            if pd >= pmin:
+                keep.append(p)
+        results = keep
+
+    if max_paths_per_case is not None and int(max_paths_per_case) > 0 and len(results) > int(max_paths_per_case):
+        k = int(max_paths_per_case)
+        idx = np.argsort(
+            -np.asarray([float(np.mean(np.abs(p.A_f) ** 2)) for p in results], dtype=float)
+        )[:k]
+        results = [results[int(i)] for i in idx]
 
     results.sort(key=lambda p: p.tau_s)
     return results

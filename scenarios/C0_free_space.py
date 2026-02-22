@@ -22,15 +22,19 @@ def run_case(
     basis: str = "linear",
     antenna_config: dict[str, Any] | None = None,
     force_cp_swap_on_odd_reflection: bool = False,
+    max_bounce_override: int | None = None,
+    diffuse_config: dict[str, Any] | None = None,
 ):
     tx, rx = default_antennas(basis=basis, **(antenna_config or {}))
     rx.position[:] = [params["distance_m"], 0.0, 1.5]
+    trace_kwargs = dict(diffuse_config or {})
     return trace_paths(
         build_scene(),
         tx,
         rx,
         f_hz,
-        max_bounce=0,
+        max_bounce=int(max_bounce_override) if max_bounce_override is not None else 0,
         los_enabled=True,
         force_cp_swap_on_odd_reflection=force_cp_swap_on_odd_reflection,
+        **trace_kwargs,
     )

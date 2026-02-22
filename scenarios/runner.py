@@ -45,6 +45,7 @@ from plots.plot_config import PlotConfig
 from plots.p0_p13 import generate_all_plots
 from rt_core.antenna import Antenna
 from rt_core.geometry import normalize
+from rt_core.materials import materials_db_hash
 from rt_io.hdf5_io import save_rt_dataset, self_test_meta_roundtrip
 from scenarios import (
     A1_los_only,
@@ -273,15 +274,53 @@ def _antennas_from_points(
     return tx, rx
 
 
-def _build_scene_from_module(mod: Any, params: dict[str, Any]) -> list[Any]:
+def _build_scene_from_module(
+    mod: Any,
+    params: dict[str, Any],
+    materials_db: str | None = None,
+    material_dispersion: str = "off",
+) -> list[Any]:
     if not hasattr(mod, "build_scene"):
         return []
     sig = inspect.signature(mod.build_scene)
     p = dict(params)
     if "material_name" in sig.parameters and "material" in p:
         p["material_name"] = p["material"]
+    if "materials_db" in sig.parameters:
+        p["materials_db"] = materials_db
+    if "material_dispersion" in sig.parameters:
+        p["material_dispersion"] = material_dispersion
     kwargs = {k: p[k] for k in sig.parameters if k in p}
     return mod.build_scene(**kwargs)
+
+
+def _run_case_from_module(
+    mod: Any,
+    params: dict[str, Any],
+    f_hz: np.ndarray,
+    basis: str,
+    antenna_config: dict[str, Any],
+    force_cp_swap_on_odd_reflection: bool,
+    materials_db: str | None = None,
+    material_dispersion: str = "off",
+    max_bounce_override: int | None = None,
+    diffuse_config: dict[str, Any] | None = None,
+) -> list[Any]:
+    sig = inspect.signature(mod.run_case)
+    kwargs: dict[str, Any] = {
+        "basis": basis,
+        "antenna_config": antenna_config,
+        "force_cp_swap_on_odd_reflection": force_cp_swap_on_odd_reflection,
+    }
+    if "materials_db" in sig.parameters:
+        kwargs["materials_db"] = materials_db
+    if "material_dispersion" in sig.parameters:
+        kwargs["material_dispersion"] = material_dispersion
+    if "max_bounce_override" in sig.parameters:
+        kwargs["max_bounce_override"] = max_bounce_override
+    if "diffuse_config" in sig.parameters:
+        kwargs["diffuse_config"] = dict(diffuse_config or {})
+    return mod.run_case(params, f_hz, **kwargs)
 
 
 def compute_reciprocity_checks(
@@ -301,6 +340,8 @@ def compute_reciprocity_checks(
     conv = str(data.get("meta", {}).get("convention", "IEEE-RHCP"))
     ant_cfg = data.get("meta", {}).get("antenna_config", {})
     force_cp = bool(data.get("meta", {}).get("force_cp_swap_on_odd_reflection", False))
+    materials_db = str(data.get("meta", {}).get("materials_db_path", "")) or None
+    material_dispersion = str(data.get("meta", {}).get("material_dispersion", "off"))
 
     entries = []
     for sid in targets:
@@ -314,7 +355,12 @@ def compute_reciprocity_checks(
             tx_pos = np.asarray(paths[0]["points"][0], dtype=float)
             rx_pos = np.asarray(paths[0]["points"][-1], dtype=float)
             tx, rx = _antennas_from_points(tx_pos, rx_pos, basis=basis, convention=conv, antenna_config=ant_cfg)
-            scene = _build_scene_from_module(mod, case.get("params", {}))
+            scene = _build_scene_from_module(
+                mod,
+                case.get("params", {}),
+                materials_db=materials_db,
+                material_dispersion=material_dispersion,
+            )
             max_bounce = int(max(int(p["meta"]["bounce_count"]) for p in paths))
             los_enabled = bool(any(int(p["meta"]["bounce_count"]) == 0 for p in paths))
             out = reciprocity_sanity(
@@ -481,9 +527,15 @@ def build_dataset(
     nf: int = 256,
     antenna_config: dict[str, Any] | None = None,
     force_cp_swap_on_odd_reflection: bool = False,
+    materials_db: str | None = None,
+    material_dispersion: str = "off",
+    scenario_ids: list[str] | None = None,
+    max_bounce_override: int | None = None,
+    diffuse_config: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     freq = uwb_frequency(nf=nf)
     git_commit, git_dirty = _git_meta()
+    mat_db_hash = materials_db_hash(materials_db)
     data: dict[str, Any] = {
         "meta": {
             "basis": basis,
@@ -492,20 +544,32 @@ def build_dataset(
             "force_cp_swap_on_odd_reflection": force_cp_swap_on_odd_reflection,
             "git_commit": git_commit,
             "git_dirty": git_dirty,
+            "materials_db_path": str(materials_db) if materials_db else "",
+            "materials_db_hash": mat_db_hash,
+            "material_dispersion": str(material_dispersion),
         },
         "frequency": freq,
         "scenarios": {},
     }
 
-    for sid, mod in SCENARIOS.items():
+    ids = scenario_ids if scenario_ids else list(SCENARIOS.keys())
+    for sid in ids:
+        if sid not in SCENARIOS:
+            continue
+        mod = SCENARIOS[sid]
         cases: dict[str, Any] = {}
         for idx, params in enumerate(mod.build_sweep_params()):
-            paths = mod.run_case(
-                params,
-                freq,
+            paths = _run_case_from_module(
+                mod=mod,
+                params=params,
+                f_hz=freq,
                 basis=basis,
                 antenna_config=antenna_config or {},
                 force_cp_swap_on_odd_reflection=force_cp_swap_on_odd_reflection,
+                materials_db=materials_db,
+                material_dispersion=material_dispersion,
+                max_bounce_override=max_bounce_override,
+                diffuse_config=diffuse_config,
             )
             cases[str(idx)] = {"params": params, "paths": paths_to_records(paths)}
         data["scenarios"][sid] = {"cases": cases}
@@ -545,6 +609,13 @@ def build_quality_report(
     lines.append(f"- exact_bounce_defaults: {exact_bounce_now}")
     exact_bounce_applied_now = bool(data.get("meta", {}).get("exact_bounce_applied", True))
     lines.append(f"- report_exact_bounce_applied: {exact_bounce_applied_now} (scenario-specific default map)")
+    lines.append(f"- material_dispersion: {data.get('meta', {}).get('material_dispersion', 'off')}")
+    lines.append(f"- materials_db_path: {data.get('meta', {}).get('materials_db_path', '')}")
+    lines.append(f"- materials_db_hash: {data.get('meta', {}).get('materials_db_hash', '')}")
+    lines.append(f"- max_bounce_override: {data.get('meta', {}).get('max_bounce_override', None)}")
+    lines.append(f"- diffuse_config: {data.get('meta', {}).get('diffuse_config', {})}")
+    lines.append(f"- rich_mode: {bool(data.get('meta', {}).get('rich_mode', False))}")
+    lines.append(f"- scenario_ids: {data.get('meta', {}).get('scenario_ids', [])}")
     antenna_config = data.get("meta", {}).get("antenna_config", {})
     lines.append(f"- antenna_config: {antenna_config}")
     physics_mode = bool(
@@ -575,6 +646,13 @@ def build_quality_report(
     lines.append(f"- xpd_matrix_source: {xpd_src_now}")
     lines.append(f"- exact_bounce_defaults: {exact_bounce_now}")
     lines.append(f"- exact_bounce_applied: {exact_bounce_applied_now}")
+    lines.append(f"- material_dispersion: {data.get('meta', {}).get('material_dispersion', 'off')}")
+    lines.append(f"- materials_db_path: {data.get('meta', {}).get('materials_db_path', '')}")
+    lines.append(f"- materials_db_hash: {data.get('meta', {}).get('materials_db_hash', '')}")
+    lines.append(f"- max_bounce_override: {data.get('meta', {}).get('max_bounce_override', None)}")
+    lines.append(f"- diffuse_config: {data.get('meta', {}).get('diffuse_config', {})}")
+    lines.append(f"- rich_mode: {bool(data.get('meta', {}).get('rich_mode', False))}")
+    lines.append(f"- scenario_ids: {data.get('meta', {}).get('scenario_ids', [])}")
     lines.append(f"- antenna_config: {antenna_config}")
     lines.append(f"- physics_validation_mode: {physics_mode}")
     lines.append(f"- meta_roundtrip: {bool(data.get('meta', {}).get('meta_roundtrip', False))}")
@@ -585,6 +663,7 @@ def build_quality_report(
     delay_period_s = float(1.0 / (freq[1] - freq[0])) if len(freq) > 1 else 0.0
     scenario_medians: list[float] = []
     total_wrap_detected = 0
+    scenario_avg_paths: dict[str, float] = {}
 
     for sid, sc in data["scenarios"].items():
         lines += [f"## {sid}", ""]
@@ -649,6 +728,7 @@ def build_quality_report(
 
         n_cases = len(path_counts_per_case)
         avg_paths_per_case = float(np.mean(path_counts_per_case)) if n_cases > 0 else 0.0
+        scenario_avg_paths[sid] = avg_paths_per_case
         lines.append(f"- avg_paths_per_case: {avg_paths_per_case:.2f} (cases={n_cases})")
         if n_cases > 0 and avg_paths_per_case < 2.0:
             lines.append(
@@ -868,6 +948,7 @@ def build_quality_report(
         lines.append("")
 
     # C4: check pinned behavior under physics validation mode.
+    std_med = float("nan")
     if physics_mode and len(scenario_medians) >= 2:
         std_med = float(np.std(np.asarray(scenario_medians, dtype=float), ddof=1))
         lines.append("## Physics Mode Check")
@@ -877,6 +958,22 @@ def build_quality_report(
             lines.append("- WARNING: medians appear pinned across scenarios even in physics mode.")
         else:
             lines.append("- non-pinned behavior observed across scenarios in physics mode.")
+        lines.append("")
+
+    if bool(data.get("meta", {}).get("rich_mode", False)):
+        lines.append("## Rich Mode Summary")
+        lines.append("")
+        lines.append(f"- scenario_avg_paths_per_case: {scenario_avg_paths}")
+        rich_thresh = 10.0
+        rich_ok = any(float(v) >= rich_thresh for v in scenario_avg_paths.values())
+        lines.append(f"- rich_multipath_threshold: avg_paths_per_case>={rich_thresh:.1f}")
+        lines.append(f"- rich_multipath_gate: {rich_ok}")
+        if not rich_ok:
+            lines.append("- WARNING: rich-mode did not reach target multipath richness; tune max_bounce/diffuse settings.")
+        if np.isfinite(std_med):
+            lines.append(f"- scenario_median_xpd_std_db: {std_med:.3f}")
+        else:
+            lines.append("- scenario_median_xpd_std_db: NA (insufficient scenarios)")
         lines.append("")
 
     if model_metrics is not None:
@@ -1223,9 +1320,14 @@ def build_quality_report(
         "D_wrap_zero": bool(int(total_wrap_detected) == 0),
         "F3_model_compare": bool(f3_pass),
     }
+    rich_mode_now = bool(data.get("meta", {}).get("rich_mode", False))
+    rich_multipath_gate = bool(any(float(v) >= 10.0 for v in scenario_avg_paths.values())) if rich_mode_now else True
     hard_fail = [k for k, v in hard_gates.items() if not bool(v)]
     hard_summary = {
         "release_mode": bool(release_mode_now),
+        "rich_mode": rich_mode_now,
+        "rich_multipath_gate": rich_multipath_gate,
+        "rich_avg_paths_per_case": scenario_avg_paths,
         "hard_gates": hard_gates,
         "hard_fail": hard_fail,
         "hard_fail_count": int(len(hard_fail)),
@@ -1237,6 +1339,8 @@ def build_quality_report(
     lines.append(f"- hard_gates: {hard_gates}")
     lines.append(f"- hard_fail: {hard_fail}")
     lines.append(f"- hard_fail_count: {len(hard_fail)}")
+    lines.append(f"- rich_mode: {rich_mode_now}")
+    lines.append(f"- rich_multipath_gate: {rich_multipath_gate}")
     lines.append(f"- geometry_invariants: {geom_stats}")
     lines.append(f"- wrap_detected_cases_total: {total_wrap_detected}")
     lines.append(f"- HARD_GATE_SUMMARY_JSON: {json.dumps(hard_summary, ensure_ascii=False, sort_keys=True)}")
@@ -1255,6 +1359,8 @@ def main() -> None:
     parser.add_argument("--report", type=str, default="outputs/validation_report.md")
     parser.add_argument("--basis", type=str, default=None, choices=["linear", "circular"])
     parser.add_argument("--bases", type=str, default="linear,circular")
+    parser.add_argument("--scenario-ids", type=str, default="all")
+    parser.add_argument("--rich-mode", action="store_true")
     parser.add_argument("--xpd-matrix-source", type=str, default="A", choices=["A", "J"])
     parser.add_argument("--plot-scenario", type=str, default=None)
     parser.add_argument("--plot-case", type=str, default=None)
@@ -1272,6 +1378,17 @@ def main() -> None:
     parser.add_argument("--rx-axial-ratio-db", type=float, default=0.0)
     parser.add_argument("--disable-antenna-coupling", action="store_true")
     parser.add_argument("--physics-validation-mode", action="store_true")
+    parser.add_argument("--materials-db", type=str, default=None)
+    parser.add_argument("--material-dispersion", type=str, default="off", choices=["off", "on", "debye"])
+    parser.add_argument("--max-bounce-override", type=int, default=None)
+    parser.add_argument("--diffuse", type=str, default="off", choices=["off", "on"])
+    parser.add_argument("--diffuse-model", type=str, default="lambertian", choices=["lambertian", "directive", "directive_backscatter"])
+    parser.add_argument("--diffuse-factor", type=float, default=0.0)
+    parser.add_argument("--diffuse-lobe-alpha", type=float, default=8.0)
+    parser.add_argument("--diffuse-rays-per-hit", type=int, default=0)
+    parser.add_argument("--diffuse-seed", type=int, default=0)
+    parser.add_argument("--min-path-power-db", type=float, default=None)
+    parser.add_argument("--max-paths-per-case", type=int, default=None)
     parser.add_argument("--force-cp-swap-on-odd-reflection", action="store_true")
     parser.add_argument("--model-compare", dest="model_compare", action="store_true")
     parser.add_argument("--no-model-compare", dest="model_compare", action="store_false")
@@ -1321,6 +1438,22 @@ def main() -> None:
     parser.set_defaults(model_compare=True)
     args = parser.parse_args()
 
+    if bool(args.rich_mode):
+        if str(args.material_dispersion).lower() == "off":
+            args.material_dispersion = "on"
+        if str(args.diffuse).lower() == "off":
+            args.diffuse = "on"
+        if args.max_bounce_override is None:
+            args.max_bounce_override = 4
+        if float(args.diffuse_factor) <= 0.0:
+            args.diffuse_factor = 0.25
+        if int(args.diffuse_rays_per_hit) <= 0:
+            args.diffuse_rays_per_hit = 2
+        if args.min_path_power_db is None:
+            args.min_path_power_db = -120.0
+        if args.max_paths_per_case is None:
+            args.max_paths_per_case = 256
+
     if bool(args.release_mode):
         _, dirty_now = _git_meta()
         if dirty_now:
@@ -1341,6 +1474,21 @@ def main() -> None:
         antenna_config["rx_axial_ratio_db"] = 0.0
         antenna_config["enable_coupling"] = False
 
+    run_scenarios = None
+    if str(args.scenario_ids).strip().lower() != "all":
+        run_scenarios = [s.strip() for s in str(args.scenario_ids).split(",") if s.strip()]
+
+    diffuse_cfg: dict[str, Any] = {
+        "diffuse_enabled": bool(str(args.diffuse).lower() == "on"),
+        "diffuse_model": str(args.diffuse_model),
+        "diffuse_factor": float(max(0.0, min(1.0, args.diffuse_factor))),
+        "diffuse_lobe_alpha": float(max(args.diffuse_lobe_alpha, 1e-6)),
+        "diffuse_rays_per_hit": int(max(0, args.diffuse_rays_per_hit)),
+        "diffuse_seed": int(args.diffuse_seed),
+        "min_path_power_db": (float(args.min_path_power_db) if args.min_path_power_db is not None else None),
+        "max_paths_per_case": (int(args.max_paths_per_case) if args.max_paths_per_case is not None else None),
+    }
+
     bases = _parse_bases(args.basis, args.bases)
     multi = len(bases) > 1
     release_gate_failures: list[str] = []
@@ -1352,6 +1500,11 @@ def main() -> None:
             nf=args.nf,
             antenna_config=antenna_config,
             force_cp_swap_on_odd_reflection=args.force_cp_swap_on_odd_reflection,
+            materials_db=args.materials_db,
+            material_dispersion=args.material_dispersion,
+            scenario_ids=run_scenarios,
+            max_bounce_override=args.max_bounce_override,
+            diffuse_config=diffuse_cfg,
         )
         data.setdefault("meta", {})["cmdline"] = " ".join(shlex.quote(a) for a in sys.argv)
         data.setdefault("meta", {})["seed"] = {"model_seed": int(args.model_seed)}
@@ -1362,6 +1515,13 @@ def main() -> None:
         data.setdefault("meta", {})["exact_bounce_applied"] = True
         data.setdefault("meta", {})["physics_validation_mode"] = not bool(antenna_config.get("enable_coupling", True))
         data.setdefault("meta", {})["antenna_config"] = dict(antenna_config)
+        data.setdefault("meta", {})["materials_db_path"] = str(args.materials_db or "")
+        data.setdefault("meta", {})["materials_db_hash"] = materials_db_hash(args.materials_db)
+        data.setdefault("meta", {})["material_dispersion"] = str(args.material_dispersion)
+        data.setdefault("meta", {})["max_bounce_override"] = args.max_bounce_override
+        data.setdefault("meta", {})["diffuse_config"] = dict(diffuse_cfg)
+        data.setdefault("meta", {})["rich_mode"] = bool(args.rich_mode)
+        data.setdefault("meta", {})["scenario_ids"] = list(run_scenarios) if run_scenarios else list(SCENARIOS.keys())
         out_h5 = _basis_output_path(args.output, b, multi)
         out_plot = _basis_output_dir(args.plots_dir, b, multi)
         out_rep = _basis_output_path(args.report, b, multi)

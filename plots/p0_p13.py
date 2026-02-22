@@ -13,8 +13,8 @@ from scipy import stats
 from analysis.ctf_cir import ctf_to_cir, pdp
 from analysis.xpd_stats import gof_model_selection_db, make_subbands, model_quantiles_db, pathwise_xpd
 from plots.plot_config import PlotConfig
+from rt_core.materials import DEFAULT_MATERIAL_SPECS, resolve_material_library
 from rt_core.polarization import fresnel_reflection
-from scenarios.A4_dielectric_plane import MATERIALS
 
 
 def _ensure_dir(out_dir: str | Path) -> Path:
@@ -124,6 +124,24 @@ def _plot_meta_line(data: dict[str, Any], config: PlotConfig, exact_info: str) -
         f"coupling={ant.get('enable_coupling', 'NA')}, txLeak={ant.get('tx_cross_pol_leakage_db', 'NA')}dB, "
         f"rxLeak={ant.get('rx_cross_pol_leakage_db', 'NA')}dB"
     )
+
+
+def _material_library_from_data(data: dict[str, Any]) -> dict[str, Any]:
+    meta = data.get("meta", {}) or {}
+    db_path = meta.get("materials_db_path", None)
+    disp_mode = str(meta.get("material_dispersion", "off"))
+    try:
+        return resolve_material_library(
+            materials_db_path=db_path,
+            material_dispersion=disp_mode,
+            default_specs=DEFAULT_MATERIAL_SPECS,
+        )
+    except Exception:
+        return resolve_material_library(
+            materials_db_path=None,
+            material_dispersion="off",
+            default_specs=DEFAULT_MATERIAL_SPECS,
+        )
 
 
 def _title(ax: plt.Axes, title: str, data: dict[str, Any], config: PlotConfig, exact_info: str) -> None:
@@ -583,13 +601,20 @@ def p16_fresnel_curves(data: dict[str, Any], out: Path, config: PlotConfig) -> N
     freq = np.asarray(data["frequency"], dtype=float)
     fig, axs = plt.subplots(2, 1, figsize=(8, 7), sharex=True)
     theta = np.deg2rad(45.0)
-    for name, mat in MATERIALS.items():
+    mats = _material_library_from_data(data)
+    disp_mode = str(data.get("meta", {}).get("material_dispersion", "off"))
+    for name, mat in mats.items():
         gs, gp = fresnel_reflection(mat, theta_i=theta, f_hz=freq)
         axs[0].plot(freq * 1e-9, np.abs(gs), label=f"{name} |Gs|")
         axs[0].plot(freq * 1e-9, np.abs(gp), "--", label=f"{name} |Gp|")
         axs[1].plot(freq * 1e-9, np.unwrap(np.angle(gs)), label=f"{name} ∠Gs")
         axs[1].plot(freq * 1e-9, np.unwrap(np.angle(gp)), "--", label=f"{name} ∠Gp")
-    axs[0].set_title("P16 Fresnel magnitude/phase vs frequency\n" + _plot_meta_line(data, config, "None"), fontsize=9)
+    axs[0].set_title(
+        "P16 Fresnel magnitude/phase vs frequency\n"
+        + _plot_meta_line(data, config, "None")
+        + f", material_dispersion={disp_mode}",
+        fontsize=9,
+    )
     axs[0].set_ylabel("magnitude")
     axs[1].set_xlabel("f [GHz]")
     axs[1].set_ylabel("phase [rad]")
@@ -597,6 +622,140 @@ def p16_fresnel_curves(data: dict[str, Any], out: Path, config: PlotConfig) -> N
     axs[1].grid(True, alpha=0.3)
     axs[0].legend(fontsize=7, ncol=2)
     _save(fig, out, "P16_fresnel_curves")
+
+
+def p22_material_dispersion_impact(data: dict[str, Any], out: Path, config: PlotConfig) -> None:
+    freq = np.asarray(data["frequency"], dtype=float)
+    mats_disp = _material_library_from_data(data)
+    mats_const = resolve_material_library(None, material_dispersion="off", default_specs=DEFAULT_MATERIAL_SPECS)
+    theta = np.deg2rad(45.0)
+
+    names = [n for n in sorted(set(mats_disp.keys()) & set(mats_const.keys())) if n in mats_disp and n in mats_const]
+    if len(names) == 0:
+        _write_skip(out, "P22_material_dispersion_impact", "Skipped: no overlapping materials for comparison")
+        return
+
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    for name in names:
+        gs_d, gp_d = fresnel_reflection(mats_disp[name], theta_i=theta, f_hz=freq)
+        gs_c, gp_c = fresnel_reflection(mats_const[name], theta_i=theta, f_hz=freq)
+        p_d = np.abs(gs_d) ** 2 + np.abs(gp_d) ** 2
+        p_c = np.abs(gs_c) ** 2 + np.abs(gp_c) ** 2
+        delta_db = 10.0 * np.log10((p_d + 1e-18) / (p_c + 1e-18))
+        ax.plot(freq * 1e-9, delta_db, label=name)
+
+    ax.set_title(
+        "P22 material dispersion impact (Fresnel power delta)\n"
+        + _plot_meta_line(data, config, "None")
+        + f", material_dispersion={str(data.get('meta', {}).get('material_dispersion', 'off'))}",
+        fontsize=9,
+    )
+    ax.set_xlabel("f [GHz]")
+    ax.set_ylabel("Δ reflection power [dB]\n(dispersive vs const)")
+    ax.grid(True, alpha=0.3)
+    ax.legend(fontsize=8)
+    _save(fig, out, "P22_material_dispersion_impact")
+
+
+def _is_diffuse_path(path: dict[str, Any]) -> bool:
+    inter = [str(x).lower() for x in path.get("meta", {}).get("interactions", [])]
+    return any("diffuse" in x for x in inter)
+
+
+def _rms_delay_spread_ns(paths: list[dict[str, Any]], matrix_source: str) -> float:
+    if len(paths) == 0:
+        return np.nan
+    tau = np.asarray([float(p.get("tau_s", np.nan)) for p in paths], dtype=float)
+    pw = np.asarray([_path_power(p, matrix_source) for p in paths], dtype=float)
+    good = np.isfinite(tau) & np.isfinite(pw) & (pw > 0.0)
+    if not np.any(good):
+        return np.nan
+    tau = tau[good]
+    pw = pw[good]
+    w = pw / np.sum(pw)
+    mu = float(np.sum(w * tau))
+    var = float(np.sum(w * (tau - mu) ** 2))
+    return float(np.sqrt(max(var, 0.0)) * 1e9)
+
+
+def p23_path_count_vs_bounce(data: dict[str, Any], out: Path, config: PlotConfig) -> None:
+    bounce_vals = []
+    for _, _, case in _scope_cases(data, config):
+        for p in case.get("paths", []):
+            bounce_vals.append(int(p.get("meta", {}).get("bounce_count", 0)))
+    if len(bounce_vals) == 0:
+        _write_skip(out, "P23_path_count_vs_bounce", "Skipped: no paths")
+        return
+    b = np.asarray(bounce_vals, dtype=int)
+    uniq = np.arange(0, int(np.max(b)) + 1, dtype=int)
+    counts = np.asarray([int(np.sum(b == k)) for k in uniq], dtype=int)
+    fig, ax = plt.subplots(figsize=(7, 4))
+    ax.bar(uniq, counts)
+    ax.set_xlabel("bounce_count")
+    ax.set_ylabel("path count")
+    ax.set_title("P23 path count histogram vs bounce\n" + _plot_meta_line(data, config, "None"))
+    ax.grid(True, alpha=0.3)
+    _save(fig, out, "P23_path_count_vs_bounce")
+
+
+def p24_rms_delay_spread_diffuse_compare(data: dict[str, Any], out: Path, config: PlotConfig) -> None:
+    all_rms: list[float] = []
+    spec_rms: list[float] = []
+    for _, _, case in _scope_cases(data, config):
+        paths = list(case.get("paths", []))
+        if len(paths) == 0:
+            continue
+        r_all = _rms_delay_spread_ns(paths, config.matrix_source)
+        if np.isfinite(r_all):
+            all_rms.append(float(r_all))
+        spec = [p for p in paths if not _is_diffuse_path(p)]
+        r_sp = _rms_delay_spread_ns(spec, config.matrix_source)
+        if np.isfinite(r_sp):
+            spec_rms.append(float(r_sp))
+    if len(all_rms) == 0:
+        _write_skip(out, "P24_rms_delay_spread_diffuse_compare", "Skipped: no finite RMS delay spread")
+        return
+    fig, ax = plt.subplots(figsize=(7, 4))
+    def _ecdf(vals: list[float]) -> tuple[np.ndarray, np.ndarray]:
+        x = np.sort(np.asarray(vals, dtype=float))
+        y = np.arange(1, len(x) + 1, dtype=float) / max(len(x), 1)
+        return x, y
+    xa, ya = _ecdf(all_rms)
+    ax.plot(xa, ya, label=f"all paths (n={len(all_rms)})")
+    if len(spec_rms) > 0:
+        xs, ys = _ecdf(spec_rms)
+        ax.plot(xs, ys, label=f"specular-only (n={len(spec_rms)})")
+    ax.set_xlabel("RMS delay spread [ns]")
+    ax.set_ylabel("CDF")
+    ax.set_title("P24 RMS delay spread: diffuse off/on view\n" + _plot_meta_line(data, config, "None"))
+    ax.grid(True, alpha=0.3)
+    ax.legend(fontsize=8)
+    _save(fig, out, "P24_rms_delay_spread_diffuse_compare")
+
+
+def p25_diffuse_power_accounting(data: dict[str, Any], out: Path, config: PlotConfig) -> None:
+    ratios = []
+    labels = []
+    for sid, cid, case in _scope_cases(data, config):
+        paths = list(case.get("paths", []))
+        if len(paths) == 0:
+            continue
+        p_all = float(np.sum([_path_power(p, config.matrix_source) for p in paths]))
+        p_dif = float(np.sum([_path_power(p, config.matrix_source) for p in paths if _is_diffuse_path(p)]))
+        if p_all <= 0.0:
+            continue
+        ratios.append(100.0 * p_dif / p_all)
+        labels.append(f"{sid}/{cid}")
+    if len(ratios) == 0:
+        _write_skip(out, "P25_diffuse_power_accounting", "Skipped: no diffuse-tagged paths")
+        return
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.plot(np.arange(len(ratios)), ratios, "o", ms=4)
+    ax.set_xlabel("case index")
+    ax.set_ylabel("diffuse power ratio [%]")
+    ax.set_title("P25 diffuse power accounting\n" + _plot_meta_line(data, config, "None"))
+    ax.grid(True, alpha=0.3)
+    _save(fig, out, "P25_diffuse_power_accounting")
 
 
 def p17_cp_same_opp_vs_bounce(data: dict[str, Any], out: Path, config: PlotConfig, exact_bounce_map: dict[str, int]) -> None:
@@ -958,6 +1117,10 @@ def generate_all_plots(
     p19_reciprocity_sanity(data, out, config)
     p20_xpd_fit_gof(data, out, config, exact_map)
     p21_tap_vs_path_consistency(data, out, config)
+    p22_material_dispersion_impact(data, out, config)
+    p23_path_count_vs_bounce(data, out, config)
+    p24_rms_delay_spread_diffuse_compare(data, out, config)
+    p25_diffuse_power_accounting(data, out, config)
 
 
 def _run_self_test() -> None:

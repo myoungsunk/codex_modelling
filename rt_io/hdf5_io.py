@@ -61,6 +61,13 @@ META_COMPARE_KEYS = (
     "exact_bounce_applied",
     "physics_validation_mode",
     "antenna_config",
+    "materials_db_path",
+    "materials_db_hash",
+    "material_dispersion",
+    "max_bounce_override",
+    "diffuse_config",
+    "rich_mode",
+    "scenario_ids",
     "release_mode",
     "seed_json",
 )
@@ -156,6 +163,19 @@ def _normalize_meta_for_compare(meta: dict[str, Any], default_schema_version: st
     out["exact_bounce_defaults"] = eb if isinstance(eb, dict) else {}
     out["seed_json"] = str(out.get("seed_json", _stringify_seed(out.get("seed", ""))))
     out["exact_bounce_applied"] = bool(out.get("exact_bounce_applied", True))
+    out["materials_db_path"] = str(out.get("materials_db_path", ""))
+    out["materials_db_hash"] = str(out.get("materials_db_hash", ""))
+    out["material_dispersion"] = str(out.get("material_dispersion", "off"))
+    out["max_bounce_override"] = out.get("max_bounce_override", None)
+    dc = out.get("diffuse_config", {})
+    if isinstance(dc, str):
+        dc = _json_loads_safe(dc, {})
+    out["diffuse_config"] = dc if isinstance(dc, dict) else {}
+    out["rich_mode"] = bool(out.get("rich_mode", False))
+    sids = out.get("scenario_ids", [])
+    if isinstance(sids, str):
+        sids = _json_loads_safe(sids, [])
+    out["scenario_ids"] = sids if isinstance(sids, list) else []
     return out
 
 
@@ -262,6 +282,17 @@ def save_rt_dataset(path: str | Path, data: dict[str, Any]) -> Path:
         meta.attrs["antenna_config_json"] = _json_dumps_canonical(antenna_cfg)
         meta.attrs["physics_validation_mode"] = bool(src_meta.get("physics_validation_mode", False))
         meta.attrs["release_mode"] = bool(src_meta.get("release_mode", False))
+        meta.attrs["materials_db_path"] = str(src_meta.get("materials_db_path", ""))
+        meta.attrs["materials_db_hash"] = str(src_meta.get("materials_db_hash", ""))
+        meta.attrs["material_dispersion"] = str(src_meta.get("material_dispersion", "off"))
+        meta.attrs["max_bounce_override"] = (
+            int(src_meta.get("max_bounce_override"))
+            if src_meta.get("max_bounce_override") is not None
+            else -1
+        )
+        meta.attrs["diffuse_config_json"] = _json_dumps_canonical(src_meta.get("diffuse_config", {}))
+        meta.attrs["rich_mode"] = bool(src_meta.get("rich_mode", False))
+        meta.attrs["scenario_ids_json"] = _json_dumps_canonical(src_meta.get("scenario_ids", []))
         git_diff = src_meta.get("git_diff", None)
         if git_diff is None:
             git_diff = _git_diff()
@@ -439,6 +470,17 @@ def load_rt_dataset(path: str | Path) -> dict[str, Any]:
                 "antenna_config_json": antenna_json,
                 "antenna_config": _json_loads_safe(antenna_json, {}),
                 "release_mode": bool(meta_g.attrs.get("release_mode", False)),
+                "materials_db_path": str(meta_g.attrs.get("materials_db_path", "")),
+                "materials_db_hash": str(meta_g.attrs.get("materials_db_hash", "")),
+                "material_dispersion": str(meta_g.attrs.get("material_dispersion", "off")),
+                "max_bounce_override": (
+                    int(meta_g.attrs.get("max_bounce_override", -1))
+                    if int(meta_g.attrs.get("max_bounce_override", -1)) >= 0
+                    else None
+                ),
+                "diffuse_config": _json_loads_safe(str(meta_g.attrs.get("diffuse_config_json", "{}")), {}),
+                "rich_mode": bool(meta_g.attrs.get("rich_mode", False)),
+                "scenario_ids": _json_loads_safe(str(meta_g.attrs.get("scenario_ids_json", "[]")), []),
                 "git_diff": meta_g.attrs.get("git_diff", ""),
             }
         else:
@@ -461,6 +503,13 @@ def load_rt_dataset(path: str | Path) -> dict[str, Any]:
                 "antenna_config_json": "{}",
                 "antenna_config": {},
                 "release_mode": False,
+                "materials_db_path": "",
+                "materials_db_hash": "",
+                "material_dispersion": "off",
+                "max_bounce_override": None,
+                "diffuse_config": {},
+                "rich_mode": False,
+                "scenario_ids": [],
                 "git_diff": "",
             }
 

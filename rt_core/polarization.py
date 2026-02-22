@@ -102,7 +102,42 @@ def fresnel_reflection(material: Material, theta_i: float, f_hz: NDArray[np.floa
     if material.complex_eps_r is not None:
         eps_c = np.full(freq.shape, material.complex_eps_r, dtype=np.complex128)
     else:
-        eps_c = np.full(freq.shape, material.eps_r * (1.0 - 1j * material.tan_delta), dtype=np.complex128)
+        mode = str(getattr(material, "dispersion_model", "const")).lower()
+        if mode == "table" and material.table_f_hz and material.table_eps_r:
+            f_tab = np.asarray(material.table_f_hz, dtype=float)
+            e_tab = np.asarray(material.table_eps_r, dtype=float)
+            t_tab = (
+                np.asarray(material.table_tan_delta, dtype=float)
+                if material.table_tan_delta is not None and len(material.table_tan_delta) == len(f_tab)
+                else np.full(f_tab.shape, float(material.tan_delta), dtype=float)
+            )
+            if np.any(f_tab <= 0.0):
+                f_tab = np.maximum(f_tab, 1.0)
+            ord_idx = np.argsort(f_tab)
+            f_tab = f_tab[ord_idx]
+            e_tab = e_tab[ord_idx]
+            t_tab = t_tab[ord_idx]
+            logf = np.log10(np.maximum(freq, 1.0))
+            logft = np.log10(np.maximum(f_tab, 1.0))
+            eps_r = np.interp(logf, logft, e_tab, left=e_tab[0], right=e_tab[-1])
+            tan = np.interp(logf, logft, t_tab, left=t_tab[0], right=t_tab[-1])
+            eps_r = np.maximum(eps_r, 1.0)
+            tan = np.maximum(tan, 0.0)
+            eps_c = eps_r * (1.0 - 1j * tan)
+        elif mode == "debye" and material.debye_eps_inf is not None and material.debye_delta_eps and material.debye_tau_s:
+            de = np.asarray(material.debye_delta_eps, dtype=float)
+            ts = np.asarray(material.debye_tau_s, dtype=float)
+            if len(de) != len(ts) or len(de) == 0:
+                eps_c = np.full(freq.shape, material.eps_r * (1.0 - 1j * material.tan_delta), dtype=np.complex128)
+            else:
+                w = 2.0 * np.pi * freq
+                eps_c = np.full(freq.shape, float(material.debye_eps_inf), dtype=np.complex128)
+                for d_eps, tau in zip(de, ts):
+                    eps_c += d_eps / (1.0 + 1j * w * max(float(tau), 1e-15))
+                if float(material.tan_delta) > 0.0:
+                    eps_c = eps_c - 1j * np.maximum(np.real(eps_c), 1.0) * float(material.tan_delta)
+        else:
+            eps_c = np.full(freq.shape, material.eps_r * (1.0 - 1j * material.tan_delta), dtype=np.complex128)
 
     root = np.sqrt(eps_c - sin2)
     gamma_s = (cos_i - root) / (cos_i + root)
