@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import argparse
+import inspect
+import importlib
 from pathlib import Path
 from typing import Any
 
 import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
+from matplotlib.lines import Line2D
 import numpy as np
 from scipy import stats
 
@@ -15,6 +19,50 @@ from analysis.xpd_stats import gof_model_selection_db, make_subbands, model_quan
 from plots.plot_config import PlotConfig
 from rt_core.materials import DEFAULT_MATERIAL_SPECS, resolve_material_library
 from rt_core.polarization import fresnel_reflection
+
+
+SCENARIO_GUIDE: dict[str, dict[str, Any]] = {
+    "C0": {
+        "goal": "Free-space LOS sanity for coordinate/basis/delay checks.",
+        "plots": ["P0", "P1", "P2", "P3", "P14"],
+    },
+    "A1": {
+        "goal": "Nearly LOS-only baseline (max_bounce=0).",
+        "plots": ["P0", "P1", "P2", "P3"],
+    },
+    "A2": {
+        "goal": "Single PEC 1-bounce (odd) with LOS blocked.",
+        "plots": ["P0", "P1", "P5", "P6", "P7"],
+    },
+    "A2R": {
+        "goal": "Rotated PEC plane for oblique-incidence polarization mixing.",
+        "plots": ["P0", "P1", "P7", "P15", "P21"],
+    },
+    "A3": {
+        "goal": "Two-plate corner 2-bounce (even) with LOS blocked.",
+        "plots": ["P0", "P1", "P6", "P17"],
+    },
+    "A3R": {
+        "goal": "Rotated dihedral corner to stress parity and linear cross-pol.",
+        "plots": ["P0", "P1", "P7", "P15", "P21"],
+    },
+    "A4": {
+        "goal": "Dielectric material sweep (Fresnel frequency dependence).",
+        "plots": ["P8", "P9", "P16", "P22"],
+    },
+    "A5": {
+        "goal": "Depolarization stress case (parity collapse behavior).",
+        "plots": ["P10", "P11", "P12"],
+    },
+    "A6": {
+        "goal": "Near-normal CP parity benchmark (odd/even comparison).",
+        "plots": ["P5", "P6", "P17_A6"],
+    },
+    "B0": {
+        "goal": "Room-box multipath-rich statistics scenario.",
+        "plots": ["P13", "P23", "P24", "P25", "P21"],
+    },
+}
 
 
 def _ensure_dir(out_dir: str | Path) -> Path:
@@ -43,6 +91,27 @@ def _matrix_f(path: dict[str, Any], matrix_source: str) -> np.ndarray:
 def _path_power(path: dict[str, Any], matrix_source: str) -> float:
     M = _matrix_f(path, matrix_source)
     return float(np.mean(np.abs(M) ** 2))
+
+
+def _representative_case_for_scenario(cases: dict[str, dict[str, Any]], matrix_source: str) -> tuple[str, dict[str, Any]] | None:
+    if len(cases) == 0:
+        return None
+    items = list(cases.items())
+    max_paths = max(len(case.get("paths", [])) for _, case in items)
+    cand = [(cid, case) for cid, case in items if len(case.get("paths", [])) == max_paths]
+    if len(cand) == 1:
+        return cand[0]
+    best = cand[0]
+    best_pw = -np.inf
+    for cid, case in cand:
+        paths = list(case.get("paths", []))
+        if len(paths) == 0:
+            continue
+        pmax = max(_path_power(p, matrix_source) for p in paths)
+        if pmax > best_pw:
+            best_pw = pmax
+            best = (cid, case)
+    return best
 
 
 def _all_cases(data: dict[str, Any]) -> list[tuple[str, str, dict[str, Any]]]:
@@ -183,7 +252,7 @@ def p0_geometry_ray_overlay(data: dict[str, Any], out: Path, config: PlotConfig,
     fig, ax = plt.subplots(figsize=(7, 5))
     cmap = {0: "tab:blue", 1: "tab:orange", 2: "tab:green"}
     for p in paths:
-        pts = np.asarray(p.get("points", []), dtype=float)
+        pts = _path_points_with_fallback(p, sid, case.get("params", {}))
         if len(pts) < 2:
             continue
         b = int(p["meta"]["bounce_count"])
@@ -758,6 +827,703 @@ def p25_diffuse_power_accounting(data: dict[str, Any], out: Path, config: PlotCo
     _save(fig, out, "P25_diffuse_power_accounting")
 
 
+def _scenario_summary(data: dict[str, Any], sid: str, matrix_source: str) -> dict[str, Any]:
+    sc = data.get("scenarios", {}).get(sid, {})
+    cases = sc.get("cases", {})
+    n_cases = int(len(cases))
+    total_paths = 0
+    los_cases = 0
+    bounce_vals: list[int] = []
+    tx_rx_dists_m: list[float] = []
+    strongest_tau = np.nan
+    strongest_power = -np.inf
+
+    for case in cases.values():
+        paths = list(case.get("paths", []))
+        total_paths += len(paths)
+        if any(int(p.get("meta", {}).get("bounce_count", 0)) == 0 for p in paths):
+            los_cases += 1
+        for p in paths:
+            b = int(p.get("meta", {}).get("bounce_count", 0))
+            bounce_vals.append(b)
+            pw = _path_power(p, matrix_source)
+            if pw > strongest_power:
+                strongest_power = pw
+                strongest_tau = float(p.get("tau_s", np.nan))
+        # Estimate direct Tx/Rx separation from scenario params (for movement summary).
+        txrx = _infer_tx_rx_from_case(sid, case.get("params", {}))
+        if txrx is not None:
+            tx, rx = txrx
+            tx_rx_dists_m.append(float(np.linalg.norm(rx - tx)))
+
+    bounce_hist: dict[int, int] = {}
+    if bounce_vals:
+        bb = np.asarray(bounce_vals, dtype=int)
+        for k in np.unique(bb):
+            bounce_hist[int(k)] = int(np.sum(bb == int(k)))
+    avg_paths = float(total_paths / max(n_cases, 1))
+    dmin = float(np.nanmin(tx_rx_dists_m)) if tx_rx_dists_m else float("nan")
+    dmax = float(np.nanmax(tx_rx_dists_m)) if tx_rx_dists_m else float("nan")
+    return {
+        "n_cases": n_cases,
+        "total_paths": int(total_paths),
+        "avg_paths_per_case": avg_paths,
+        "los_cases": int(los_cases),
+        "bounce_hist": bounce_hist,
+        "strongest_tau_s": float(strongest_tau),
+        "strongest_power_db": float(10.0 * np.log10(max(strongest_power, 1e-18))),
+        "tx_rx_dist_min_m": dmin,
+        "tx_rx_dist_max_m": dmax,
+    }
+
+
+def _scenario_module_name(sid: str) -> str | None:
+    mapping = {
+        "C0": "scenarios.C0_free_space",
+        "A1": "scenarios.A1_los_only",
+        "A2": "scenarios.A2_pec_plane",
+        "A2R": "scenarios.A2_rotated_plane",
+        "A3": "scenarios.A3_corner_2bounce",
+        "A3R": "scenarios.A3_rotated_dihedral",
+        "A4": "scenarios.A4_dielectric_plane",
+        "A5": "scenarios.A5_depol_stress",
+        "A6": "scenarios.A6_cp_parity_benchmark",
+        "B0": "scenarios.B0_room_box",
+    }
+    return mapping.get(sid)
+
+
+def _build_scene_for_case(sid: str, params: dict[str, Any], data: dict[str, Any]) -> list[Any]:
+    mod_name = _scenario_module_name(sid)
+    if mod_name is None:
+        return []
+    try:
+        mod = importlib.import_module(mod_name)
+    except Exception:
+        return []
+    if not hasattr(mod, "build_scene"):
+        return []
+    try:
+        sig = inspect.signature(mod.build_scene)
+    except Exception:
+        return []
+    p = dict(params or {})
+    if "material_name" in sig.parameters and "material" in p:
+        p["material_name"] = p["material"]
+    if "materials_db" in sig.parameters:
+        p["materials_db"] = str(data.get("meta", {}).get("materials_db_path", "")) or None
+    if "material_dispersion" in sig.parameters:
+        p["material_dispersion"] = str(data.get("meta", {}).get("material_dispersion", "off"))
+    kwargs = {k: p[k] for k in sig.parameters if k in p}
+    try:
+        return list(mod.build_scene(**kwargs))
+    except Exception:
+        return []
+
+
+def _plane_role_label(pl: Any) -> str:
+    try:
+        n = np.asarray(pl.unit_normal(), dtype=float)
+        if abs(float(n[2])) > 0.8:
+            return "floor" if float(n[2]) > 0.0 else "ceiling"
+        return "wall"
+    except Exception:
+        return "plane"
+
+
+def _draw_scene_structures_topview(
+    ax: plt.Axes,
+    sid: str,
+    case_params: dict[str, Any],
+    data: dict[str, Any],
+) -> tuple[list[Any], list[str]]:
+    planes = _build_scene_for_case(sid, case_params, data)
+    handles: list[Any] = []
+    labels: list[str] = []
+    if len(planes) == 0:
+        return handles, labels
+    cmap = plt.get_cmap("tab10")
+    for idx, pl in enumerate(planes):
+        if getattr(pl, "half_extent_u", None) is None or getattr(pl, "half_extent_v", None) is None:
+            continue
+        try:
+            color = cmap(idx % 10)
+            role = _plane_role_label(pl)
+            pid = int(getattr(pl, "id", -1))
+            mat = str(getattr(getattr(pl, "material", None), "name", "") or getattr(getattr(pl, "material", None), "kind", "mat"))
+            lbl = f"ID {pid} {role} ({mat})"
+            u, v = pl.local_axes()
+            p0 = np.asarray(pl.p0, dtype=float)
+            hu = float(pl.half_extent_u)
+            hv = float(pl.half_extent_v)
+            corners = np.asarray(
+                [
+                    p0 + hu * u + hv * v,
+                    p0 + hu * u - hv * v,
+                    p0 - hu * u - hv * v,
+                    p0 - hu * u + hv * v,
+                    p0 + hu * u + hv * v,
+                ],
+                dtype=float,
+            )
+            xy = corners[:, :2]
+            span = np.max(xy, axis=0) - np.min(xy, axis=0)
+            # Vertical wall in top-view often collapses to line; draw line strongly.
+            if float(np.linalg.norm(span)) < 1e-6 or float(np.ptp(xy[:, 0]) * np.ptp(xy[:, 1])) < 1e-8:
+                pts = xy[:-1]
+                dmax = -1.0
+                ia, ib = 0, 1
+                for i in range(len(pts)):
+                    for j in range(i + 1, len(pts)):
+                        d = float(np.linalg.norm(pts[i] - pts[j]))
+                        if d > dmax:
+                            dmax = d
+                            ia, ib = i, j
+                ax.plot([pts[ia, 0], pts[ib, 0]], [pts[ia, 1], pts[ib, 1]], "-", color=color, lw=2.2, alpha=0.9)
+            else:
+                ax.plot(xy[:, 0], xy[:, 1], "-", color=color, lw=1.4, alpha=0.85)
+                ax.fill(xy[:, 0], xy[:, 1], color=color, alpha=0.05)
+            cxy = np.nanmean(xy[:-1], axis=0)
+            ax.text(float(cxy[0]), float(cxy[1]), f"{pid}", color=color, fontsize=7)
+            handles.append(Line2D([0], [0], color=color, lw=2.0))
+            labels.append(lbl)
+        except Exception:
+            continue
+    # deduplicate labels while keeping order
+    out_h: list[Any] = []
+    out_l: list[str] = []
+    seen: set[str] = set()
+    for h, l in zip(handles, labels):
+        if l in seen:
+            continue
+        seen.add(l)
+        out_h.append(h)
+        out_l.append(l)
+    return out_h, out_l
+
+
+def _structures_brief(planes: list[Any], max_items: int = 4) -> str:
+    if len(planes) == 0:
+        return "none"
+    parts: list[str] = []
+    for pl in planes[:max_items]:
+        try:
+            parts.append(f"{int(getattr(pl,'id',-1))}:{_plane_role_label(pl)}")
+        except Exception:
+            continue
+    if len(planes) > max_items:
+        parts.append("...")
+    return ", ".join(parts) if parts else "none"
+
+
+def _structure_legend_lines(planes: list[Any], max_items: int = 4) -> list[str]:
+    if len(planes) == 0:
+        return ["structures: none"]
+    lines: list[str] = []
+    for pl in planes[:max_items]:
+        try:
+            pid = int(getattr(pl, "id", -1))
+            role = _plane_role_label(pl)
+            mat = str(
+                getattr(getattr(pl, "material", None), "name", "")
+                or getattr(getattr(pl, "material", None), "kind", "mat")
+            )
+            lines.append(f"ID {pid}: {role}, {mat}")
+        except Exception:
+            continue
+    if len(planes) > max_items:
+        lines.append("...")
+    return lines if lines else ["structures: none"]
+
+
+def _scenario_param_note(sid: str, params: dict[str, Any]) -> str:
+    p = dict(params or {})
+    if sid == "A2R":
+        return (
+            f"rotated plane: tilt_x={float(p.get('tilt_x_deg', np.nan)):.1f}deg, "
+            f"yaw_z={float(p.get('yaw_z_deg', np.nan)):.1f}deg"
+        )
+    if sid == "A3R":
+        return (
+            f"rotated dihedral: yaw={float(p.get('yaw_deg', np.nan)):.1f}deg, "
+            f"floor/ceiling={bool(p.get('with_floor_ceiling', True))}"
+        )
+    if sid == "A6":
+        return (
+            f"mode={str(p.get('mode', 'NA'))}, target_bounce={int(p.get('target_bounce', -1))}, "
+            f"inc<= {float(p.get('incidence_max_deg', np.nan)):.1f}deg"
+        )
+    return ""
+
+
+def _draw_plane_normals_topview(ax: plt.Axes, planes: list[Any], length_m: float = 2.0) -> None:
+    for pl in planes:
+        try:
+            n = np.asarray(pl.unit_normal(), dtype=float)
+            nxy = n[:2]
+            nn = float(np.linalg.norm(nxy))
+            if nn < 1e-9:
+                continue
+            p0 = np.asarray(pl.p0, dtype=float)[:2]
+            d = (nxy / nn) * length_m
+            ax.annotate(
+                "",
+                xy=(float(p0[0] + d[0]), float(p0[1] + d[1])),
+                xytext=(float(p0[0]), float(p0[1])),
+                arrowprops=dict(arrowstyle="->", color="0.35", lw=1.1),
+            )
+            pid = int(getattr(pl, "id", -1))
+            ax.text(float(p0[0] + d[0]), float(p0[1] + d[1]), f"n{pid}", color="0.35", fontsize=7)
+        except Exception:
+            continue
+
+
+def _set_view_limits_from_points(ax: plt.Axes, pts_xy: np.ndarray, min_span_m: float = 3.0, pad_ratio: float = 0.18) -> None:
+    if pts_xy.ndim != 2 or pts_xy.shape[0] == 0:
+        return
+    xmn = float(np.nanmin(pts_xy[:, 0]))
+    xmx = float(np.nanmax(pts_xy[:, 0]))
+    ymn = float(np.nanmin(pts_xy[:, 1]))
+    ymx = float(np.nanmax(pts_xy[:, 1]))
+    sx = max(xmx - xmn, min_span_m)
+    sy = max(ymx - ymn, min_span_m)
+    cx = 0.5 * (xmx + xmn)
+    cy = 0.5 * (ymx + ymn)
+    hx = 0.5 * sx * (1.0 + pad_ratio)
+    hy = 0.5 * sy * (1.0 + pad_ratio)
+    ax.set_xlim(cx - hx, cx + hx)
+    ax.set_ylim(cy - hy, cy + hy)
+
+
+def _infer_tx_rx_from_case(sid: str, params: dict[str, Any]) -> tuple[np.ndarray, np.ndarray] | None:
+    p = dict(params or {})
+    # Defaults from scenarios/common.py
+    tx = np.array([0.0, 0.0, 1.5], dtype=float)
+    rx = np.array([6.0, 0.0, 1.5], dtype=float)
+
+    try:
+        if sid == "C0":
+            rx = np.array([float(p.get("distance_m", 6.0)), 0.0, 1.5], dtype=float)
+        elif sid == "A1":
+            rx = np.array([float(p.get("distance_m", 6.0)), 0.2, 1.5], dtype=float)
+        elif sid == "A2":
+            rx = np.array([float(p.get("distance_m", 6.0)), 0.0, 1.5], dtype=float)
+        elif sid == "A2R":
+            tx = np.array([0.0, -1.0, 1.5], dtype=float)
+            rx = np.array([float(p.get("distance_m", 6.0)), 1.0, 1.7], dtype=float)
+        elif sid == "A3":
+            tx = np.array([0.0, 0.0, 1.5], dtype=float)
+            rx = np.array([float(p.get("rx_x", 4.0)), float(p.get("rx_y", 4.0)), 1.5], dtype=float)
+        elif sid == "A3R":
+            tx = np.array([0.0, -0.8, 1.4], dtype=float)
+            rx = np.array([float(p.get("rx_x", 3.5)), float(p.get("rx_y", 4.0)), 1.6], dtype=float)
+        elif sid == "A4":
+            rx = np.array([float(p.get("distance_m", 6.0)), 0.0, 1.5], dtype=float)
+        elif sid == "A5":
+            rx = np.array([float(p.get("rx_x", 3.5)), float(p.get("rx_y", 4.5)), 1.5], dtype=float)
+        elif sid == "A6":
+            mode = str(p.get("mode", "odd"))
+            tx = np.array([2.0, -2.0, 1.5], dtype=float) if mode == "odd" else np.array([2.0, 1.0, 1.5], dtype=float)
+            rx = np.array([float(p.get("rx_x", 2.4)), float(p.get("rx_y", -2.0 if mode == "odd" else 1.0)), float(p.get("rx_z", 1.5))], dtype=float)
+        elif sid == "B0":
+            tx = np.array([2.0, 0.0, 1.5], dtype=float)
+            rx = np.array([float(p.get("rx_x", 6.0)), float(p.get("rx_y", 0.0)), float(p.get("rx_z", 1.5))], dtype=float)
+    except Exception:
+        return None
+    return tx, rx
+
+
+def _path_points_with_fallback(path: dict[str, Any], sid: str, params: dict[str, Any]) -> np.ndarray:
+    pts = np.asarray(path.get("points", []), dtype=float)
+    if pts.ndim == 2 and pts.shape[0] >= 2 and pts.shape[1] == 3:
+        return pts
+    txrx = _infer_tx_rx_from_case(sid, params)
+    if txrx is None:
+        return np.zeros((0, 3), dtype=float)
+    tx, rx = txrx
+    rpts = np.asarray(path.get("reflection_points", []), dtype=float)
+    if rpts.ndim != 2 or (rpts.size > 0 and rpts.shape[1] != 3):
+        rpts = np.zeros((0, 3), dtype=float)
+    if rpts.size == 0:
+        return np.vstack([tx, rx])
+    return np.vstack([tx, rpts, rx])
+
+
+def _scenario_overview_plot(data: dict[str, Any], sid: str, out: Path, config: PlotConfig) -> dict[str, Any]:
+    summary = _scenario_summary(data, sid, config.matrix_source)
+    sc = data["scenarios"][sid]
+    cases = sc.get("cases", {})
+    if len(cases) == 0:
+        _write_skip(out, f"S_{sid}_overview", f"Skipped: no cases in scenario {sid}")
+        return summary
+
+    fig, axs = plt.subplots(2, 2, figsize=(11, 8))
+    ax_xy, ax_tp, ax_bh, ax_txt = axs[0, 0], axs[0, 1], axs[1, 0], axs[1, 1]
+    cmap = {0: "tab:blue", 1: "tab:orange", 2: "tab:green", 3: "tab:red"}
+    rep = _representative_case_for_scenario(cases, config.matrix_source)
+    if rep is None:
+        _write_skip(out, f"S_{sid}_overview", f"Skipped: no valid representative case in {sid}")
+        return summary
+    rep_cid, rep_case = rep
+    rep_params = rep_case.get("params", {})
+    struct_handles, struct_labels = _draw_scene_structures_topview(ax_xy, sid, rep_params, data)
+    rep_planes = _build_scene_for_case(sid, rep_params, data)
+    _draw_plane_normals_topview(ax_xy, rep_planes)
+
+    # (1) Top-view: one representative RX case, draw all paths to that RX.
+    tx_pts: list[np.ndarray] = []
+    rx_pts: list[np.ndarray] = []
+    view_pts_xy: list[np.ndarray] = []
+    rep_paths = list(rep_case.get("paths", []))
+    for p in rep_paths:
+        pts = _path_points_with_fallback(p, sid, rep_params)
+        if len(pts) < 2:
+            continue
+        b = int(p.get("meta", {}).get("bounce_count", 0))
+        ax_xy.plot(pts[:, 0], pts[:, 1], "-o", ms=2.5, lw=1.0, alpha=0.75, color=cmap.get(b, "k"))
+        view_pts_xy.append(np.asarray(pts[:, :2], dtype=float))
+        tx_pts.append(pts[0])
+        rx_pts.append(pts[-1])
+
+    # show full case movement as context only (without all-case path clutter)
+    all_rxy: list[np.ndarray] = []
+    all_txy: list[np.ndarray] = []
+    for case in cases.values():
+        tr = _infer_tx_rx_from_case(sid, case.get("params", {}))
+        if tr is None:
+            continue
+        all_txy.append(tr[0])
+        all_rxy.append(tr[1])
+
+    if tx_pts:
+        txy = np.asarray(tx_pts, dtype=float)
+        rxy = np.asarray(rx_pts, dtype=float)
+        ax_xy.scatter(txy[:, 0], txy[:, 1], marker="^", s=24, c="k", label="TX")
+        ax_xy.scatter(rxy[:, 0], rxy[:, 1], marker="s", s=26, c="tab:purple", label="RX(rep case)")
+        view_pts_xy.append(np.asarray(txy[:, :2], dtype=float))
+        view_pts_xy.append(np.asarray(rxy[:, :2], dtype=float))
+    if all_rxy:
+        arr = np.asarray(all_rxy, dtype=float)
+        ax_xy.scatter(arr[:, 0], arr[:, 1], marker="s", s=10, c="0.65", alpha=0.7, label="RX sweep(all)")
+        view_pts_xy.append(np.asarray(arr[:, :2], dtype=float))
+        if len(arr) >= 2:
+            ax_xy.plot(arr[:, 0], arr[:, 1], "--", lw=0.9, color="0.55", alpha=0.8)
+            d = arr[-1] - arr[0]
+            ax_xy.annotate(
+                "",
+                xy=(float(arr[-1, 0]), float(arr[-1, 1])),
+                xytext=(float(arr[0, 0]), float(arr[0, 1])),
+                arrowprops=dict(arrowstyle="->", color="0.45", lw=1.4),
+            )
+            ax_xy.text(float(arr[-1, 0]), float(arr[-1, 1]), f" ΔRX={np.linalg.norm(d):.2f}m", color="0.35", fontsize=8)
+
+    marker_handles = [
+        Line2D([0], [0], marker="^", linestyle="None", color="k", markersize=6, label="TX"),
+        Line2D([0], [0], marker="s", linestyle="None", color="tab:purple", markersize=6, label="RX(rep case)"),
+        Line2D([0], [0], marker="s", linestyle="None", color="0.55", markersize=5, label="RX sweep(all)"),
+        Line2D([0], [0], linestyle="-", color="k", lw=1.0, label="all paths @ rep RX"),
+        Line2D([0], [0], linestyle="--", color="0.45", lw=1.2, label="RX movement"),
+        Line2D([0], [0], linestyle="-", color="0.35", lw=1.2, label="normal n (proj)"),
+    ]
+    leg_m = ax_xy.legend(handles=marker_handles, loc="upper right", fontsize=7, framealpha=0.9, title="Markers")
+    ax_xy.add_artist(leg_m)
+    if struct_handles and struct_labels:
+        ax_xy.legend(struct_handles, struct_labels, loc="lower left", fontsize=6.5, framealpha=0.9, title="Structures")
+    note = _scenario_param_note(sid, rep_params)
+    ttl = f"Representative case geometry (all paths @ {rep_cid})"
+    if note:
+        ttl += f"\n{note}"
+    ax_xy.set_title(ttl)
+    ax_xy.set_xlabel("x [m]")
+    ax_xy.set_ylabel("y [m]")
+    if view_pts_xy:
+        _set_view_limits_from_points(ax_xy, np.vstack(view_pts_xy), min_span_m=4.0, pad_ratio=0.2)
+    ax_xy.grid(True, alpha=0.3)
+
+    # (2) Delay-power scatter (all paths in scenario).
+    tau_ns: list[float] = []
+    pw_db: list[float] = []
+    bb: list[int] = []
+    for case in cases.values():
+        for p in case.get("paths", []):
+            tau_ns.append(float(p.get("tau_s", np.nan)) * 1e9)
+            pw_db.append(10.0 * np.log10(_path_power(p, config.matrix_source) + 1e-18))
+            bb.append(int(p.get("meta", {}).get("bounce_count", 0)))
+    if tau_ns:
+        sca = ax_tp.scatter(np.asarray(tau_ns), np.asarray(pw_db), c=np.asarray(bb), cmap="viridis", s=12, alpha=0.85)
+        fig.colorbar(sca, ax=ax_tp, label="bounce_count")
+    ax_tp.set_title("All paths: delay vs power")
+    ax_tp.set_xlabel("tau [ns]")
+    ax_tp.set_ylabel("power [dB]")
+    ax_tp.grid(True, alpha=0.3)
+
+    # (3) Bounce histogram.
+    bh = summary["bounce_hist"]
+    if bh:
+        keys = np.asarray(sorted(bh.keys()), dtype=int)
+        vals = np.asarray([bh[int(k)] for k in keys], dtype=int)
+        ax_bh.bar(keys, vals)
+        ax_bh.set_xticks(keys)
+    ax_bh.set_title("Path count by bounce")
+    ax_bh.set_xlabel("bounce_count")
+    ax_bh.set_ylabel("count")
+    ax_bh.grid(True, alpha=0.3)
+
+    # (4) Scenario text summary.
+    guide = SCENARIO_GUIDE.get(sid, {"goal": "Scenario summary", "plots": []})
+    text = [
+        f"Scenario: {sid}",
+        f"Goal: {guide['goal']}",
+        f"Cases: {summary['n_cases']}",
+        f"Total paths: {summary['total_paths']}",
+        f"Avg paths/case: {summary['avg_paths_per_case']:.2f}",
+        f"LOS cases: {summary['los_cases']}/{summary['n_cases']}",
+        (
+            f"TX-RX dist range: {summary['tx_rx_dist_min_m']:.2f}~{summary['tx_rx_dist_max_m']:.2f} m"
+            if np.isfinite(summary.get("tx_rx_dist_min_m", np.nan)) and np.isfinite(summary.get("tx_rx_dist_max_m", np.nan))
+            else "TX-RX dist range: NA"
+        ),
+        f"Strongest tau: {summary['strongest_tau_s']*1e9:.3f} ns",
+        f"Strongest power: {summary['strongest_power_db']:.2f} dB",
+        f"Representative case: {rep_cid} (all paths shown)",
+        f"Key plots: {', '.join(guide.get('plots', []))}",
+        f"Matrix source: {config.matrix_source}",
+    ]
+    if note:
+        text.append(f"Geom note: {note}")
+    ax_txt.axis("off")
+    ax_txt.text(0.02, 0.98, "\n".join(text), va="top", ha="left", fontsize=9)
+
+    fig.suptitle(
+        f"Scenario Overview: {sid}\n"
+        + _plot_meta_line(data, config, "None"),
+        fontsize=10,
+    )
+    _save(fig, out, f"S_{sid}_overview")
+    return summary
+
+
+def scenario_comparison_grid(data: dict[str, Any], out: Path, config: PlotConfig) -> None:
+    sids = sorted(list(data.get("scenarios", {}).keys()))
+    if len(sids) == 0:
+        _write_skip(out, "S_scenarios_comparison", "Skipped: no scenarios in dataset")
+        return
+    n = len(sids)
+    per_page = 4
+    n_pages = int(np.ceil(float(n) / float(per_page)))
+    ncols = 2
+    nrows = 2
+    pdf_path = out / "S_scenarios_comparison.pdf"
+
+    with PdfPages(pdf_path) as pdf:
+        for page_idx in range(n_pages):
+            fig, axs = plt.subplots(nrows, ncols, figsize=(12, 9))
+            axs_arr = np.atleast_2d(axs)
+            start = page_idx * per_page
+            stop = min(n, start + per_page)
+            page_sids = sids[start:stop]
+
+            for local_idx, sid in enumerate(page_sids):
+                r = local_idx // ncols
+                c = local_idx % ncols
+                ax = axs_arr[r, c]
+                cases = data["scenarios"][sid].get("cases", {})
+                rep = _representative_case_for_scenario(cases, config.matrix_source)
+                if rep is None:
+                    ax.set_title(f"{sid} (no case)")
+                    ax.axis("off")
+                    continue
+                rep_cid, rep_case = rep
+                rep_params = rep_case.get("params", {})
+                planes = _build_scene_for_case(sid, rep_params, data)
+                _draw_scene_structures_topview(ax, sid, rep_params, data)
+                _draw_plane_normals_topview(ax, planes)
+
+                cmap = {0: "tab:blue", 1: "tab:orange", 2: "tab:green", 3: "tab:red"}
+                view_pts_xy: list[np.ndarray] = []
+                for p in rep_case.get("paths", []):
+                    pts = _path_points_with_fallback(p, sid, rep_params)
+                    if len(pts) < 2:
+                        continue
+                    b = int(p.get("meta", {}).get("bounce_count", 0))
+                    ax.plot(pts[:, 0], pts[:, 1], "-o", ms=2.2, lw=1.0, alpha=0.8, color=cmap.get(b, "k"))
+                    view_pts_xy.append(np.asarray(pts[:, :2], dtype=float))
+
+                tr = _infer_tx_rx_from_case(sid, rep_params)
+                if tr is not None:
+                    tx, rx = tr
+                    ax.scatter([tx[0]], [tx[1]], marker="^", s=22, c="k")
+                    ax.scatter([rx[0]], [rx[1]], marker="s", s=22, c="tab:purple")
+                    view_pts_xy.append(np.asarray([[tx[0], tx[1]], [rx[0], rx[1]]], dtype=float))
+
+                all_rx = []
+                for case in cases.values():
+                    tr2 = _infer_tx_rx_from_case(sid, case.get("params", {}))
+                    if tr2 is not None:
+                        all_rx.append(tr2[1])
+                if all_rx:
+                    arr = np.asarray(all_rx, dtype=float)
+                    ax.scatter(arr[:, 0], arr[:, 1], marker="s", s=10, c="0.65", alpha=0.7)
+                    view_pts_xy.append(np.asarray(arr[:, :2], dtype=float))
+                    if len(arr) >= 2:
+                        ax.plot(arr[:, 0], arr[:, 1], "--", lw=0.9, color="0.55", alpha=0.8)
+                        ax.annotate(
+                            "",
+                            xy=(float(arr[-1, 0]), float(arr[-1, 1])),
+                            xytext=(float(arr[0, 0]), float(arr[0, 1])),
+                            arrowprops=dict(arrowstyle="->", color="0.45", lw=1.1),
+                        )
+                        dr = float(np.linalg.norm(arr[-1] - arr[0]))
+                        ax.text(float(arr[-1, 0]), float(arr[-1, 1]), f"ΔRX={dr:.2f}m", color="0.35", fontsize=7)
+
+                note = _scenario_param_note(sid, rep_params)
+                s_lines = _structure_legend_lines(planes, max_items=3)
+                info = [f"rep case: {rep_cid}"] + s_lines
+                if note:
+                    info.append(note)
+                ax.text(
+                    0.02,
+                    0.02,
+                    "\n".join(info),
+                    transform=ax.transAxes,
+                    fontsize=6.5,
+                    va="bottom",
+                    ha="left",
+                    bbox=dict(facecolor="white", edgecolor="0.8", alpha=0.75, boxstyle="round,pad=0.2"),
+                )
+                ax.set_title(f"{sid} (all paths @ rep RX)", fontsize=10)
+                ax.set_xlabel("x [m]")
+                ax.set_ylabel("y [m]")
+                if view_pts_xy:
+                    pts_xy = np.vstack(view_pts_xy)
+                    _set_view_limits_from_points(ax, pts_xy, min_span_m=4.0, pad_ratio=0.2)
+                ax.grid(True, alpha=0.25)
+
+            for local_idx in range(len(page_sids), per_page):
+                r = local_idx // ncols
+                c = local_idx % ncols
+                axs_arr[r, c].axis("off")
+
+            legend_handles = [
+                Line2D([0], [0], color="0.6", lw=2, label="structure boundary"),
+                Line2D([0], [0], color="k", lw=1.0, marker="o", markersize=3, label="all paths @ rep RX"),
+                Line2D([0], [0], marker="^", linestyle="None", color="k", markersize=6, label="TX(rep)"),
+                Line2D([0], [0], marker="s", linestyle="None", color="tab:purple", markersize=6, label="RX(rep)"),
+                Line2D([0], [0], marker="s", linestyle="None", color="0.55", markersize=5, label="RX sweep"),
+                Line2D([0], [0], linestyle="-", color="0.35", lw=1.2, label="normal n (proj)"),
+            ]
+            fig.legend(handles=legend_handles, loc="lower center", ncol=3, fontsize=9, framealpha=0.9)
+            fig.suptitle(
+                f"Scenario Comparison (4 per page) page {page_idx+1}/{n_pages}\n"
+                + _plot_meta_line(data, config, "None"),
+                fontsize=10,
+            )
+            fig.tight_layout(rect=[0.01, 0.08, 0.99, 0.95])
+            png_path = out / f"S_scenarios_comparison_p{page_idx+1:02d}.png"
+            fig.savefig(png_path, dpi=180)
+            if page_idx == 0:
+                fig.savefig(out / "S_scenarios_comparison.png", dpi=180)
+            pdf.savefig(fig)
+            plt.close(fig)
+
+
+def scenario_comparison_dashboard(data: dict[str, Any], out: Path, config: PlotConfig) -> None:
+    sids = sorted(list(data.get("scenarios", {}).keys()))
+    if len(sids) == 0:
+        _write_skip(out, "S_scenarios_dashboard", "Skipped: no scenarios in dataset")
+        return
+    sums = {sid: _scenario_summary(data, sid, config.matrix_source) for sid in sids}
+    avg_paths = np.asarray([float(sums[s]["avg_paths_per_case"]) for s in sids], dtype=float)
+    los_ratio = np.asarray(
+        [
+            float(sums[s]["los_cases"]) / max(int(sums[s]["n_cases"]), 1)
+            for s in sids
+        ],
+        dtype=float,
+    )
+    tau_ns = np.asarray([1e9 * float(sums[s]["strongest_tau_s"]) for s in sids], dtype=float)
+    b0 = np.asarray([int(sums[s]["bounce_hist"].get(0, 0)) for s in sids], dtype=float)
+    b1 = np.asarray([int(sums[s]["bounce_hist"].get(1, 0)) for s in sids], dtype=float)
+    b2p = np.asarray(
+        [
+            int(sum(v for k, v in sums[s]["bounce_hist"].items() if int(k) >= 2))
+            for s in sids
+        ],
+        dtype=float,
+    )
+    x = np.arange(len(sids), dtype=float)
+
+    fig, axs = plt.subplots(2, 2, figsize=(14, 9))
+    axs[0, 0].bar(x, avg_paths)
+    axs[0, 0].set_title("Avg paths per case")
+    axs[0, 0].set_xticks(x, sids, rotation=30)
+    axs[0, 0].grid(True, alpha=0.3)
+
+    axs[0, 1].bar(x, los_ratio)
+    axs[0, 1].set_title("LOS case ratio")
+    axs[0, 1].set_xticks(x, sids, rotation=30)
+    axs[0, 1].set_ylim(0.0, 1.0)
+    axs[0, 1].grid(True, alpha=0.3)
+
+    axs[1, 0].bar(x, tau_ns)
+    axs[1, 0].set_title("Strongest tau [ns]")
+    axs[1, 0].set_xticks(x, sids, rotation=30)
+    axs[1, 0].grid(True, alpha=0.3)
+
+    axs[1, 1].bar(x, b0, label="bounce=0")
+    axs[1, 1].bar(x, b1, bottom=b0, label="bounce=1")
+    axs[1, 1].bar(x, b2p, bottom=b0 + b1, label="bounce>=2")
+    axs[1, 1].set_title("Bounce composition (path counts)")
+    axs[1, 1].set_xticks(x, sids, rotation=30)
+    axs[1, 1].legend(fontsize=8)
+    axs[1, 1].grid(True, alpha=0.3)
+
+    fig.suptitle(
+        "Scenario Comparison Dashboard (single-file numeric comparison)\n"
+        + _plot_meta_line(data, config, "None"),
+        fontsize=10,
+    )
+    _save(fig, out, "S_scenarios_dashboard")
+
+
+def scenario_overview_pack(data: dict[str, Any], out: Path, config: PlotConfig) -> None:
+    scenarios = sorted(list(data.get("scenarios", {}).keys()))
+    if len(scenarios) == 0:
+        _write_skip(out, "SCENARIO_OVERVIEW", "Skipped: no scenarios in dataset")
+        return
+
+    lines: list[str] = []
+    lines.append("# Scenario Visual Guide")
+    lines.append("")
+    lines.append("Each scenario has an overview figure generated as `S_<scenario_id>_overview.(png|pdf)`.")
+    lines.append("The figure includes representative geometry, delay-power scatter, bounce histogram, and summary text.")
+    lines.append("For one-file multi-scenario comparison, start with `S_scenarios_comparison.(png|pdf)`.")
+    lines.append("When scenarios are many, page images are saved as `S_scenarios_comparison_p01.png`, `..._p02.png`, ... (4 scenarios/page).")
+    lines.append("`S_scenarios_dashboard.(png|pdf)` adds numeric trend comparisons (paths/LOS/tau/bounce composition).")
+    lines.append("")
+
+    for sid in scenarios:
+        summary = _scenario_overview_plot(data, sid, out, config)
+        goal = SCENARIO_GUIDE.get(sid, {}).get("goal", "Scenario summary")
+        plots = SCENARIO_GUIDE.get(sid, {}).get("plots", [])
+        fig_name = f"S_{sid}_overview.png"
+        lines.append(f"## {sid}")
+        lines.append(f"- Goal: {goal}")
+        lines.append(f"- Figure: `{fig_name}`")
+        lines.append(f"- Cases: {summary.get('n_cases', 0)}")
+        lines.append(f"- Total paths: {summary.get('total_paths', 0)}")
+        lines.append(f"- Avg paths/case: {float(summary.get('avg_paths_per_case', 0.0)):.2f}")
+        lines.append(f"- LOS cases: {summary.get('los_cases', 0)}/{summary.get('n_cases', 0)}")
+        lines.append(f"- Strongest tau [ns]: {1e9*float(summary.get('strongest_tau_s', np.nan)):.3f}")
+        lines.append(f"- Strongest power [dB]: {float(summary.get('strongest_power_db', np.nan)):.2f}")
+        lines.append(f"- Recommended validation plots: {', '.join(plots)}")
+        lines.append("")
+
+    (out / "SCENARIO_VISUAL_GUIDE.md").write_text("\n".join(lines), encoding="utf-8")
+    scenario_comparison_grid(data, out, config)
+    scenario_comparison_dashboard(data, out, config)
+
+
 def p17_cp_same_opp_vs_bounce(data: dict[str, Any], out: Path, config: PlotConfig, exact_bounce_map: dict[str, int]) -> None:
     if not _cp_metrics_enabled(data, out, "P17_cp_same_opp_vs_bounce"):
         return
@@ -1121,6 +1887,7 @@ def generate_all_plots(
     p23_path_count_vs_bounce(data, out, config)
     p24_rms_delay_spread_diffuse_compare(data, out, config)
     p25_diffuse_power_accounting(data, out, config)
+    scenario_overview_pack(data, out, config)
 
 
 def _run_self_test() -> None:

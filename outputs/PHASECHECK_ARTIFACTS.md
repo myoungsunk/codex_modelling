@@ -19,6 +19,10 @@ This folder keeps only the most recent validation run artifacts.
 ## Plot folder
 - `plots_phasecheck/`
   - All validation figures for this run (PNG/PDF pairs).
+  - Includes scenario understanding figures:
+    - `S_C0_overview`, `S_A1_overview`, `S_A2_overview`, `S_A2R_overview`, `S_A3_overview`,
+      `S_A3R_overview`, `S_A4_overview`, `S_A5_overview`, `S_A6_overview`, `S_B0_overview`
+    - `SCENARIO_VISUAL_GUIDE.md` (scenario-by-scenario interpretation guide).
 
 ## Plot meaning guide
 ### Channel geometry / path sanity
@@ -63,3 +67,11 @@ This folder keeps only the most recent validation run artifacts.
 - `F5_rt_vs_synth_subband_xpd`: RT vs synthetic subband XPD mean/sigma overlay.
 - `F5_rt_vs_synth_subband_sigma`: RT vs synthetic subband sigma comparison.
 - `F6_offdiag_phase_uniformity`: Off-diagonal phase histogram and Kuiper uniformity diagnostics.
+
+### Scenario understanding (new)
+- `S_<scenario>_overview`: per-scenario 2x2 card
+  - representative path geometry (top-view)
+  - all-path delay vs power scatter
+  - bounce-count histogram
+  - text summary (goal/cases/path counts/LOS/strongest path/recommended plots)
+- `SCENARIO_VISUAL_GUIDE.md`: quick index explaining what each scenario figure means.

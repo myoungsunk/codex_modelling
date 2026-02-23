@@ -400,7 +400,7 @@ def _normal_loglik(v: NDArray[np.float64], mu: float, sigma: float) -> float:
     if sigma <= 0.0 or len(v) == 0:
         return -np.inf
     z = (v - mu) / sigma
-    ll = -0.5 * z * z - np.log(sigma) - 0.5 * np.log(2.0 * np.pi)
+    ll = -0.5 * z * z - np.log(max(float(sigma), EPS)) - 0.5 * np.log(2.0 * np.pi)
     return float(np.sum(ll))
 
 
@@ -481,7 +481,7 @@ def _fit_gmm2_model(v: NDArray[np.float64], seed: int = 0, restarts: int = 4, ma
         for _ in range(int(max_iter)):
             n1 = stats.norm.pdf(v, loc=mu1, scale=max(s1, 1e-3))
             n2 = stats.norm.pdf(v, loc=mu2, scale=max(s2, 1e-3))
-            mix = w * n1 + (1.0 - w) * n2 + EPS
+            mix = np.maximum(w * n1 + (1.0 - w) * n2, EPS)
             r1 = (w * n1) / mix
             r2 = 1.0 - r1
             w = float(np.clip(np.mean(r1), 1e-4, 1.0 - 1e-4))
@@ -493,7 +493,7 @@ def _fit_gmm2_model(v: NDArray[np.float64], seed: int = 0, restarts: int = 4, ma
             s2 = float(np.sqrt(np.sum(r2 * (v - mu2) ** 2) / max(sw2, EPS)))
             s1 = max(s1, 1e-3)
             s2 = max(s2, 1e-3)
-            ll = float(np.sum(np.log(mix)))
+            ll = float(np.sum(np.log(np.maximum(mix, EPS))))
             if abs(ll - prev_ll) < 1e-8:
                 break
             prev_ll = ll
@@ -601,7 +601,7 @@ def _fit_spike_slab_model(
     for _iter in range(int(max_iter)):
         p_sp = stats.norm.pdf(v, loc=spike_loc, scale=sigma_spike)
         p_sl = stats.norm.pdf(v, loc=slab_mu, scale=max(slab_sigma, 1e-3))
-        mix = pi * p_sp + (1.0 - pi) * p_sl + EPS
+        mix = np.maximum(pi * p_sp + (1.0 - pi) * p_sl, EPS)
         r = (pi * p_sp) / mix
         pi = float(np.clip(np.mean(r), 1e-4, 1.0 - 1e-4))
         w_sl = np.maximum(1.0 - r, EPS)
@@ -609,7 +609,7 @@ def _fit_spike_slab_model(
         slab_mu = float(np.sum(w_sl * v) / sw)
         slab_sigma = float(np.sqrt(np.sum(w_sl * (v - slab_mu) ** 2) / sw))
         slab_sigma = max(slab_sigma, 1e-3)
-        ll = float(np.sum(np.log(mix)))
+        ll = float(np.sum(np.log(np.maximum(mix, EPS))))
         if abs(ll - prev_ll) < 1e-8:
             break
         prev_ll = ll

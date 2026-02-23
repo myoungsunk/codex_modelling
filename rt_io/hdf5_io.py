@@ -254,9 +254,76 @@ def synthesize_ctf_from_decomposed(paths: list[dict[str, Any]], f_hz: np.ndarray
     return h_f
 
 
+def _validate_rt_data_for_save(data: dict[str, Any]) -> None:
+    if "frequency" not in data:
+        raise ValueError("save_rt_dataset: missing 'frequency' field.")
+    freq = np.asarray(data["frequency"], dtype=float)
+    if freq.ndim != 1 or len(freq) == 0:
+        raise ValueError("save_rt_dataset: 'frequency' must be a non-empty 1D array.")
+    if not np.all(np.isfinite(freq)):
+        raise ValueError("save_rt_dataset: 'frequency' contains NaN/Inf values.")
+    nf = int(len(freq))
+
+    scenarios = data.get("scenarios", {})
+    if not isinstance(scenarios, dict):
+        raise ValueError("save_rt_dataset: 'scenarios' must be a dictionary.")
+
+    def _check_mat(
+        arr: Any,
+        name: str,
+        sid: str,
+        cid: str,
+        pid: int,
+        required: bool = True,
+    ) -> None:
+        if arr is None:
+            if required:
+                raise ValueError(f"save_rt_dataset: missing {name} at {sid}/{cid}/path[{pid}]")
+            return
+        a = np.asarray(arr)
+        if a.shape != (nf, 2, 2):
+            raise ValueError(
+                f"save_rt_dataset: invalid {name} shape at {sid}/{cid}/path[{pid}] "
+                f"(expected {(nf, 2, 2)}, got {a.shape})"
+            )
+        if not np.all(np.isfinite(a)):
+            raise ValueError(f"save_rt_dataset: {name} contains NaN/Inf at {sid}/{cid}/path[{pid}]")
+
+    for sid, sc in scenarios.items():
+        cases = (sc or {}).get("cases", {})
+        if not isinstance(cases, dict):
+            raise ValueError(f"save_rt_dataset: scenarios/{sid}/cases must be a dictionary.")
+        for cid, case in cases.items():
+            paths = (case or {}).get("paths", [])
+            if not isinstance(paths, list):
+                raise ValueError(f"save_rt_dataset: scenarios/{sid}/cases/{cid}/paths must be a list.")
+            for i, pp in enumerate(paths):
+                tau = float(pp.get("tau_s", np.nan))
+                if not np.isfinite(tau):
+                    raise ValueError(f"save_rt_dataset: tau_s is NaN/Inf at {sid}/{cid}/path[{i}]")
+                pl = pp.get("path_length_m", None)
+                if pl is not None and not np.isfinite(float(pl)):
+                    raise ValueError(f"save_rt_dataset: path_length_m is NaN/Inf at {sid}/{cid}/path[{i}]")
+                _check_mat(pp.get("A_f", None), "A_f", str(sid), str(cid), int(i), required=True)
+                _check_mat(pp.get("J_f", None), "J_f", str(sid), str(cid), int(i), required=False)
+                _check_mat(pp.get("G_tx_f", None), "G_tx_f", str(sid), str(cid), int(i), required=False)
+                _check_mat(pp.get("G_rx_f", None), "G_rx_f", str(sid), str(cid), int(i), required=False)
+                sg = pp.get("scalar_gain_f", None)
+                if sg is not None:
+                    sg_arr = np.asarray(sg, dtype=float)
+                    if sg_arr.shape != (nf,):
+                        raise ValueError(
+                            f"save_rt_dataset: invalid scalar_gain_f shape at {sid}/{cid}/path[{i}] "
+                            f"(expected {(nf,)}, got {sg_arr.shape})"
+                        )
+                    if not np.all(np.isfinite(sg_arr)):
+                        raise ValueError(f"save_rt_dataset: scalar_gain_f contains NaN/Inf at {sid}/{cid}/path[{i}]")
+
+
 def save_rt_dataset(path: str | Path, data: dict[str, Any]) -> Path:
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
+    _validate_rt_data_for_save(data)
 
     with h5py.File(p, "w") as f:
         meta = f.create_group("meta")

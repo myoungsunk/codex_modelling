@@ -79,6 +79,27 @@ class Hdf5MetaContractTests(unittest.TestCase):
             self.assertIn("git_commit", msg)
             self.assertIn("xpd_matrix_source", msg)
 
+    def test_save_rejects_invalid_frequency_and_tau(self) -> None:
+        data = self._tiny_data()
+        data["frequency"] = np.asarray([6e9, np.nan, 7e9], dtype=float)
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "bad_freq.h5"
+            with self.assertRaises(ValueError):
+                save_rt_dataset(p, data)
+
+        data2 = self._tiny_data()
+        nf = len(np.asarray(data2["frequency"], dtype=float))
+        bad_path = {
+            "tau_s": float("nan"),
+            "A_f": np.zeros((nf, 2, 2), dtype=np.complex128),
+            "meta": {"bounce_count": 0},
+        }
+        data2["scenarios"]["C0"]["cases"]["0"]["paths"] = [bad_path]
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "bad_tau.h5"
+            with self.assertRaises(ValueError):
+                save_rt_dataset(p, data2)
+
 
 if __name__ == "__main__":
     unittest.main()

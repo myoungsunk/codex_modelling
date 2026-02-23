@@ -15,4 +15,4 @@ __pycache__/
 .tox/
 .coverage*
 .cache/
-.mplconfig/
+.mplconfig*/

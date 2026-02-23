@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
@@ -9,6 +10,84 @@ from numpy.typing import NDArray
 from scipy import stats as scipy_stats
 
 from analysis.xpd_stats import conditional_fit, floor_pinned_exclusion_mask, pathwise_xpd
+
+
+@dataclass(frozen=True)
+class SyntheticPathGenerationConfig:
+    """Configuration container for synthetic 2x2 path generation."""
+
+    f_hz: NDArray[np.float64]
+    num_rays: int
+    delay_samples_s: NDArray[np.float64]
+    power_samples: NDArray[np.float64]
+    parity_probs: dict[str, float]
+    parity_fit: dict[str, dict[str, float]]
+    parity_slope_model: dict[str, dict[str, Any]] | None = None
+    parity_subband_fit: dict[str, dict[str, dict[str, float]]] | None = None
+    parity_censoring: dict[str, dict[str, Any]] | None = None
+    parity_subband_censoring: dict[str, dict[str, Any]] | None = None
+    subbands: list[tuple[int, int]] | None = None
+    kappa_freq_mode: str = "piecewise_constant"
+    incidence_probs: dict[str, float] | None = None
+    incidence_probs_by_parity: dict[str, dict[str, float]] | None = None
+    parity_incidence_fit: dict[str, dict[str, float]] | None = None
+    parity_incidence_slope_model: dict[str, dict[str, Any]] | None = None
+    empirical_xpd_by_condition: dict[str, list[float]] | None = None
+    matrix_source: str = "A"
+    xpd_freq_noise_sigma_db: float = 0.0
+    sample_slope: bool = False
+    slope_sigma_db_per_hz: float = 0.0
+    kappa_min: float = 1e-6
+    kappa_max: float = 1e12
+    num_paths_mode: str = "fixed"
+    rt_case_path_counts: NDArray[np.int64] | None = None
+    rt_path_scenarios: list[str] | NDArray[np.str_] | None = None
+    rt_path_cases: list[str] | NDArray[np.str_] | None = None
+    return_diagnostics: bool = False
+    seed: int = 0
+    phase_sampling_method: str = "iid"
+
+    def to_kwargs(self) -> dict[str, Any]:
+        return {
+            "f_hz": self.f_hz,
+            "num_rays": self.num_rays,
+            "delay_samples_s": self.delay_samples_s,
+            "power_samples": self.power_samples,
+            "parity_probs": dict(self.parity_probs),
+            "parity_fit": dict(self.parity_fit),
+            "parity_slope_model": self.parity_slope_model,
+            "parity_subband_fit": self.parity_subband_fit,
+            "parity_censoring": self.parity_censoring,
+            "parity_subband_censoring": self.parity_subband_censoring,
+            "subbands": self.subbands,
+            "kappa_freq_mode": self.kappa_freq_mode,
+            "incidence_probs": self.incidence_probs,
+            "incidence_probs_by_parity": self.incidence_probs_by_parity,
+            "parity_incidence_fit": self.parity_incidence_fit,
+            "parity_incidence_slope_model": self.parity_incidence_slope_model,
+            "empirical_xpd_by_condition": self.empirical_xpd_by_condition,
+            "matrix_source": self.matrix_source,
+            "xpd_freq_noise_sigma_db": self.xpd_freq_noise_sigma_db,
+            "sample_slope": self.sample_slope,
+            "slope_sigma_db_per_hz": self.slope_sigma_db_per_hz,
+            "kappa_min": self.kappa_min,
+            "kappa_max": self.kappa_max,
+            "num_paths_mode": self.num_paths_mode,
+            "rt_case_path_counts": self.rt_case_path_counts,
+            "rt_path_scenarios": self.rt_path_scenarios,
+            "rt_path_cases": self.rt_path_cases,
+            "return_diagnostics": self.return_diagnostics,
+            "seed": self.seed,
+            "phase_sampling_method": self.phase_sampling_method,
+        }
+
+
+def generate_synthetic_paths_from_config(
+    config: SyntheticPathGenerationConfig,
+) -> list[dict[str, Any]] | tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Dataclass entrypoint for synthetic path generation."""
+
+    return generate_synthetic_paths(**config.to_kwargs())
 
 
 def _matrix_from_path(path: dict[str, Any], matrix_source: str = "A") -> NDArray[np.complex128]:
@@ -370,8 +449,14 @@ def generate_synthetic_paths(
     freq = np.asarray(f_hz, dtype=float)
     n_f = len(freq)
 
-    d = np.asarray(delay_samples_s, dtype=float)
-    p = np.asarray(power_samples, dtype=float)
+    d_in = np.asarray(delay_samples_s, dtype=float)
+    p_in = np.asarray(power_samples, dtype=float)
+    valid_delay_mask = np.isfinite(d_in) & (d_in >= 0.0)
+    valid_power_mask = np.isfinite(p_in) & (p_in > 0.0)
+    d = np.asarray(d_in[valid_delay_mask], dtype=float)
+    p = np.asarray(p_in[valid_power_mask], dtype=float)
+    dropped_delay_count = int(len(d_in) - len(d))
+    dropped_power_count = int(len(p_in) - len(p))
     if len(d) == 0:
         d = np.array([0.0], dtype=float)
     if len(p) == 0:
@@ -420,14 +505,17 @@ def generate_synthetic_paths(
         else:
             inc_labels, inc_probs_global = [], np.array([], dtype=float)
 
-    npair = int(min(len(d), len(np.asarray(power_samples, dtype=float))))
-    pwr = np.asarray(power_samples, dtype=float)
+    npair = int(min(len(d_in), len(p_in)))
     if npair > 0:
-        pair_delay = np.asarray(d[:npair], dtype=float)
-        pair_power = np.asarray(pwr[:npair], dtype=float)
+        d_pair = np.asarray(d_in[:npair], dtype=float)
+        p_pair = np.asarray(p_in[:npair], dtype=float)
+        pair_mask = np.isfinite(d_pair) & (d_pair >= 0.0) & np.isfinite(p_pair) & (p_pair > 0.0)
+        pair_delay = np.asarray(d_pair[pair_mask], dtype=float)
+        pair_power = np.asarray(p_pair[pair_mask], dtype=float)
+        npair = int(len(pair_delay))
     else:
         pair_delay = np.asarray(d, dtype=float)
-        pair_power = np.asarray(pwr, dtype=float)
+        pair_power = np.asarray(p, dtype=float)
     sids_arr = np.asarray(list(rt_path_scenarios) if rt_path_scenarios is not None else ["NA"] * len(pair_delay), dtype=object)
     cids_arr = np.asarray(list(rt_path_cases) if rt_path_cases is not None else ["NA"] * len(pair_delay), dtype=object)
     n_lab = int(min(len(pair_delay), len(sids_arr), len(cids_arr)))
@@ -489,13 +577,17 @@ def generate_synthetic_paths(
                 n_total=npair,
                 rng=rng,
             )
-            tau = float(pair_delay[idx])
-            ray_power = float(max(pair_power[idx], 1e-15))
+            tau = float(pair_delay[idx]) if npair > 0 else float(d[0])
+            ray_power = float(max(pair_power[idx], 1e-15)) if npair > 0 else float(p[0])
         else:
             idx_d = int(rng.integers(0, len(d)))
             idx_p = int(rng.choice(np.arange(len(p)), p=p))
             tau = float(d[idx_d])
-            ray_power = float(max(power_samples[idx_p], 1e-15)) if len(power_samples) > idx_p else float(max(np.mean(power_samples), 1e-15))
+            ray_power = float(max(p[idx_p], 1e-15))
+        if not np.isfinite(tau) or tau < 0.0:
+            tau = float(np.median(d)) if len(d) else 0.0
+        if not np.isfinite(ray_power) or ray_power <= 0.0:
+            ray_power = float(np.median(p)) if len(p) else 1.0
 
         if parity_schedule is not None and _i < len(parity_schedule):
             parity = str(parity_schedule[_i])
@@ -660,12 +752,12 @@ def generate_synthetic_paths(
                     "incidence_angle_bin": incidence_bin,
                     "synthetic_matrix_source": src,
                     "synthetic_xpd0_db": float(xpd0_db),
-                        "synthetic_slope_db_per_hz": float(slope),
-                        "synthetic_sampling_scenario_id": str(sid_target),
-                        "synthetic_sampling_case_id": str(cid_target),
-                        "scenario_id": str(sid_target),
-                        "case_id": str(cid_target),
-                        "interactions": ["synthetic"],
+                    "synthetic_slope_db_per_hz": float(slope),
+                    "synthetic_sampling_scenario_id": str(sid_target),
+                    "synthetic_sampling_case_id": str(cid_target),
+                    "scenario_id": str(sid_target),
+                    "case_id": str(cid_target),
+                    "interactions": ["synthetic"],
                     "surface_ids": [],
                     "incidence_angles": [],
                     "AoD": [0.0, 0.0, 0.0],
@@ -690,6 +782,9 @@ def generate_synthetic_paths(
         "kappa_truncation_count": int(kappa_trunc_count),
         "kappa_truncation_rate": float(kappa_trunc_count / max(kappa_total, 1)),
         "phase_sampling_method": str(phase_method),
+        "dropped_invalid_delay_samples": int(dropped_delay_count),
+        "dropped_invalid_power_samples": int(dropped_power_count),
+        "pair_aligned_samples": int(npair),
     }
     if return_diagnostics:
         return paths, diagnostics

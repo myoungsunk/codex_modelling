@@ -23,6 +23,7 @@ from analysis.measurement_compare import (
     load_measurement_four_csv,
     load_measurement_matrix_csv,
 )
+from analysis.power_utils import path_power as _path_power
 from analysis.tap_path_consistency import (
     build_min_repro_bundle,
     evaluate_dataset_tap_path_consistency,
@@ -30,7 +31,7 @@ from analysis.tap_path_consistency import (
     write_repro_bundle_json,
 )
 from analysis.ctf_cir import ctf_to_cir, detect_cir_wrap, first_peak_tau_s, pdp, synthesize_ctf_with_source, tau_resolution_s
-from analysis.run_model_fit import fit_and_generate
+from analysis.run_model_fit import FitAndGenerateConfig, fit_and_generate_from_config
 from analysis.xpd_stats import (
     conditional_fit,
     estimate_leakage_floor_from_antenna_config,
@@ -103,12 +104,6 @@ def _basis_output_dir(path: str | Path, basis: str, multi: bool) -> Path:
     if not multi:
         return p
     return p / basis
-
-
-def _path_power(path: dict[str, Any], matrix_source: str) -> float:
-    use_j = str(matrix_source).upper() == "J" and "J_f" in path
-    m = np.asarray(path["J_f"] if use_j else path["A_f"], dtype=np.complex128)
-    return float(np.mean(np.abs(m) ** 2))
 
 
 def _circular_delay_error(a_s: float, b_s: float, period_s: float) -> float:
@@ -1622,7 +1617,7 @@ def main() -> None:
                 model_num_paths_mode = "match_rt_per_scenario"
             model_json = out_h5.with_name(f"{out_h5.stem}_model_params.json")
             synth_json = out_h5.with_name(f"{out_h5.stem}_synthetic_compare.json")
-            model_res = fit_and_generate(
+            model_cfg = FitAndGenerateConfig(
                 input_h5=out_h5,
                 output_json=model_json,
                 synthetic_compare_json=synth_json,
@@ -1639,6 +1634,7 @@ def main() -> None:
                 seed=int(args.model_seed),
                 return_paths=True,
             )
+            model_res = fit_and_generate_from_config(model_cfg)
             plot_metrics = generate_rt_vs_synth_plots(
                 rt_paths=model_res.get("rt_paths", []),
                 synth_paths=model_res.get("synthetic_paths", []),

@@ -56,6 +56,7 @@ class SVModelUpdatesTests(unittest.TestCase):
         self.assertEqual(len(synth), len(d))
         self.assertAlmostEqual(float(diag["kappa_clamp_rate"]), 0.0, places=9)
         self.assertLessEqual(float(diag["kappa_truncation_rate"]), 1.0)
+        self.assertGreaterEqual(int(diag.get("dropped_invalid_delay_samples", 0)), 0)
 
     def test_offdiag_phase_per_ray_sampling(self) -> None:
         nf = 32
@@ -175,6 +176,28 @@ class SVModelUpdatesTests(unittest.TestCase):
         )
         self.assertEqual(len(sy_scn), len(d))
         self.assertEqual(str(dg_scn["num_paths_mode"]), "match_rt_per_scenario")
+
+    def test_nan_delay_samples_do_not_propagate_to_tau(self) -> None:
+        nf = 8
+        f = np.linspace(6e9, 7e9, nf)
+        d = np.array([10e-9, np.nan, 20e-9, np.inf], dtype=float)
+        p = np.array([1.0, 0.5, np.nan, 0.2], dtype=float)
+        synth, diag = generate_synthetic_paths(
+            f_hz=f,
+            num_rays=4,
+            delay_samples_s=d,
+            power_samples=p,
+            parity_probs={"odd": 0.5, "even": 0.5},
+            parity_fit={"odd": {"mu": 10.0, "sigma": 1.0}, "even": {"mu": 11.0, "sigma": 1.0}},
+            matrix_source="J",
+            return_diagnostics=True,
+            seed=11,
+        )
+        self.assertGreaterEqual(int(diag.get("dropped_invalid_delay_samples", 0)), 1)
+        self.assertGreaterEqual(int(diag.get("dropped_invalid_power_samples", 0)), 1)
+        taus = np.asarray([float(pth["tau_s"]) for pth in synth], dtype=float)
+        self.assertTrue(np.all(np.isfinite(taus)))
+        self.assertTrue(np.all(taus >= 0.0))
 
 
 if __name__ == "__main__":

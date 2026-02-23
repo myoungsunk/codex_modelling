@@ -3,12 +3,17 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 
-from analysis.sv_polarimetric_model import generate_synthetic_paths, summarize_rt_vs_synth
+from analysis.sv_polarimetric_model import (
+    SyntheticPathGenerationConfig,
+    generate_synthetic_paths_from_config,
+    summarize_rt_vs_synth,
+)
 from analysis.xpd_stats import (
     censoring_profile_by_bucket,
     conditional_fit,
@@ -23,6 +28,58 @@ from analysis.xpd_stats import (
     subband_centers_hz,
 )
 from rt_io.hdf5_io import load_rt_dataset
+
+
+@dataclass(frozen=True)
+class FitAndGenerateConfig:
+    """Typed configuration for model-fit and synthetic generation pipeline."""
+
+    input_h5: str | Path
+    output_json: str | Path
+    synthetic_compare_json: str | Path
+    matrix_source: str = "A"
+    num_subbands: int = 4
+    num_synth_rays: int = 64
+    num_paths_mode: str = "fixed"
+    incidence_bins_deg: list[float] | None = None
+    use_incidence_conditioning: bool = True
+    phase_common_removed: bool = True
+    phase_per_ray_sampling: bool = True
+    seed: int = 0
+    xpd_freq_noise_sigma_db: float = 0.0
+    sample_slope: bool = False
+    slope_sigma_db_per_hz: float = 0.0
+    kappa_min: float = 1e-6
+    kappa_max: float = 1e12
+    kappa_freq_mode: str = "piecewise_constant"
+    offdiag_amp_ratio_min: float = 1e-3
+    phase_sampling_method: str = "iid"
+    return_paths: bool = False
+
+    def to_kwargs(self) -> dict[str, Any]:
+        return {
+            "input_h5": self.input_h5,
+            "output_json": self.output_json,
+            "synthetic_compare_json": self.synthetic_compare_json,
+            "matrix_source": self.matrix_source,
+            "num_subbands": self.num_subbands,
+            "num_synth_rays": self.num_synth_rays,
+            "num_paths_mode": self.num_paths_mode,
+            "incidence_bins_deg": self.incidence_bins_deg,
+            "use_incidence_conditioning": self.use_incidence_conditioning,
+            "phase_common_removed": self.phase_common_removed,
+            "phase_per_ray_sampling": self.phase_per_ray_sampling,
+            "seed": self.seed,
+            "xpd_freq_noise_sigma_db": self.xpd_freq_noise_sigma_db,
+            "sample_slope": self.sample_slope,
+            "slope_sigma_db_per_hz": self.slope_sigma_db_per_hz,
+            "kappa_min": self.kappa_min,
+            "kappa_max": self.kappa_max,
+            "kappa_freq_mode": self.kappa_freq_mode,
+            "offdiag_amp_ratio_min": self.offdiag_amp_ratio_min,
+            "phase_sampling_method": self.phase_sampling_method,
+            "return_paths": self.return_paths,
+        }
 
 
 def _iter_case_paths(dataset: dict[str, Any]):
@@ -393,7 +450,7 @@ def fit_and_generate(
     else:
         powers = np.ones((max(len(all_paths), 1),), dtype=float)
 
-    synth_out = generate_synthetic_paths(
+    synth_cfg = SyntheticPathGenerationConfig(
         f_hz=freq,
         num_rays=num_synth_rays,
         delay_samples_s=delays,
@@ -425,6 +482,7 @@ def fit_and_generate(
         seed=seed,
         phase_sampling_method=str(phase_sampling_method),
     )
+    synth_out = generate_synthetic_paths_from_config(synth_cfg)
     synth_paths, synth_diag = synth_out
     align_diag = _align_synth_continuous_xpd(
         rt_samples=full_samples,
@@ -524,6 +582,12 @@ def fit_and_generate(
     return out
 
 
+def fit_and_generate_from_config(config: FitAndGenerateConfig) -> dict[str, Any]:
+    """Dataclass entrypoint for fit-and-generate pipeline."""
+
+    return fit_and_generate(**config.to_kwargs())
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", type=str, default="outputs/rt_dataset.h5")
@@ -554,7 +618,7 @@ def main() -> None:
     args = parser.parse_args()
 
     bins = [float(x) for x in args.incidence_bins_deg.split(",") if x.strip()]
-    fit_and_generate(
+    cfg = FitAndGenerateConfig(
         input_h5=args.input,
         output_json=args.output,
         synthetic_compare_json=args.synthetic_output,
@@ -576,6 +640,7 @@ def main() -> None:
         phase_sampling_method=args.phase_sampling_method,
         seed=args.seed,
     )
+    fit_and_generate_from_config(cfg)
 
 
 if __name__ == "__main__":

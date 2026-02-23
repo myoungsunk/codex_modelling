@@ -15,12 +15,7 @@ from typing import Any
 import numpy as np
 
 from analysis.ctf_cir import ctf_to_cir, detect_cir_wrap, synthesize_ctf_with_source, tau_resolution_s
-
-
-def _path_power(path: dict[str, Any], matrix_source: str) -> float:
-    use_j = str(matrix_source).upper() == "J" and "J_f" in path
-    m = np.asarray(path["J_f"] if use_j else path["A_f"], dtype=np.complex128)
-    return float(np.mean(np.abs(m) ** 2))
+from analysis.power_utils import path_power as _path_power
 
 
 def _xpd_db_with_relative_floor(co_power: float, cross_power: float, rel_floor: float = 1e-9) -> float:
