@@ -6,7 +6,12 @@ import unittest
 
 import numpy as np
 
-from analysis.sv_polarimetric_model import generate_synthetic_paths, offdiag_phases, summarize_rt_vs_synth
+from analysis.sv_polarimetric_model import (
+    generate_synthetic_paths,
+    kuiper_uniform_test,
+    offdiag_phases,
+    summarize_rt_vs_synth,
+)
 
 
 def _simple_path(nf: int, tau_s: float, xpd_db: float, parity: str) -> dict:
@@ -60,6 +65,52 @@ class SVModelUpdatesTests(unittest.TestCase):
         self.assertEqual(len(a_ray), 2 * len(paths))
         self.assertEqual(len(a_all), 2 * len(paths) * nf)
 
+    def test_offdiag_phase_amp_gate_and_debug(self) -> None:
+        nf = 8
+        p = _simple_path(nf, 10e-9, 60.0, "odd")
+        # Make one off-diagonal almost zero to exercise amplitude gating.
+        p["A_f"][:, 0, 1] = 1e-12 + 0j
+        p["J_f"] = np.asarray(p["A_f"], dtype=np.complex128).copy()
+        phases, dbg = offdiag_phases(
+            [p],
+            matrix_source="A",
+            per_ray_sampling=True,
+            common_phase_removed=True,
+            amp_ratio_min=1e-3,
+            return_debug=True,
+        )
+        self.assertLess(len(phases), 2)
+        self.assertEqual(int(dbg.get("n_total_candidates", 0)), 2)
+        self.assertGreaterEqual(int(dbg.get("n_rejected_amp_gate", 0)), 1)
+        self.assertIn("phase_top_bins", dbg)
+
+    def test_stratified_phase_sampling_stable_uniformity(self) -> None:
+        nf = 8
+        f = np.linspace(6e9, 7e9, nf)
+        d = np.linspace(10e-9, 50e-9, 64)
+        p = np.linspace(1.0, 0.1, 64)
+        synth = generate_synthetic_paths(
+            f_hz=f,
+            num_rays=64,
+            delay_samples_s=d,
+            power_samples=p,
+            parity_probs={"odd": 0.5, "even": 0.5},
+            parity_fit={"odd": {"mu": 12.0, "sigma": 2.0}, "even": {"mu": 14.0, "sigma": 2.0}},
+            matrix_source="J",
+            phase_sampling_method="stratified_uniform",
+            seed=7,
+        )
+        ph = offdiag_phases(
+            synth,
+            matrix_source="J",
+            per_ray_sampling=True,
+            common_phase_removed=True,
+            amp_ratio_min=1e-3,
+        )
+        ku = kuiper_uniform_test(ph, bootstrap_B=200, seed=3)
+        self.assertGreaterEqual(int(ku.get("n", 0)), 50)
+        self.assertGreaterEqual(float(ku.get("p_boot", 0.0)), 0.05)
+
     def test_summary_contains_phase_and_ks_fields(self) -> None:
         nf = 16
         f = np.linspace(6e9, 7e9, nf)
@@ -74,12 +125,14 @@ class SVModelUpdatesTests(unittest.TestCase):
             phase_test_basis="circular",
             common_phase_removed=True,
             per_ray_phase_sampling=True,
+            offdiag_amp_ratio_min=1e-3,
             phase_bootstrap_B=20,
             seed=0,
         )
         self.assertIn("f3_xpd_ks2_p", out)
         self.assertIn("phase_test_basis", out)
         self.assertEqual(str(out["phase_uniformity_rt_status"]), "INFO_DETERMINISTIC")
+        self.assertIn("phase_offdiag_synth_debug", out)
 
     def test_num_paths_mode_per_case_and_per_scenario(self) -> None:
         nf = 8

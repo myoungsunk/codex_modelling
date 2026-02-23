@@ -1,1 +1,0 @@
-Skipped: CP metrics require circular basis. current basis=linear

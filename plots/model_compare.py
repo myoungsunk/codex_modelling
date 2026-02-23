@@ -44,6 +44,8 @@ def generate_rt_vs_synth_plots(
     num_subbands: int = 4,
     phase_common_removed: bool = True,
     phase_per_ray_sampling: bool = True,
+    phase_sampling_method: str = "iid",
+    offdiag_amp_ratio_min: float = 1e-3,
     ks_n_cap: int = 200,
 ) -> dict[str, Any]:
     """Generate F2/F3/F4 style comparison plots and return summary metrics."""
@@ -188,17 +190,21 @@ def generate_rt_vs_synth_plots(
     _save(fig, out, "F5_rt_vs_synth_subband_sigma")
 
     # F6: off-diagonal phase histogram + Kuiper uniformity test.
-    ph_rt = offdiag_phases(
+    ph_rt, ph_rt_dbg = offdiag_phases(
         rt_paths,
         matrix_source=matrix_source,
         per_ray_sampling=phase_per_ray_sampling,
         common_phase_removed=phase_common_removed,
+        amp_ratio_min=float(max(0.0, offdiag_amp_ratio_min)),
+        return_debug=True,
     )
-    ph_sy = offdiag_phases(
+    ph_sy, ph_sy_dbg = offdiag_phases(
         synth_paths,
         matrix_source=matrix_source,
         per_ray_sampling=phase_per_ray_sampling,
         common_phase_removed=phase_common_removed,
+        amp_ratio_min=float(max(0.0, offdiag_amp_ratio_min)),
+        return_debug=True,
     )
     ku_rt = kuiper_uniform_test(ph_rt, bootstrap_B=500, seed=0)
     ku_sy = kuiper_uniform_test(ph_sy, bootstrap_B=500, seed=1)
@@ -209,7 +215,8 @@ def generate_rt_vs_synth_plots(
     axs[0].set_title(
         "RT offdiag phase\n"
         f"Kuiper V={ku_rt['V']:.3f}, p={ku_rt['p_boot']:.3f}, "
-        f"per_ray={phase_per_ray_sampling}, common_removed={phase_common_removed}"
+        f"n={int(ph_rt_dbg.get('n_after_amp_gate', len(ph_rt)))} / {int(ph_rt_dbg.get('n_total_candidates', len(ph_rt)))}, "
+        f"amp_ratio_min={float(offdiag_amp_ratio_min):.2e}"
     )
     axs[0].set_xlabel("phase [rad]")
     axs[0].set_ylabel("density")
@@ -218,7 +225,8 @@ def generate_rt_vs_synth_plots(
     axs[1].set_title(
         "Synth offdiag phase\n"
         f"Kuiper V={ku_sy['V']:.3f}, p={ku_sy['p_boot']:.3f}, "
-        f"per_ray={phase_per_ray_sampling}, common_removed={phase_common_removed}"
+        f"n={int(ph_sy_dbg.get('n_after_amp_gate', len(ph_sy)))} / {int(ph_sy_dbg.get('n_total_candidates', len(ph_sy)))}, "
+        f"amp_ratio_min={float(offdiag_amp_ratio_min):.2e}"
     )
     axs[1].set_xlabel("phase [rad]")
     axs[1].set_ylabel("density")
@@ -291,6 +299,10 @@ def generate_rt_vs_synth_plots(
         "f6_phase_test_basis": matrix_source,
         "f6_common_phase_removed": bool(phase_common_removed),
         "f6_per_ray_sampling": bool(phase_per_ray_sampling),
+        "f6_phase_sampling_method": str(phase_sampling_method),
+        "f6_phase_offdiag_amp_ratio_min": float(max(0.0, offdiag_amp_ratio_min)),
+        "f6_phase_offdiag_rt_debug": ph_rt_dbg,
+        "f6_phase_offdiag_synth_debug": ph_sy_dbg,
         "f6_phase_uniformity_V_rt": float(ku_rt["V"]) if np.isfinite(ku_rt["V"]) else np.nan,
         "f6_phase_uniformity_p_rt": float(ku_rt["p_boot"]) if np.isfinite(ku_rt["p_boot"]) else np.nan,
         "f6_phase_uniformity_V_synth": float(ku_sy["V"]) if np.isfinite(ku_sy["V"]) else np.nan,

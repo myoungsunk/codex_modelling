@@ -191,14 +191,58 @@ def _truncated_normal_scalar(
     return float(scipy_stats.truncnorm.rvs(a, b, loc=mu, scale=sig, random_state=rng))
 
 
+def _sample_phase_vector(
+    rng: np.random.Generator,
+    n: int,
+    method: str = "iid",
+) -> NDArray[np.float64]:
+    nn = int(max(n, 1))
+    mode = str(method).strip().lower()
+    if mode == "stratified_uniform":
+        u = float(rng.uniform(0.0, 1.0))
+        base = -np.pi + (2.0 * np.pi) * ((np.arange(nn, dtype=float) + u) / float(nn))
+        return np.asarray(rng.permutation(base), dtype=float)
+    return np.asarray(rng.uniform(-np.pi, np.pi, size=nn), dtype=float)
+
+
+def _phase_top_bins(
+    phases: NDArray[np.float64],
+    nbins: int = 24,
+    top_k: int = 3,
+) -> list[dict[str, float | int]]:
+    if len(phases) == 0 or nbins <= 0 or top_k <= 0:
+        return []
+    bins = np.linspace(-np.pi, np.pi, int(nbins) + 1, dtype=float)
+    hist, edges = np.histogram(phases, bins=bins)
+    order = np.argsort(hist)[::-1]
+    out: list[dict[str, float | int]] = []
+    for idx in order[: int(top_k)]:
+        c = int(hist[int(idx)])
+        if c <= 0:
+            continue
+        out.append(
+            {
+                "bin_start_rad": float(edges[int(idx)]),
+                "bin_end_rad": float(edges[int(idx) + 1]),
+                "count": c,
+            }
+        )
+    return out
+
+
 def offdiag_phases(
     paths: list[dict[str, Any]],
     matrix_source: str = "A",
     per_ray_sampling: bool = True,
     center_freq_index: int | None = None,
     common_phase_removed: bool = True,
-) -> NDArray[np.float64]:
+    amp_ratio_min: float = 0.0,
+    return_debug: bool = False,
+) -> NDArray[np.float64] | tuple[NDArray[np.float64], dict[str, Any]]:
     vals: list[float] = []
+    ratios: list[float] = []
+    n_total_candidates = 0
+    amp_min = float(max(0.0, amp_ratio_min))
     for p in paths:
         m = _matrix_from_path(p, matrix_source=matrix_source)
         if m.ndim != 3 or m.shape[1:] != (2, 2):
@@ -216,10 +260,37 @@ def offdiag_phases(
                 else:
                     phi0 = float(np.angle(np.trace(x) + 1e-15))
                 x = x * np.exp(-1j * phi0)
-            vals.append(float(np.angle(x[0, 1])))
-            vals.append(float(np.angle(x[1, 0])))
+            denom = float(max(np.linalg.norm(x, ord="fro"), 1e-15))
+            r12 = float(np.abs(x[0, 1]) / denom)
+            r21 = float(np.abs(x[1, 0]) / denom)
+            ratios.extend([r12, r21])
+            n_total_candidates += 2
+            if r12 >= amp_min:
+                vals.append(float(np.angle(x[0, 1])))
+            if r21 >= amp_min:
+                vals.append(float(np.angle(x[1, 0])))
     arr = np.asarray(vals, dtype=float)
-    return arr[np.isfinite(arr)]
+    arr = arr[np.isfinite(arr)]
+    if not return_debug:
+        return arr
+
+    ratios_arr = np.asarray(ratios, dtype=float)
+    ratios_arr = ratios_arr[np.isfinite(ratios_arr)]
+    n_after = int(len(arr))
+    debug = {
+        "amp_ratio_min": float(amp_min),
+        "n_total_candidates": int(n_total_candidates),
+        "n_after_amp_gate": n_after,
+        "n_rejected_amp_gate": int(max(n_total_candidates - n_after, 0)),
+        "amp_ratio_min_observed": (float(np.min(ratios_arr)) if len(ratios_arr) else np.nan),
+        "amp_ratio_median": (float(np.median(ratios_arr)) if len(ratios_arr) else np.nan),
+        "amp_ratio_p95": (float(np.percentile(ratios_arr, 95.0)) if len(ratios_arr) else np.nan),
+        "unique_phase_bin_count": int(np.count_nonzero(np.histogram(arr, bins=np.linspace(-np.pi, np.pi, 37))[0]))
+        if len(arr)
+        else 0,
+        "phase_top_bins": _phase_top_bins(arr),
+    }
+    return arr, debug
 
 
 def kuiper_uniform_test(
@@ -291,6 +362,7 @@ def generate_synthetic_paths(
     rt_path_cases: list[str] | NDArray[np.str_] | None = None,
     return_diagnostics: bool = False,
     seed: int = 0,
+    phase_sampling_method: str = "iid",
 ) -> list[dict[str, Any]] | tuple[list[dict[str, Any]], dict[str, Any]]:
     """Generate synthetic per-ray paths with 2x2 matrices and delays."""
 
@@ -323,6 +395,14 @@ def generate_synthetic_paths(
         rng=rng,
     )
     n_paths = int(max(len(schedule), 1))
+    phase_method = str(phase_sampling_method).strip().lower()
+    phase_pool: NDArray[np.float64] | None = None
+    if phase_method == "stratified_uniform":
+        phase_pool = np.zeros((n_paths, 4), dtype=float)
+        for j in range(4):
+            u = float(rng.uniform(0.0, 1.0))
+            base = -np.pi + (2.0 * np.pi) * ((np.arange(n_paths, dtype=float) + u) / float(max(n_paths, 1)))
+            phase_pool[:, j] = np.asarray(rng.permutation(base), dtype=float)
 
     paths: list[dict[str, Any]] = []
     kappa_total = 0
@@ -494,7 +574,10 @@ def generate_synthetic_paths(
             elif u_path < (p_pin + p_floor) and np.isfinite(float(par_cens.get("floor_db", np.nan))):
                 path_point_mode = "floor"
                 path_point_value = float(np.clip(float(par_cens.get("floor_db", np.nan)), xpd_min_db, xpd_max_db))
-        phi = rng.uniform(0.0, 2.0 * np.pi, size=4)
+        if phase_pool is not None and _i < phase_pool.shape[0]:
+            phi = np.asarray(phase_pool[_i], dtype=float)
+        else:
+            phi = _sample_phase_vector(rng=rng, n=4, method=phase_method)
         M_f = np.zeros((n_f, 2, 2), dtype=np.complex128)
         mode_freq = str(kappa_freq_mode).strip().lower()
         subband_xpd_db: dict[int, float] = {}
@@ -606,6 +689,7 @@ def generate_synthetic_paths(
         "kappa_clamp_rate": 0.0,
         "kappa_truncation_count": int(kappa_trunc_count),
         "kappa_truncation_rate": float(kappa_trunc_count / max(kappa_total, 1)),
+        "phase_sampling_method": str(phase_method),
     }
     if return_diagnostics:
         return paths, diagnostics
@@ -629,6 +713,7 @@ def summarize_rt_vs_synth(
     eval_basis: str | None = None,
     convention: str = "IEEE-RHCP",
     seed: int = 0,
+    offdiag_amp_ratio_min: float = 1e-3,
 ) -> dict[str, Any]:
     rt_samples = pathwise_xpd(
         rt_paths,
@@ -813,26 +898,38 @@ def summarize_rt_vs_synth(
     span_rt_c = float(np.nanmax(a_rt_c) - np.nanmin(a_rt_c)) if np.any(np.isfinite(a_rt_c)) else np.nan
     span_sy_c = float(np.nanmax(a_sy_c) - np.nanmin(a_sy_c)) if np.any(np.isfinite(a_sy_c)) else np.nan
 
-    ph_rt = offdiag_phases(
+    ph_rt, ph_rt_dbg = offdiag_phases(
         rt_paths,
         matrix_source=rt_matrix_source,
         per_ray_sampling=per_ray_phase_sampling,
         common_phase_removed=common_phase_removed,
+        amp_ratio_min=offdiag_amp_ratio_min,
+        return_debug=True,
     )
-    ph_sy = offdiag_phases(
+    ph_sy, ph_sy_dbg = offdiag_phases(
         synth_paths,
         matrix_source=synth_matrix_source,
         per_ray_sampling=per_ray_phase_sampling,
         common_phase_removed=common_phase_removed,
+        amp_ratio_min=offdiag_amp_ratio_min,
+        return_debug=True,
     )
     ku_rt = kuiper_uniform_test(ph_rt, bootstrap_B=phase_bootstrap_B, seed=seed)
     ku_sy = kuiper_uniform_test(ph_sy, bootstrap_B=phase_bootstrap_B, seed=seed + 1)
-    if int(ku_sy.get("n", 0)) < 20:
+    if int(ku_sy.get("n", 0)) < 50:
         synth_phase_status = "INSUFFICIENT"
     elif np.isfinite(float(ku_sy.get("p_boot", np.nan))) and float(ku_sy["p_boot"]) >= 0.05:
         synth_phase_status = "PASS"
     else:
         synth_phase_status = "FAIL"
+    phase_hint = "none"
+    if synth_phase_status == "FAIL":
+        if int(ph_sy_dbg.get("unique_phase_bin_count", 0)) <= 3:
+            phase_hint = "phase concentration after amplitude gate"
+        elif float(ph_sy_dbg.get("amp_ratio_median", np.nan)) < float(offdiag_amp_ratio_min) * 2.0:
+            phase_hint = "off-diagonal amplitudes close to gate threshold"
+        else:
+            phase_hint = "synthetic phase sampling mismatch or residual correlation"
 
     f5_status = "FAIL"
     if np.isfinite(mu_rmse) and mu_rmse <= 3.0:
@@ -899,6 +996,9 @@ def summarize_rt_vs_synth(
         "phase_test_basis": phase_test_basis,
         "common_phase_removed": bool(common_phase_removed),
         "per_ray_sampling": bool(per_ray_phase_sampling),
+        "phase_offdiag_amp_ratio_min": float(offdiag_amp_ratio_min),
+        "phase_offdiag_rt_debug": ph_rt_dbg,
+        "phase_offdiag_synth_debug": ph_sy_dbg,
         "phase_uniformity_V_rt": float(ku_rt["V"]) if np.isfinite(ku_rt["V"]) else np.nan,
         "phase_uniformity_p_rt": float(ku_rt["p_boot"]) if np.isfinite(ku_rt["p_boot"]) else np.nan,
         "phase_uniformity_V_synth": float(ku_sy["V"]) if np.isfinite(ku_sy["V"]) else np.nan,
@@ -906,4 +1006,5 @@ def summarize_rt_vs_synth(
         "phase_uniformity_p": float(ku_sy["p_boot"]) if np.isfinite(ku_sy["p_boot"]) else np.nan,
         "phase_uniformity_rt_status": "INFO_DETERMINISTIC",
         "phase_uniformity_synth_status": synth_phase_status,
+        "phase_uniformity_synth_hint": phase_hint,
     }

@@ -129,6 +129,8 @@ def fit_and_generate(
     kappa_min: float = 1e-6,
     kappa_max: float = 1e12,
     kappa_freq_mode: str = "piecewise_constant",
+    offdiag_amp_ratio_min: float = 1e-3,
+    phase_sampling_method: str = "iid",
     return_paths: bool = False,
 ) -> dict[str, Any]:
     ds = load_rt_dataset(input_h5)
@@ -421,6 +423,7 @@ def fit_and_generate(
         rt_path_cases=path_cases,
         return_diagnostics=True,
         seed=seed,
+        phase_sampling_method=str(phase_sampling_method),
     )
     synth_paths, synth_diag = synth_out
     align_diag = _align_synth_continuous_xpd(
@@ -448,6 +451,7 @@ def fit_and_generate(
         eval_basis=basis_in,
         convention=conv,
         seed=seed,
+        offdiag_amp_ratio_min=float(max(0.0, offdiag_amp_ratio_min)),
     )
     comparison.update(
         {
@@ -495,6 +499,8 @@ def fit_and_generate(
         "use_incidence_conditioning": bool(use_incidence_conditioning),
         "phase_common_removed": bool(phase_common_removed),
         "phase_per_ray_sampling": bool(phase_per_ray_sampling),
+        "phase_sampling_method": str(phase_sampling_method),
+        "phase_offdiag_amp_ratio_min": float(max(0.0, offdiag_amp_ratio_min)),
         "synthetic_generation": synth_diag,
     }
     save_stats_json(output_json, model_obj)
@@ -542,6 +548,8 @@ def main() -> None:
     parser.add_argument("--slope-sigma-db-per-hz", type=float, default=0.0)
     parser.add_argument("--kappa-min", type=float, default=1e-6)
     parser.add_argument("--kappa-max", type=float, default=1e12)
+    parser.add_argument("--offdiag-amp-ratio-min", type=float, default=1e-3)
+    parser.add_argument("--phase-sampling-method", type=str, default="iid", choices=["iid", "stratified_uniform"])
     parser.add_argument("--seed", type=int, default=0)
     args = parser.parse_args()
 
@@ -564,6 +572,8 @@ def main() -> None:
         slope_sigma_db_per_hz=args.slope_sigma_db_per_hz,
         kappa_min=args.kappa_min,
         kappa_max=args.kappa_max,
+        offdiag_amp_ratio_min=args.offdiag_amp_ratio_min,
+        phase_sampling_method=args.phase_sampling_method,
         seed=args.seed,
     )
 

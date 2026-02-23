@@ -1058,13 +1058,33 @@ def build_quality_report(
         phase_basis = str(model_metrics.get("phase_test_basis", model_metrics.get("f6_phase_test_basis", "unknown")))
         phase_common = bool(model_metrics.get("common_phase_removed", model_metrics.get("f6_common_phase_removed", True)))
         phase_per_ray = bool(model_metrics.get("per_ray_sampling", model_metrics.get("f6_per_ray_sampling", True)))
+        phase_method = str(model_metrics.get("phase_sampling_method", model_metrics.get("f6_phase_sampling_method", "iid")))
+        phase_amp_min = float(
+            model_metrics.get("phase_offdiag_amp_ratio_min", model_metrics.get("f6_phase_offdiag_amp_ratio_min", np.nan))
+        )
         phase_rt_status = str(model_metrics.get("phase_uniformity_rt_status", "INFO_DETERMINISTIC"))
         phase_sy_status = str(model_metrics.get("phase_uniformity_synth_status", "NA"))
         lines.append(
-            f"- phase_test_config: basis={phase_basis}, common_phase_removed={phase_common}, per_ray_sampling={phase_per_ray}"
+            f"- phase_test_config: basis={phase_basis}, common_phase_removed={phase_common}, "
+            f"per_ray_sampling={phase_per_ray}, sampling_method={phase_method}, offdiag_amp_ratio_min={phase_amp_min:.2e}"
         )
         lines.append(f"- phase_test_rt_status: {phase_rt_status}")
         lines.append(f"- phase_test_synth_status: {phase_sy_status}")
+        phase_hint = str(model_metrics.get("phase_uniformity_synth_hint", "none"))
+        if phase_hint and phase_hint != "none":
+            lines.append(f"- phase_test_synth_hint: {phase_hint}")
+        rt_dbg = model_metrics.get("phase_offdiag_rt_debug", model_metrics.get("f6_phase_offdiag_rt_debug", {}))
+        sy_dbg = model_metrics.get("phase_offdiag_synth_debug", model_metrics.get("f6_phase_offdiag_synth_debug", {}))
+        if isinstance(rt_dbg, dict):
+            lines.append(
+                "- phase_offdiag_rt_samples: "
+                f"{int(rt_dbg.get('n_after_amp_gate', 0))}/{int(rt_dbg.get('n_total_candidates', 0))}"
+            )
+        if isinstance(sy_dbg, dict):
+            lines.append(
+                "- phase_offdiag_synth_samples: "
+                f"{int(sy_dbg.get('n_after_amp_gate', 0))}/{int(sy_dbg.get('n_total_candidates', 0))}"
+            )
         lines.append("")
 
     if reciprocity_metrics is not None and reciprocity_metrics.get("entries"):
@@ -1404,6 +1424,8 @@ def main() -> None:
     parser.add_argument("--model-disable-incidence-conditioning", action="store_true")
     parser.add_argument("--model-phase-keep-common", action="store_true")
     parser.add_argument("--model-phase-all-freq-samples", action="store_true")
+    parser.add_argument("--model-phase-sampling-method", type=str, default="iid", choices=["iid", "stratified_uniform"])
+    parser.add_argument("--model-offdiag-amp-ratio-min", type=float, default=1e-3)
     parser.add_argument("--model-seed", type=int, default=0)
     parser.add_argument("--measurement-compare", action="store_true")
     parser.add_argument("--measurement-format", type=str, default="matrix_csv", choices=["matrix_csv", "four_csv"])
@@ -1458,6 +1480,8 @@ def main() -> None:
         _, dirty_now = _git_meta()
         if dirty_now:
             raise SystemExit("release-mode failed: git working tree is dirty. Commit/stash changes and rerun.")
+        if str(args.model_phase_sampling_method).strip().lower() == "iid":
+            args.model_phase_sampling_method = "stratified_uniform"
 
     antenna_config = {
         "convention": args.convention,
@@ -1509,6 +1533,8 @@ def main() -> None:
         data.setdefault("meta", {})["cmdline"] = " ".join(shlex.quote(a) for a in sys.argv)
         data.setdefault("meta", {})["seed"] = {"model_seed": int(args.model_seed)}
         data.setdefault("meta", {})["seed_json"] = "{\"model_seed\":%d}" % int(args.model_seed)
+        data.setdefault("meta", {})["model_phase_sampling_method"] = str(args.model_phase_sampling_method)
+        data.setdefault("meta", {})["model_offdiag_amp_ratio_min"] = float(max(0.0, args.model_offdiag_amp_ratio_min))
         data.setdefault("meta", {})["release_mode"] = bool(args.release_mode)
         data.setdefault("meta", {})["xpd_matrix_source"] = str(args.xpd_matrix_source)
         data.setdefault("meta", {})["exact_bounce_defaults"] = dict(DEFAULT_EXACT_BOUNCE)
@@ -1608,6 +1634,8 @@ def main() -> None:
                 use_incidence_conditioning=not bool(args.model_disable_incidence_conditioning),
                 phase_common_removed=not bool(args.model_phase_keep_common),
                 phase_per_ray_sampling=not bool(args.model_phase_all_freq_samples),
+                phase_sampling_method=str(args.model_phase_sampling_method),
+                offdiag_amp_ratio_min=float(max(0.0, args.model_offdiag_amp_ratio_min)),
                 seed=int(args.model_seed),
                 return_paths=True,
             )
@@ -1620,6 +1648,8 @@ def main() -> None:
                 num_subbands=int(args.model_num_subbands),
                 phase_common_removed=not bool(args.model_phase_keep_common),
                 phase_per_ray_sampling=not bool(args.model_phase_all_freq_samples),
+                phase_sampling_method=str(args.model_phase_sampling_method),
+                offdiag_amp_ratio_min=float(max(0.0, args.model_offdiag_amp_ratio_min)),
             )
             compare_metrics = model_res.get("comparison", {}).get("comparison", {})
             model_metrics = dict(compare_metrics)

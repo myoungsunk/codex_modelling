@@ -5,3 +5,14 @@ outputs/
 __pycache__/
 .pycache_local/
 *.py[cod]
+
+# Local tool/cache artifacts (do not commit)
+.DS_Store
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.nox/
+.tox/
+.coverage*
+.cache/
+.mplconfig/
