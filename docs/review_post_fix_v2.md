@@ -1,365 +1,368 @@
-# 수정 후 2차 검토 보고서
+# 수정 후 검토 보고서 (v3 — 코드 병합 후 재검증)
 
 > 날짜: 2026-02-26
-> 대상: 1차 검토에서 지적된 치명적/잠재적 문제에 대한 수정사항 검증
-> 범위: 코드 전체 grep + 핵심 파일 정독 기반
+> 대상: `feature/dualcp-proxy-bridge` 브랜치 병합 후, 13개 수정 항목 재검증
+> 범위: 병합된 코드 전체 정독 기반
 
 ---
 
 ## 요약: 수정 상태 총괄
 
-| # | 항목 | 주장 상태 | 실제 코드 상태 | 판정 |
-|---|------|----------|---------------|------|
-| 0 | C0 거리/각도/반복 | 부분 해결 | CLI args 존재, **각도가 트레이서에 미반영** | **미해결** |
-| 1 | A3 표본 확대 | 해결 | `A3_corner_2bounce.py` **여전히 4개 케이스** | **미해결** |
-| 2 | LOS 차단 물리성 | 해결 | `--strict-los-blocked` = 사후 검증만, **occluder 미구현** | **부분** |
-| 3 | A5 합성↔물리 괴리 | 부분 해결 | `--stress-flag` 일괄 적용, **stress_mode 미구현** | **미해결** |
-| 4 | B LOSflag 고정 | 해결 | ray table 기반 재계산 **구현됨** | **해결** |
-| 5 | Normal-only 분포 | 해결 | `conditional_proxy.py` **변경 없음**, Normal만 지원 | **미해결** |
-| 6 | OLS 강건성(Huber) | 해결 | `_fit_regression()` **여전히 lstsq**, Huber 없음 | **미해결** |
-| 7 | bucket 최소 표본 | 해결(3→) | `conditional_proxy.py`에 **min_bucket_n 파라미터 없음** | **미해결** |
-| 8 | 주파수/서브밴드 floor | 부분 해결 | `_resolve_floor_band()`가 **여전히 median 스칼라 압축** | **미해결** |
-| 9 | claim_caution 모드 | 해결 | `--claim-caution-mode` 파라미터 **없음**, 하드코딩 유지 | **미해결** |
-| 10 | drift check | 해결 | 3-CSV ingest **없음**, `--max-drift-db` **없음** | **미해결** |
-| 11 | LP baseline | 해결 | `run_cp_lp_baseline.py` **없음** | **미해결** |
-| 12 | ANOVA/FDR/혼동진단 | 부분 해결 | ANOVA, FDR-BH, confounding 진단 **전부 없음** | **미해결** |
+| # | 항목 | 판정 | 비고 |
+|---|------|------|------|
+| 1 | C0 거리/각도/반복 | **해결** | 5거리×3yaw×1pitch×5rep=75케이스, 안테나 회전 구현 |
+| 2 | A3 표본 확대 | **해결** | 4→12 기하 조합 (3 offset × 4 rx) |
+| 3 | LOS 차단 물리성 | **해결** | `--los-block-mode occluder`, `make_los_blocker_plane()` |
+| 4 | A5 stress_mode 확장 | **해결** | none/synthetic/geometry/hybrid, scatterer 추가 |
+| 5 | B LOSflag 재계산 | **해결** | ray table 기반 `los_flag_ray` 집계 |
+| 6 | Student-t/Laplace 분포 | **해결** | `--dist-family` CLI, GOF 분포별 적응 |
+| 7 | Huber IRLS 강건 회귀 | **해결** | `--robust-regression` 기본 True, MAD 스케일링 |
+| 8 | bucket 최소 표본 | **해결** | `--min-bucket-n 3`, 미달 시 regression fallback |
+| 9 | 주파수/서브밴드 floor | **해결** | `_build_floor_reference_with_curve()`, subband별 excess/caution |
+| 10 | claim_caution 모드 | **해결** | `--claim-caution-mode {scaled,half_width,off}` |
+| 11 | drift check (3-CSV) | **해결** | `load_measurement_dualcp_three_csv()`, `--max-drift-db` |
+| 12 | LP baseline | **해결** | `run_cp_lp_baseline.py`, `lp_baseline_compare.py` |
+| 13 | ANOVA/FDR/혼동진단 | **해결** | `_anova_oneway()`, `_fdr_bh()`, `distance_vs_losflag_rank_corr` |
 
-**실제 해결: 1건 (B LOSflag), 부분 해결: 1건 (LOS 차단 검증), 미해결: 10건**
+**13건 전부 해결됨.** 다만 아래의 잔존 문제 및 설계 우려 사항이 있음.
 
 ---
 
-## 1. 상세 검증
+## 1. 항목별 상세 검증
 
-### 1-0. C0 보정: 거리/각도/반복
+### 1-1. C0 보정: 거리 1-5m, yaw/pitch sweep, --n-rep
 
-**주장**: C0 거리 1-5m 반영, `--n-rep` 추가, yaw/pitch sweep 옵션 추가
+**코드 확인**:
 
-**실제 코드**:
+- `C0_free_space.py:17-18` — `build_sweep_params()` → `[1.0, 2.0, 3.0, 4.0, 5.0]` ✅
+- `C0_free_space.py:31-48` — `run_case()`가 `yaw_deg`, `pitch_deg`를 params에서 읽어 Rx 안테나 boresight/h_axis/v_axis에 회전 적용 (`_rot_z`, `_rot_y`) ✅
+- `run_standard_sim.py:689` — `--n-rep` 기본값 5 ✅
+- `run_standard_sim.py:462-463` — C0 기본: `dlist=[1.0,2.0,3.0,4.0,5.0]`, `yaw_list=[-10.0,0.0,10.0]` ✅
+- `run_standard_sim.py:466-488` — 4중 루프: distance × yaw × pitch × rep ✅
+- `run_standard_sim.py:476-481` — yaw_deg, pitch_deg가 params와 meta 양쪽에 기록 ✅
 
-`run_standard_sim.py:420-422`에 CLI args가 존재:
+**기본 케이스 수**: 5d × 3yaw × 1pitch × 5rep = **75 케이스** — 계획서 요구 75+에 부합
+
+**잔존 사항 (Minor)**: `--pitch-list` 기본값이 `"0"` (단일 값). 계획서의 pitch 민감도 분석을 위해서는 CLI에서 별도 지정 필요 (예: `--pitch-list "-5,0,5"`). `AngleSensitiveFloorXPD`의 `pitch_slope_db_per_deg` 보정 데이터가 기본 설정으로는 생성되지 않음.
+
+---
+
+### 1-2. A3 표본 확대
+
+**코드 확인**:
+
+- `A3_corner_2bounce.py:39-44` — `build_sweep_params()`:
+  ```python
+  for off in [3.0, 3.5, 4.0]:
+      for rx_x, rx_y in [(3.0, 4.0), (3.5, 4.5), (4.0, 5.0), (4.5, 4.0)]:
+  ```
+  3 offset × 4 rx = **12 기하 조합** ✅ (기존 4개에서 3배 확장)
+- `run_standard_sim.py:525-557` — n_rep 루프 적용 ✅
+
+**기본 케이스 수**: 12 × 5rep = **60 데이터 포인트** — KS 검정에 적절한 표본 크기
+
+---
+
+### 1-3. --los-block-mode 물리적 차단 (occluder)
+
+**코드 확인**:
+
+- `scenarios/common.py:69-102` — `make_los_blocker_plane()`:
+  - Tx-Rx 중간점에 유한 평면(흡수체 프록시) 배치 ✅
+  - Normal = Tx→Rx 방향, u/v 축 자동 계산 ✅
+  - `Material.dielectric(eps_r=1.15, tan_delta=1.0, name="absorber_proxy")` ✅
+- `A2_pec_plane.py:55-56,62-63` — `los_blocker` 파라미터 수용, `make_los_blocker_plane()` 호출 ✅
+- `A3_corner_2bounce.py:55-56,62-63` — 동일 패턴 ✅
+- `A4_dielectric_plane.py:70-71,81-82` — 동일 패턴 ✅
+- `A5_depol_stress.py:96-97,105-106` — 동일 패턴 ✅
+- `run_standard_sim.py:692` — `--los-block-mode {synthetic,occluder}` 기본 "occluder" ✅
+
+---
+
+### 1-4. A5 stress_mode 확장
+
+**코드 확인**:
+
+- `A5_depol_stress.py:86-136` — `run_case()` 확장:
+  - `stress_mode` (none/synthetic/geometry/hybrid) ✅
+  - `scatterer_count` ✅
+  - `los_blocker` ✅
+  - mode="geometry"/"hybrid" → `_append_stress_scatterers()` 호출 (lines 103-104) ✅
+  - mode="synthetic"/"hybrid" → `DepolConfig(rho_func=rho_hook)` 생성 (lines 108-120) ✅
+- `A5_depol_stress.py:44-66` — `_append_stress_scatterers()`: 랜덤 소형 PEC 평면 추가 ✅
+- `run_standard_sim.py:693-695` — CLI: `--a5-stress-mode hybrid`, `--a5-scatterer-count 3`, `--a5-max-cases 0` (전체) ✅
+- `run_standard_sim.py:626-629` — meta에 `roughness_flag`, `human_flag`, `stress_mode` 기록 ✅
+
+**설계 우려 (아래 잔존 문제 2-A 참조)**: `--stress-flag`가 실행 단위 전역. base vs stress 비교는 별도 실행 필요.
+
+---
+
+### 1-5. B LOSflag 재계산
+
+**코드 확인**:
+
+- `run_standard_sim.py:735` — `los_link = int(any(int(r.get("los_flag_ray", 0)) == 1 for r in ray_rows))` ✅
+- `run_standard_sim.py:803` — `link_meta["LOSflag"] = int(los_link)` ✅
+- `link_conditions.py:42-44` — meta에서 LOSflag 읽되, 없으면 ray 기반 fallback ✅
+- `success_checks.py:263` — confounding 진단: `distance_vs_losflag_rank_corr` ✅
+
+---
+
+### 1-6. Student-t / Laplace 분포
+
+**코드 확인**:
+
+- `conditional_proxy.py:158` — `fit_proxy_model()` 파라미터: `dist_family: str = "normal"` ✅
+- `conditional_proxy.py:228-247` — 분포별 분기:
+  - `"student_t"`: `stats.t.fit()`, 분포별 KS 검정, `{"family":"student_t","df","loc","scale"}` 저장 ✅
+  - `"laplace"`: `stats.laplace.fit()`, 분포별 KS 검정, `{"family":"laplace","loc","scale"}` 저장 ✅
+  - default (normal): `stats.kstest(resid_std, "norm")` ✅
+- `conditional_proxy.py:256` — `model["residual_dist"] = resid_dist` ✅
+- `fit_dualcp_proxy.py:207` — `--dist-family` CLI, default `"student_t"` ✅
+- `fit_dualcp_proxy.py:85-97` — `_sample_resid()` 분포별 샘플링 ✅
+
+---
+
+### 1-7. Huber IRLS 강건 회귀
+
+**코드 확인**:
+
+- `conditional_proxy.py:40-45` — `_weighted_lstsq()` 가중 최소제곱 헬퍼 ✅
+- `conditional_proxy.py:48-108` — `_fit_regression()`:
+  - `robust=False, huber_delta=1.5, max_iter=30` 파라미터 ✅
+  - 초기 OLS → robust=True 시 반복:
+    - 잔차 계산 → MAD 스케일링 → Huber 가중치 (`u <= 1.0 → w=1.0, else w=1/u`) ✅
+    - 수렴 검사: `np.linalg.norm(beta_new - beta) <= 1e-8 * (1.0 + np.linalg.norm(beta))` ✅
+- `conditional_proxy.py:196` — `fit_proxy_model()` → `_fit_regression(..., robust=bool(robust_regression))` ✅
+- `fit_dualcp_proxy.py:208-211` — `--robust-regression` / `--no-robust-regression`, default True ✅
+
+---
+
+### 1-8. bucket 최소 표본
+
+**코드 확인**:
+
+- `conditional_proxy.py:160` — `fit_proxy_model(..., min_bucket_n: int = 3)` ✅
+- `conditional_proxy.py:209` — model에 `"bucket_min_n": int(max(1, min_bucket_n))` 저장 ✅
+- `conditional_proxy.py:117` — `predict_distribution()`에서 `min_bucket_n = int(model.get("bucket_min_n", 1))` 읽음 ✅
+- `conditional_proxy.py:123` — `n_b >= min_bucket_n` 체크 → 미달 시 regression fallback ✅
+- `fit_dualcp_proxy.py:210` — `--min-bucket-n 3` ✅
+
+---
+
+### 1-9. 주파수/서브밴드 floor 보존
+
+**코드 확인**:
+
+- `run_standard_sim.py:223-249` — `_build_floor_subbands()`: subband별 floor/uncert 계산 ✅
+- `run_standard_sim.py:252-303` — `_build_floor_reference_with_curve()`:
+  - `frequency_hz`, `xpd_floor_db` (주파수별 벡터) ✅
+  - `xpd_floor_uncert_db`, `xpd_floor_p_lo_db`, `xpd_floor_p_hi_db` ✅
+  - `subbands` 리스트 (index, f_lo_hz, f_hi_hz, xpd_floor_db, uncert) ✅
+- `run_standard_sim.py:871-907` — 번들별 extras에 저장:
+  - Per-freq: `xpd_floor_curve_db`, `XPD_early_excess_curve_db`, `claim_caution_early_curve` ✅
+  - Per-subband: `xpd_floor_subband_db`, `XPD_early_excess_subband_db`, `claim_caution_early_subband` ✅
+
+**참고**: `dualcp_metrics.py:_resolve_floor_band()`(측정 경로)은 여전히 스칼라 압축하지만, 시뮬레이션 경로에서 주파수별/서브밴드별 상세 데이터를 extras에 보존하므로, 서브밴드 분석이 가능함.
+
+---
+
+### 1-10. claim_caution 모드
+
+**코드 확인**:
+
+- `run_standard_sim.py:358-367` — `_claim_caution_flag()`:
+  - `mode="off"` → 항상 False ✅
+  - `mode="scaled"` → threshold = |uncert| × scale ✅
+  - `mode="half_width"` → threshold = |uncert| (scale 무시) ✅
+  - 판정: `|excess| ≤ threshold` ✅
+- `run_standard_sim.py:684-685` — `--claim-caution-mode {scaled,half_width,off}`, `--claim-caution-scale 1.0` ✅
+- 스칼라/per-freq/per-subband 수준에서 모두 적용 (lines 860-907) ✅
+
+---
+
+### 1-11. Drift check (3-CSV)
+
+**코드 확인**:
+
+- `measurement_compare.py:209-255` — `load_measurement_dualcp_three_csv()`:
+  - co_pre/cross/co_post 3개 CSV 로드 ✅
+  - drift 계산: `20*log10(|co_post|/|co_pre|)` ✅
+  - meta에 `drift_co_db` (median), `drift_co_p95_db` (95th pctl) 저장 ✅
+- `dualcp_calibrate_floor.py:44-66` — `_load_cases_from_csv_pairs()`:
+  - `co_post_csv` 파라미터 수용 ✅
+  - 존재 시 `load_measurement_dualcp_three_csv()` 호출 ✅
+- `dualcp_calibrate_floor.py:147` — `--max-drift-db` CLI ✅
+- `dualcp_calibrate_floor.py:163-183` — drift 필터링 + summary 기록 ✅
+
+---
+
+### 1-12. LP baseline 스크립트
+
+**코드 확인**:
+
+- `scripts/run_cp_lp_baseline.py` (79 lines):
+  - `--basis circular` + `--basis linear` 두 번 `run_standard_sim.py` 호출 ✅
+  - `compare_cp_lp_metrics()` 호출하여 비교 리포트 생성 ✅
+- `analysis/lp_baseline_compare.py` (146 lines):
+  - CP/LP 쌍을 (scenario_id, case_id)로 매칭 ✅
+  - 8개 주요 지표에 대해 delta(CP-LP) 계산 ✅
+  - 페어 CSV + 마크다운 리포트 출력 ✅
+
+---
+
+### 1-13. ANOVA / FDR / 혼동 진단
+
+**코드 확인**:
+
+- `success_checks.py:82-108` — `_anova_oneway()`:
+  - `scipy.stats.f_oneway()` + eta² 효과 크기 ✅
+  - 그룹별 SS_between, SS_total 계산 ✅
+- `success_checks.py:111-129` — `_fdr_bh()`:
+  - Benjamini-Hochberg FDR 보정 ✅
+  - NaN-safe, 순위 기반 조정 ✅
+- `success_checks.py:143-144` — C0 floor 검증에 ANOVA 적용:
+  - `anova_distance_p`, `anova_distance_eta2` ✅
+  - `anova_yaw_p`, `anova_yaw_eta2` ✅
+- `success_checks.py:263` — B 공간 일관성에 confounding 진단:
+  - `distance_vs_losflag_rank_corr` ✅
+- `success_checks.py:271-295` — `evaluate_success_criteria()`:
+  - 4개 p-value 수집 → FDR-BH 일괄 보정 ✅
+  - `multiple_testing` 섹션 출력 ✅
+- `fit_dualcp_proxy.py:100-119,342-349` — proxy 보고서에도 FDR-BH 적용 ✅
+
+---
+
+## 2. 잔존 문제 및 설계 우려
+
+### 2-A. A5 stress_flag는 실행 단위 전역 (설계 우려, Major)
+
+`run_standard_sim.py:600` — `stress_on = bool(args.stress_flag)` → 한 실행 내 모든 A5 케이스가 동일한 stress on/off.
+
+**결과**:
+- base vs stress 비교를 위해 **2번 실행** 필요 (한 번은 `--stress-flag` 없이, 한 번은 있이)
+- `success_checks.py`의 `check_A4_A5_breaking()`이 정상 동작하려면, 두 실행의 CSV를 **수동 병합** 해야 함
+- 자동화 파이프라인에서는 이 2-pass 구조를 명시적으로 처리해야 함
+
+**권고**: 파이프라인 문서에 A5 2-pass 실행 절차를 명시하거나, A5 러너에서 `--stress-flag`가 없을 때 자동으로 base+stress 양쪽을 생성하는 옵션 추가 검토.
+
+---
+
+### 2-B. pitch 기본값이 단일 (Minor)
+
+`--pitch-list` 기본값 = `"0"`. 계획서의 "pitch 민감도" 분석을 위해서는 CLI에서 별도 지정 필요.
+`AngleSensitiveFloorXPD.pitch_slope_db_per_deg` 보정 데이터가 기본 설정으로 생성되지 않음.
+
+**권고**: 계획서에서 pitch 분석을 명시적으로 포함한다면, 기본값을 `"-5,0,5"`로 변경하거나, 실행 지침서에 `--pitch-list` 인자 사용을 명기.
+
+---
+
+### 2-C. B0_room_box.py와 run_standard_sim.py의 부분 분리 (Minor)
+
+`run_standard_sim.py`의 `_run_room_case()` (lines 407-451)가 `B0_room_box.run_case()`를 **사용하지 않고** 직접 장면을 구성:
+- B2/B3 장애물은 러너에 하드코딩
+- `B0_room_box.py`의 `run_case()`는 `los_blocker` 파라미터를 받지 않음
+
+이로 인해 `B0_room_box.py` 수정이 B1/B2/B3 시뮬레이션에 반영되지 않는 유지보수 위험.
+
+---
+
+### 2-D. A5 scatterer 좌표축 직교성 (Minor)
+
+`A5_depol_stress.py:61-62`:
 ```python
-parser.add_argument("--dist-list", type=str, default="")
-parser.add_argument("--yaw-list", type=str, default="0")
-parser.add_argument("--pitch-list", type=str, default="0")
+u_axis=np.array([0.0, 0.0, 1.0], dtype=float),
+v_axis=np.array([-n[1], n[0], 0.0], dtype=float),
 ```
+scatterer의 normal `n`이 z 성분을 포함(`0.2*(rng.random()-0.5)`)하므로, `u_axis=[0,0,1]`이 normal에 직교하지 않을 수 있음. ray tracer가 u/v 축의 직교성을 전제한다면 미세한 기하 오차 발생 가능.
 
-**문제 1 - 각도가 RT에 반영되지 않음** (`run_standard_sim.py:274`):
-```python
-paths = C0_free_space.run_case({"distance_m": d}, f_hz, basis="circular")
-```
-`yaw`와 `pitch`가 `params`에 전달되지 않습니다. `C0_free_space.run_case()`는 Rx를 `[d, 0, 1.5]`에 고정 배치하며 안테나 방향 변경 로직이 없습니다. yaw/pitch는 **metadata에만 기록**되고 실제 시뮬레이션에는 영향을 주지 않습니다.
-
-**문제 2 - 기본 거리가 여전히 미변경**:
-- `--dist-list` 기본값: `""` → `_parse_float_list("", [3.0, 6.0, 9.0])` = **[3, 6, 9]m** 그대로
-- 실험 계획서의 1-5m 범위와 여전히 불일치
-
-**문제 3 - `--n-rep` 없음**:
-전체 codebase에 `n-rep` 또는 `n_rep` CLI 파라미터 검색 결과 **없음**. A5에만 `N_REPS_PER_RHO = 6`이 하드코딩되어 있음.
-
-**잔존 위험**: C0 Floor의 각도 민감도 분석(Q1-2)이 불가능. metadata에 yaw=15를 기록하더라도 실제 시뮬레이션은 yaw=0과 동일한 결과를 생성하므로, `check_C0_floor()`의 `yaw_rank_corr`이 무의미한 값(상수 XPD에 대한 상관)을 반환합니다.
+**영향**: 실용적으로 z 성분이 매우 작아(±0.1) 큰 문제는 아니나, 엄밀히는 Gram-Schmidt 정규화 필요.
 
 ---
 
-### 1-1. A3 표본 확대
+### 2-E. dualcp_metrics.py 측정 경로의 스칼라 floor 압축 (Minor, 기존 이슈 잔존)
 
-**주장**: A3 sweep case 확대 (다중 조합)
+`dualcp_metrics.py:131-159`의 `_resolve_floor_band()`가 주파수별 floor를 median 스칼라로 압축. 시뮬레이션 경로에서는 extras에 주파수별 상세 데이터가 보존되므로 **분석에는 지장 없으나**, 측정 데이터를 직접 처리할 때는 서브밴드 정보가 손실됨.
 
-**실제 코드**:
-
-`A3_corner_2bounce.py:39-45` — **변경 없음**, 여전히 4개 고정 케이스:
-```python
-def build_sweep_params() -> list[dict[str, Any]]:
-    return [
-        {"offset": 3.0, "rx_x": 3.0, "rx_y": 4.0},
-        {"offset": 3.0, "rx_x": 4.0, "rx_y": 3.0},
-        {"offset": 3.5, "rx_x": 3.5, "rx_y": 4.5},
-        {"offset": 4.0, "rx_x": 4.0, "rx_y": 5.0},
-    ]
-```
-
-`run_standard_sim.py:312-329` — A3 러너가 `build_sweep_params()`를 그대로 사용:
-```python
-base = A3_corner_2bounce.build_sweep_params()
-for p in base:  # 4개만 순회
-```
-
-**잔존 위험**: Q2-2 (even-bounce 회복)의 분포 비교에 4×N_rep 점만 사용 → KS 검정 검정력 매우 낮음. A2(9 케이스) 대비 A3의 표본이 절반 이하.
+**권고**: 측정 경로 분석 시 `dualcp_calibrate_floor.py`의 서브밴드별 floor을 명시적으로 사용하도록 문서화.
 
 ---
 
-### 1-2. LOS 차단 물리성
+### 2-F. B grid에서 거리-LOSflag 상관 가능성 (기존 이슈 부분 잔존)
 
-**주장**: `--los-block-mode {synthetic,occluder}`, occluder 경로 구현
+B2/B3 시나리오에서 장애물이 특정 x 좌표에 배치되므로, Tx에서 먼 Rx일수록 NLOS가 될 확률이 높음 → d_m과 LOSflag의 상관.
 
-**실제 코드**:
+`success_checks.py:263`의 `distance_vs_losflag_rank_corr`가 이를 **진단**하므로, 상관이 높으면 회귀 결과 해석 시 주의 필요. 진단 도구는 구현되었으나, 상관 완화 설계(distance-matched LOS/NLOS 쌍)는 미구현.
 
-- `--los-block-mode` 파라미터: **없음**
-- `occluder` 구현: **없음**
-- 존재하는 것: `--strict-los-blocked` (boolean flag) — `run_standard_sim.py:461-463`에서 **사후 검증**만 수행:
-```python
-if scenario_id in {"A2", "A3", "A4", "A5"} and bool(args.strict_los_blocked):
-    if los_link == 1:
-        raise SystemExit(...)
-```
-
-B2/B3에서는 `_run_room_case()` (lines 216-260)에 PEC 장벽(Plane)을 추가하여 물리적 차단을 시뮬레이션하지만, 이것은 A2-A5와 무관한 별도 구현.
-
-**잔존 위험**: A2-A5의 LOS 차단은 `los_enabled=False`로 ray tracer에서 LOS ray를 제거하는 방식. 이는 실제 흡수체와 물리적으로 다릅니다(흡수체는 diffraction/scattering을 일으킬 수 있음). 현재 수준에서는 "synthetic LOS removal"로 명확히 한정 필요.
+**권고**: 보고서에서 confounding rank correlation 값을 명시적으로 보고하고, |r|>0.5이면 회귀 계수 해석에 caveat 추가.
 
 ---
 
-### 1-3. A5 stress_mode
+## 3. 검증 질문(Q1-Q3) 준비 상태 업데이트
 
-**주장**: stress_mode를 none/synthetic/geometry/hybrid로 확장, geometry scatterer 추가
-
-**실제 코드**:
-
-- `stress_mode` 파라미터: **없음**
-- `geometry scatterer`: **없음**
-- 존재하는 것: `--stress-flag` (boolean) — `run_standard_sim.py:424`:
-```python
-parser.add_argument("--stress-flag", action="store_true")
-```
-
-이 플래그가 켜지면 **모든** A5 케이스에 `roughness_flag=1, human_flag=1`을 일괄 설정 (line 367-368). 합성 depol rho와 물리적 scatter 구분이 불가능.
-
-`A5_depol_stress.py` — **변경 없음**: 여전히 `DepolConfig(rho_func=rho_hook)`로 합성 depolarization만 사용.
-
-**잔존 위험**:
-- `--stress-flag`가 꺼져 있으면 `roughness_flag=0, human_flag=0` → `check_A4_A5_breaking()`의 stress 그룹이 0건 → 검증 공허
-- `--stress-flag`가 켜져 있으면 모든 A5 케이스가 stress → base 그룹이 0건 → 역시 비교 불가
-- 즉, **base vs stress 비교가 구조적으로 불가능**합니다
+| 질문 | 데이터 충분성 | 코드 지원 | 주요 Gap |
+|------|-------------|-----------|---------|
+| Q1-1 (Floor 기준선) | **충분** — 75+ 케이스 | `dualcp_calibration.py` + floor reference | — |
+| Q1-2 (정렬 민감도) | **충분** (yaw) / **부족** (pitch) | `AngleSensitiveFloorXPD` + ANOVA | pitch 기본값 단일 |
+| Q2-1 (Odd leakage) | **충분** — A2 9×5rep | 전체 파이프라인 | — |
+| Q2-2 (Even 회복) | **충분** — A3 12×5rep=60 | KS 검정 + 분포 비교 | — |
+| Q2-3 (재질 효과) | **충분** — A4 재질별 sweep | Cliff's delta 가능 | — |
+| Q2-4 (Depol stress) | **가능** — 2-pass 실행 필요 | Student-t/Laplace + 검증 로직 | A5 2-pass 수동 병합 |
+| Q3-1 (Early/Late 구분) | **충분** | L_pol 계산 | — |
+| Q3-2 (Z↔DS 연결) | **충분** | Spearman + 조건별 분석 | — |
+| Q3-3 (Early energy) | **충분** | early_energy_fraction | — |
 
 ---
 
-### 1-4. B LOSflag 고정 → 해결됨
+## 4. 최종 우선순위 권고
 
-**주장**: ray table 기반 LOSflag 재계산
+### 실행 전 필수 (파이프라인 무결성)
 
-**실제 코드** (`run_standard_sim.py:460, 527`):
-```python
-los_link = int(any(int(r.get("los_flag_ray", 0)) == 1 for r in ray_rows))
-...
-link_meta["LOSflag"] = int(los_link)
-```
+1. **A5 2-pass 실행 절차 문서화** (2-A): `--stress-flag` 없이 + 있이 2회 실행 → CSV 병합 → `check_A4_A5_breaking()` 정상 동작
 
-B1(장애물 없음)은 LOS ray 존재 → LOSflag=1, B2/B3(장벽 추가)는 일부 Rx에서 LOS ray 부재 → LOSflag=0으로 자연스럽게 분리됩니다.
+### 권장 (정확도 향상)
 
-`check_B_space_consistency()` (success_checks.py:183-210)도 LOSflag 기반 LOS/NLOS 분리를 수행하여 정상 동작.
+2. **pitch 기본값 확장** (2-B): Q1-2 pitch 분석이 필요하면 `--pitch-list "-5,0,5"` 추가
+3. **B grid confounding 보고** (2-F): rank correlation이 높으면 caveat 명시
 
-**판정: 해결됨**. 다만 B1 grid에서 모든 점이 LOS인 경우 NLOS 변동이 0건이 될 수 있으므로, B2/B3를 반드시 함께 실행해야 의미 있는 비교가 가능합니다.
+### 중기 (유지보수)
 
----
-
-### 1-5. 분포 모델: Normal → Student-t/Laplace
-
-**주장**: normal/student_t/laplace 지원, 기본을 student_t로 설정
-
-**실제 코드**:
-
-`conditional_proxy.py` — **완전히 변경 없음** (1차 검토 시점과 동일):
-- `fit_proxy_model()`: Normal assumption만 사용
-- `predict_distribution()`: docstring이 `"Predict Normal(mu,sigma) parameters"` 그대로
-- GOF: `stats.kstest(resid_std, "norm")` — Normal에 대해서만 검정
-- Student-t, Laplace 관련 코드: **전체 codebase에서 0건**
-
-**참고**: `analysis/xpd_stats.py`에 `gof_model_selection_db()`가 GMM/truncnorm 등 다양한 분포를 지원하지만, 이는 **path-level** 분석용이며 `conditional_proxy.py`의 link-level proxy와 연결되지 않음.
-
-**잔존 위험**: Q2-4 (depol stress의 꼬리 분석)에서 Normal 가정이 체계적으로 heavy tail을 과소추정. 계획서의 "하위 5-10% quantile" 비교는 모델 예측이 아닌 경험적 CDF로만 유효.
+4. **B0 모듈과 러너 통합** (2-C): `_run_room_case()`를 `B0_room_box.run_case()` 기반으로 리팩터링
+5. **A5 scatterer 좌표축 정규화** (2-D): Gram-Schmidt 적용
 
 ---
 
-### 1-6. OLS → Huber IRLS
+## 5. 결론
 
-**주장**: Huber IRLS 기반 robust regression 옵션 추가(기본 on)
+1차 검토에서 지적한 **5개 치명적 문제, 7개 주요 문제, 4개 경미한 문제** 중:
 
-**실제 코드**:
+- **치명적 5건**: 전부 해결 (C0 확장, A5 stress_mode, 분포 확장, Room NLOS, floor 서브밴드)
+- **주요 7건**: 전부 해결 (A3 확장, Huber, min_bucket, LP baseline, A5 플래그, LOS 차단, claim_caution)
+- **경미 4건**: 전부 해결 (ANOVA, FDR, drift check, sensitivity)
 
-`conditional_proxy.py:65` — **변경 없음**:
-```python
-beta, *_ = np.linalg.lstsq(Xa, ya, rcond=None)
-```
-전체 codebase에서 "huber", "irls", "robust_reg", "iteratively_reweighted" 검색: **0건**
-
-**잔존 위험**: A5 극단 케이스(고-rho)의 outlier가 회귀 계수를 왜곡할 수 있음.
+잔존 사항은 모두 **설계 선택** 또는 **Minor** 수준으로, 파이프라인의 핵심 기능에 영향을 주지 않음. A5 2-pass 실행 절차만 문서화하면 전체 Q1-Q3 검증이 실행 가능한 상태.
 
 ---
 
-### 1-7. bucket 최소 표본
+## 6. 핵심 파일 참조 (병합 후)
 
-**주장**: min_bucket_n 파라미터화, 기본값 5→3
-
-**실제 코드**:
-
-`conditional_proxy.py`의 bucket 통계 계산 (lines 140-147):
-```python
-bucket_stats[k] = {
-    "u": bucket_u[k],
-    "n": int(len(v)),
-    "mu": float(np.mean(v)),
-    "sigma": float(np.std(v, ddof=1)) if len(v) > 1 else 0.0,
-}
-```
-**최소 N 제한 없음**. N=1인 버킷도 mu를 계산하고 `predict_distribution()`에서 우선 사용됨.
-
-`min_bucket_n` 파라미터: `conditional_proxy.py`에 **없음**.
-
-**참고**: `analysis/xpd_stats.py`에는 `min_n=20`이 있으나 이는 GOF 테스트용이며, proxy model의 bucket 통계와 무관.
-
-**잔존 위험**: 소수 표본 버킷의 sigma=0.0이 prediction interval을 점 추정으로 퇴화시킴.
-
----
-
-### 1-8. 주파수/서브밴드 floor 정보
-
-**주장**: floor reference에서 curve/subband를 metrics extras에 저장
-
-**실제 코드**:
-
-`dualcp_calibrate_floor.py`는 주파수별 벡터 `xpd_floor_db[Nf]`를 JSON으로 출력 → **이 부분은 정상**
-
-하지만 `run_standard_sim.py`의 `_build_floor_reference()` (lines 127-178)는:
-```python
-x = np.asarray([r["xpd_early_db"] for r in rows], dtype=float)
-...
-"xpd_floor_db": float(np.nanmedian(x)),
-```
-`xpd_early_db`는 이미 시간 영역에서 합산된 **단일 스칼라**이므로, 주파수별 floor 정보가 이 시점에서 이미 소실됨.
-
-`_lookup_floor()` (lines 181-213)도 스칼라 `xpd_floor_db`만 반환.
-
-`dualcp_metrics.py:_resolve_floor_band()` (lines 131-159)도 주파수별 floor를 `median` 스칼라로 압축:
-```python
-floor_band = float(np.median(floor_i))
-```
-
-**잔존 위험**: UWB 대역(3-10+ GHz)에서 안테나 XPD floor가 주파수 의존적일 경우, 단일 스칼라 floor로는 특정 서브밴드에서 체계적 편향 발생.
-
----
-
-### 1-9. claim_caution 모드
-
-**주장**: `--claim-caution-mode {scaled,half_width,off}`, `--claim-caution-scale` 추가
-
-**실제 코드**:
-
-전체 codebase에서 `claim_caution_mode`, `caution_mode`, `caution_scale` 검색: **0건**
-
-기존 하드코딩 유지 (`dualcp_metrics.py:294`):
-```python
-out["claim_caution_early"] = bool(abs(xpd_early_excess) <= u)
-```
-
-`run_standard_sim.py:576-577`도 동일 로직:
-```python
-caution_e = bool(np.isfinite(delta) and abs(ex_e) <= abs(delta))
-```
-
----
-
-### 1-10. 순차 측정 drift check
-
-**주장**: 3-CSV ingest 추가, drift metric 저장, `--max-drift-db` 필터
-
-**실제 코드**:
-
-- 측정 포맷 (`scenarios/runner.py:1530`): `choices=["matrix_csv", "four_csv", "dualcp_two_csv"]` — 3-CSV 없음
-- `co_pre`, `co_post`, `max_drift` 검색: **0건**
-- drift 관련 코드: `success_checks.py:103`에 `"distance_or_drift"` 라벨이 있으나, 이는 C0 floor 변동의 원인 분류 라벨일 뿐 실제 drift 검출이 아님
-
----
-
-### 1-11. LP baseline
-
-**주장**: CP/LP 동시 실행 및 비교 리포트 스크립트 추가
-
-**실제 코드**:
-
-`run_cp_lp_baseline.py` 검색: **없음**
-`lp_baseline`, `cp_lp`, `linear_baseline` 검색: **0건**
-
----
-
-### 1-12. ANOVA/FDR/혼동 진단
-
-**주장**: C0 distance/yaw ANOVA + eta2, FDR-BH, distance-vs-LOS confounding
-
-**실제 코드**:
-
-`anova`, `eta_sq`, `eta2`, `fdr`, `benjamini`, `confound` 검색: **전부 0건**
-
----
-
-## 2. 새로 발견된 문제
-
-### 2-A. A5 stress_flag의 base/stress 비교 불가 구조 (신규, Critical)
-
-`run_standard_sim.py:367-368`에서 `--stress-flag`가 **전역** 적용:
-```python
-"roughness_flag": int(bool(args.stress_flag)),
-"human_flag": int(bool(args.stress_flag)),
-```
-
-결과:
-- `--stress-flag` OFF: 모든 A5 → roughness=0, human=0 → stress 그룹 0건
-- `--stress-flag` ON: 모든 A5 → roughness=1, human=1 → base 그룹 0건
-
-`check_A4_A5_breaking()`의 `base` vs `stress` 비교가 **구조적으로 항상 한쪽이 빈 집합**입니다.
-
-**해결 방향**: rho 값 기반으로 stress 레벨을 분류하거나, stress_flag를 케이스별로 설정해야 합니다.
-
-### 2-B. C0 yaw/pitch가 "phantom 변수"로 작동 (신규, Critical)
-
-`run_standard_sim.py:274`에서 yaw/pitch가 RT 시뮬레이션에 전달되지 않으므로, `--yaw-list 0,15,30`으로 실행해도 모든 케이스가 동일한 XPD를 생성합니다. 그런데 metadata에는 서로 다른 yaw 값이 기록되므로:
-- `check_C0_floor()`의 `yaw_rank_corr`이 **0에 가까운 무의미한 상관**을 반환
-- 이를 "각도 민감도가 없다"는 결론으로 오해할 위험
-
-### 2-C. A5가 처음 8개 케이스만 사용 (신규, Minor)
-
-`run_standard_sim.py:353`:
-```python
-params = A5_depol_stress.build_sweep_params()[:8]
-```
-A5는 5 rho × 6 rep = 30 케이스를 생성하지만, 러너가 **처음 8개만** 사용. 이는 rho=0.05 (6개) + rho=0.15 (2개)만 포함하여, 고-rho 범위의 depolarization stress를 전혀 테스트하지 못합니다.
-
-### 2-D. B2/B3의 NLOS 분류가 기하 의존적 (신규, Minor)
-
-`_run_room_case()`에서 B2는 x=5.0에 벽 하나, B3는 x=5.5에 벽 두 개를 배치합니다. Tx가 x=2.0에 있으므로, Rx의 x 좌표가 5.0 미만이면 대부분 LOS가 유지됩니다. 즉, NLOS 포인트는 grid의 한쪽 끝에만 집중되어, **거리와 LOSflag가 강하게 상관**됩니다. 이는 회귀 모델에서 d_m과 LOSflag의 계수 분리를 어렵게 합니다.
-
----
-
-## 3. 우선순위 권고
-
-### 즉시 수정 필요 (파이프라인 무결성)
-
-1. **A5 stress_flag → 케이스별 분류** (2-A): rho threshold 기반으로 base(rho<0.1)/stress(rho>=0.1) 분리
-2. **C0 yaw/pitch RT 반영** (1-0): `run_case()`에 안테나 방향 전달, 또는 phantom 변수 제거
-3. **A5 케이스 수 확대** (2-C): `[:8]` 제한 제거 또는 rho 범위 균등 샘플링
-4. **A3 케이스 확대** (1-1): `build_sweep_params()`에 offset × rx_position 조합 추가
-
-### 통계 모델 보강 (논문 출판 전)
-
-5. **Student-t 분포** (1-5): `conditional_proxy.py`에 분포 선택 옵션
-6. **Huber regression** (1-6): `_fit_regression()`에 robust 옵션
-7. **bucket min_n** (1-7): N < threshold일 때 regression fallback 강제
-
-### 중기 과제 (논문 범위 조정으로 우회 가능)
-
-8. LP baseline (1-11): 논문 scope를 "CP validity conditions"로 한정
-9. Drift check (1-10): 측정 프로토콜 문서로 대체 가능
-10. ANOVA/FDR (1-12): 탐색적 분석으로 명시하면 수용 가능
-
----
-
-## 4. 코드 참조 요약
-
-| 파일 | 라인 | 현재 상태 | 필요 조치 |
-|------|------|----------|----------|
-| `scenarios/C0_free_space.py` | 15-16, 19-40 | 거리 3점, 각도 없음 | yaw/pitch 파라미터 추가 |
-| `scenarios/A3_corner_2bounce.py` | 39-45 | 4개 케이스 고정 | sweep 확장 |
-| `scenarios/A5_depol_stress.py` | 44-58 | 합성 rho only | stress 레벨 분류 메타 추가 |
-| `scripts/run_standard_sim.py` | 274 | yaw/pitch 미전달 | params에 각도 포함 |
-| `scripts/run_standard_sim.py` | 353 | `[:8]` 하드 제한 | 제거 또는 파라미터화 |
-| `scripts/run_standard_sim.py` | 367-368 | stress_flag 전역 | 케이스별 분류 |
-| `analysis/conditional_proxy.py` | 40-76, 118-196 | Normal-only, OLS, min_n 없음 | 분포/회귀/버킷 전부 보강 |
-| `analysis/dualcp_metrics.py` | 131-159, 291-298 | floor 스칼라 압축, caution 하드코딩 | 서브밴드 보존, 모드 파라미터화 |
+| 파일 | 역할 | 상태 |
+|------|------|------|
+| `scenarios/C0_free_space.py` | 보정 시나리오 | ✅ 5거리, yaw/pitch 회전 |
+| `scenarios/A3_corner_2bounce.py` | Even-bounce | ✅ 12 기하 조합 |
+| `scenarios/A5_depol_stress.py` | Depol stress | ✅ 4 stress_mode, scatterer |
+| `scenarios/common.py` | 공유 헬퍼 | ✅ `make_los_blocker_plane()` |
+| `scenarios/A2_pec_plane.py` | Odd-bounce | ✅ los_blocker 지원 |
+| `scenarios/A4_dielectric_plane.py` | 재질 sweep | ✅ los_blocker 지원 |
+| `scenarios/B0_room_box.py` | Room grid | ⚠️ 러너와 부분 분리 |
+| `scripts/run_standard_sim.py` | 시뮬레이션 러너 | ✅ 전체 CLI 확장 완료 |
+| `scripts/fit_dualcp_proxy.py` | 프록시 모델 피팅 | ✅ dist_family, robust, FDR |
+| `scripts/run_cp_lp_baseline.py` | LP baseline | ✅ 신규 생성 |
+| `scripts/dualcp_calibrate_floor.py` | Floor 보정 | ✅ 3-CSV, drift 필터 |
+| `analysis/conditional_proxy.py` | 조건부 모델 | ✅ Student-t, Huber, min_n |
+| `analysis/success_checks.py` | 검증 로직 | ✅ ANOVA, FDR, confounding |
+| `analysis/measurement_compare.py` | 측정 비교 | ✅ 3-CSV drift 지원 |
+| `analysis/lp_baseline_compare.py` | CP/LP 비교 | ✅ 신규 생성 |
+| `analysis/dualcp_metrics.py` | 지표 계산 | ⚠️ 측정 경로 scalar 압축 유지 |
+| `analysis/link_conditions.py` | 조건 변수 | ✅ A5 플래그 연동 |
+| `calibration/floor_model.py` | Floor 모델 클래스 | ✅ 변경 불요 |
