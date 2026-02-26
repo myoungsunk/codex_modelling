@@ -75,12 +75,17 @@ class RunnerSmokeTests(unittest.TestCase):
             yaw_vals = []
             with metrics_csv.open("r", encoding="utf-8", newline="") as f:
                 rd = csv.DictReader(f)
+                fieldnames = list(rd.fieldnames or [])
                 for r in rd:
                     try:
                         yaw_vals.append(float(r.get("yaw_deg", "nan")))
                     except Exception:
                         pass
             self.assertGreaterEqual(len(set(v for v in yaw_vals if v == v)), 2)
+            self.assertIn("XPD_early_minus_floor_curve_db", fieldnames)
+            self.assertIn("XPD_late_minus_floor_curve_db", fieldnames)
+            self.assertNotIn("XPD_early_excess_curve_db", fieldnames)
+            self.assertNotIn("XPD_late_excess_curve_db", fieldnames)
 
             floor_json = out_dir / "floor_reference.json"
             self.assertTrue(floor_json.exists())
@@ -92,6 +97,11 @@ class RunnerSmokeTests(unittest.TestCase):
             self.assertEqual(len(freq), len(floor))
             self.assertEqual(len(freq), len(uncert))
             self.assertTrue(isinstance(ref.get("subbands", []), list))
+            p5 = float(ref.get("p5_db", "nan"))
+            p95 = float(ref.get("p95_db", "nan"))
+            d = float(ref.get("delta_floor_db", "nan"))
+            if p5 == p5 and p95 == p95 and d == d:
+                self.assertAlmostEqual(d, 0.5 * (p95 - p5), places=9)
 
 
 if __name__ == "__main__":

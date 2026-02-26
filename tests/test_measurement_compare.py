@@ -80,7 +80,53 @@ class MeasurementBridgeTests(unittest.TestCase):
         self.assertLess(float(out["rmse_mag_db_meas_vs_rt"]), 1e-9)
         self.assertGreaterEqual(float(out["xpd_ks2_p_meas_vs_rt"]), 0.99)
 
+    def test_compare_uses_dualcp_xpd_mode_for_dualcp_format(self) -> None:
+        nf = 8
+        f = np.linspace(6.0e9, 6.2e9, nf)
+        A = np.zeros((nf, 2, 2), dtype=np.complex128)
+        A[:, 0, 0] = 1.0
+        A[:, 1, 0] = 0.1
+        A[:, 0, 1] = 0.8
+        A[:, 1, 1] = 0.8
+        ds = {
+            "meta": {"basis": "linear", "convention": "IEEE-RHCP"},
+            "frequency": f,
+            "scenarios": {
+                "S0": {
+                    "cases": {
+                        "0": {
+                            "params": {},
+                            "paths": [
+                                {
+                                    "tau_s": 0.0,
+                                    "A_f": A.copy(),
+                                    "J_f": A.copy(),
+                                    "meta": {"bounce_count": 0},
+                                }
+                            ],
+                        }
+                    }
+                }
+            },
+        }
+        meas = MeasurementData(
+            frequency_hz=f,
+            H_f=A.copy(),
+            source="unit-test",
+            meta={"format": "dualcp_two_csv", "basis": "linear", "convention": "IEEE-RHCP"},
+        )
+        out = compare_measured_to_dataset(
+            ds,
+            measurement=meas,
+            channel_definition="embedded",
+            scenario_id="S0",
+            case_id="0",
+            create_plots=False,
+        )
+        self.assertEqual(str(out.get("xpd_mode")), "dualcp")
+        # dualcp definition uses |H00|^2 / |H10|^2 = 20 dB for this toy setup.
+        self.assertAlmostEqual(float(out["xpd_mu_measured_db"]), 20.0, places=6)
+
 
 if __name__ == "__main__":
     unittest.main()
-

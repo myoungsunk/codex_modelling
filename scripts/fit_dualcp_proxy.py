@@ -10,14 +10,36 @@ from pathlib import Path
 from typing import Any
 import sys
 
-import matplotlib.pyplot as plt
+import matplotlib
 import numpy as np
 from scipy import stats
 
 if __package__ is None or __package__ == "":
     sys.path.append(str(Path(__file__).resolve().parents[1]))
 
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
 from analysis.conditional_proxy import fit_proxy_model, predict_distribution
+
+
+Z_KEY_ALIASES = {
+    "xpd_early_excess_db": ["XPD_early_excess_db"],
+    "xpd_late_excess_db": ["XPD_late_excess_db"],
+    "l_pol_db": ["L_pol_db"],
+    "xpd_early_db": ["XPD_early_db"],
+    "xpd_late_db": ["XPD_late_db"],
+}
+
+U_KEY_ALIASES = {
+    "los_blocked": ["LOSflag"],
+    "material": ["material_class"],
+    "distance_d_m": ["d_m"],
+    "pathloss_proxy_db": ["EL_proxy_db"],
+    "excess_loss_proxy_db": ["EL_proxy_db"],
+    "parity": ["dominant_parity_early"],
+    "scatter_stress": ["roughness_flag"],
+}
 
 
 def _maybe_num(v: str) -> Any:
@@ -39,6 +61,78 @@ def _load_csv(path: str | Path) -> list[dict[str, Any]]:
         for r in rd:
             rows.append({k: _maybe_num(v) for k, v in r.items()})
     return rows
+
+
+def _augment_rows_for_compat(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for r0 in rows:
+        r = dict(r0)
+        los = r.get("LOSflag", None)
+        try:
+            los_i = int(float(los))
+            r.setdefault("los_blocked", int(1 - los_i))
+        except Exception:
+            pass
+        if "material_class" in r and "material" not in r:
+            r["material"] = r.get("material_class")
+        if "d_m" in r and "distance_d_m" not in r:
+            r["distance_d_m"] = r.get("d_m")
+        if "EL_proxy_db" in r:
+            r.setdefault("pathloss_proxy_db", r.get("EL_proxy_db"))
+            r.setdefault("excess_loss_proxy_db", r.get("EL_proxy_db"))
+        if "dominant_parity_early" in r and "parity" not in r:
+            r["parity"] = r.get("dominant_parity_early")
+        if "scatter_stress" not in r:
+            try:
+                rr = int(float(r.get("roughness_flag", 0)))
+                hh = int(float(r.get("human_flag", 0)))
+                r["scatter_stress"] = int(1 if (rr == 1 or hh == 1) else 0)
+            except Exception:
+                pass
+        out.append(r)
+    return out
+
+
+def _resolve_requested_keys(
+    rows: list[dict[str, Any]],
+    requested_keys: list[str],
+    aliases: dict[str, list[str]],
+) -> list[str]:
+    if not requested_keys:
+        return []
+    keys = []
+    lower_to_key: dict[str, str] = {}
+    for r in rows:
+        for k in r.keys():
+            ks = str(k)
+            keys.append(ks)
+            lower_to_key.setdefault(ks.lower(), ks)
+    avail = set(keys)
+    resolved: list[str] = []
+    for req in requested_keys:
+        q = str(req).strip()
+        if not q:
+            continue
+        cands = [q, *aliases.get(q.lower(), [])]
+        hit = None
+        for c in cands:
+            if c in avail:
+                hit = c
+                break
+            lc = str(c).lower()
+            if lc in lower_to_key:
+                hit = lower_to_key[lc]
+                break
+        resolved.append(str(hit if hit is not None else q))
+    # stable dedup
+    out = []
+    seen = set()
+    for k in resolved:
+        if k in seen:
+            continue
+        seen.add(k)
+        out.append(k)
+    return out
 
 
 def _merge_rows(
@@ -212,14 +306,14 @@ def main() -> None:
     parser.add_argument(
         "--z-keys",
         type=str,
-        default="xpd_early_excess_db,xpd_late_excess_db,l_pol_db,rho_early_db",
+        default="XPD_early_excess_db,XPD_late_excess_db,L_pol_db,rho_early_db",
     )
     parser.add_argument(
         "--u-keys",
         type=str,
         default=(
-            "los_blocked,material,scatter_stress,distance_d_m,pathloss_proxy_db,"
-            "delay_bin,parity,incidence_angle_bin,excess_loss_proxy_db,bounce_count"
+            "LOSflag,material_class,roughness_flag,human_flag,d_m,"
+            "EL_proxy_db,delay_bin,dominant_parity_early"
         ),
     )
     args = parser.parse_args()
@@ -231,9 +325,13 @@ def main() -> None:
         bridge_rows = rt_rows
     else:
         bridge_rows = list(rows)
+    rows = _augment_rows_for_compat(rows)
+    bridge_rows = _augment_rows_for_compat(bridge_rows)
 
-    z_keys = [x.strip() for x in str(args.z_keys).split(",") if x.strip()]
-    u_keys = [x.strip() for x in str(args.u_keys).split(",") if x.strip()]
+    z_keys_req = [x.strip() for x in str(args.z_keys).split(",") if x.strip()]
+    u_keys_req = [x.strip() for x in str(args.u_keys).split(",") if x.strip()]
+    z_keys = _resolve_requested_keys(rows, z_keys_req, Z_KEY_ALIASES)
+    u_keys = _resolve_requested_keys(rows, u_keys_req, U_KEY_ALIASES)
 
     # Provide delay_bin for early/late variables.
     for r in rows:
@@ -264,9 +362,10 @@ def main() -> None:
         rows_z: list[dict[str, Any]] = []
         for r in rows:
             rv = dict(r)
-            if "xpd_early" in zk:
+            zkl = str(zk).lower()
+            if "xpd_early" in zkl:
                 rv["delay_bin"] = "early"
-            elif "xpd_late" in zk:
+            elif "xpd_late" in zkl:
                 rv["delay_bin"] = "late"
             rows_z.append(rv)
         zvals = _finite_vals(rows_z, zk)
@@ -288,9 +387,10 @@ def main() -> None:
         sig_pred = []
         for r in bridge_rows:
             rr = dict(r)
-            if "xpd_early" in zk:
+            zkl = str(zk).lower()
+            if "xpd_early" in zkl:
                 rr["delay_bin"] = "early"
-            elif "xpd_late" in zk:
+            elif "xpd_late" in zkl:
                 rr["delay_bin"] = "late"
             mu, sig, _ = predict_distribution(model, rr)
             mu_pred.append(float(mu))

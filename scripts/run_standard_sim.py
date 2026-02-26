@@ -148,7 +148,8 @@ def _build_floor_reference(bundles: list[StandardOutputBundle], bin_keys: list[s
         "xpd_floor_db": float(np.nanmedian(x)) if len(x) else float("nan"),
         "p5_db": _pctl(x, 5.0),
         "p95_db": _pctl(x, 95.0),
-        "delta_floor_db": float(_pctl(x, 95.0) - _pctl(x, 5.0)) if len(x) else float("nan"),
+        # Use half-width uncertainty (p95-p5)/2 for consistency with curve/subband uncertainty.
+        "delta_floor_db": float(0.5 * (_pctl(x, 95.0) - _pctl(x, 5.0))) if len(x) else float("nan"),
         "bin_keys": list(bin_keys or ["yaw_deg", "pitch_deg"]),
         "groups": [],
     }
@@ -173,7 +174,7 @@ def _build_floor_reference(bundles: list[StandardOutputBundle], bin_keys: list[s
                 "xpd_floor_db": float(np.nanmedian(vals)),
                 "p5_db": _pctl(vals, 5.0),
                 "p95_db": _pctl(vals, 95.0),
-                "delta_floor_db": float(_pctl(vals, 95.0) - _pctl(vals, 5.0)),
+                "delta_floor_db": float(0.5 * (_pctl(vals, 95.0) - _pctl(vals, 5.0))),
             }
         )
     out["groups"] = groups
@@ -869,40 +870,42 @@ def main() -> None:
                 b.metrics.extras["claim_caution_scale"] = float(args.claim_caution_scale)
 
             if len(f_curve_db) > 0:
-                ex_e_curve = np.asarray(b.metrics.XPD_early_db - f_curve_db, dtype=float)
-                ex_l_curve = np.asarray(b.metrics.XPD_late_db - f_curve_db, dtype=float)
+                # NOTE: This is scalar-link metric minus floor curve (not true per-frequency XPD excess).
+                # We keep it for calibration diagnostics with explicit naming.
+                minus_e_curve = np.asarray(b.metrics.XPD_early_db - f_curve_db, dtype=float)
+                minus_l_curve = np.asarray(b.metrics.XPD_late_db - f_curve_db, dtype=float)
                 c_e_curve = [
                     _claim_caution_flag(float(xx), float(uu), mode=str(args.claim_caution_mode), scale=float(args.claim_caution_scale))
-                    for xx, uu in zip(ex_e_curve.tolist(), f_curve_unc.tolist())
+                    for xx, uu in zip(minus_e_curve.tolist(), f_curve_unc.tolist())
                 ]
                 c_l_curve = [
                     _claim_caution_flag(float(xx), float(uu), mode=str(args.claim_caution_mode), scale=float(args.claim_caution_scale))
-                    for xx, uu in zip(ex_l_curve.tolist(), f_curve_unc.tolist())
+                    for xx, uu in zip(minus_l_curve.tolist(), f_curve_unc.tolist())
                 ]
                 b.metrics.extras["xpd_floor_freq_hz"] = np.asarray(f_curve_hz, dtype=float).tolist()
                 b.metrics.extras["xpd_floor_curve_db"] = np.asarray(f_curve_db, dtype=float).tolist()
                 b.metrics.extras["xpd_floor_uncert_curve_db"] = np.asarray(f_curve_unc, dtype=float).tolist()
-                b.metrics.extras["XPD_early_excess_curve_db"] = ex_e_curve.tolist()
-                b.metrics.extras["XPD_late_excess_curve_db"] = ex_l_curve.tolist()
+                b.metrics.extras["XPD_early_minus_floor_curve_db"] = minus_e_curve.tolist()
+                b.metrics.extras["XPD_late_minus_floor_curve_db"] = minus_l_curve.tolist()
                 b.metrics.extras["claim_caution_early_curve"] = c_e_curve
                 b.metrics.extras["claim_caution_late_curve"] = c_l_curve
 
             if len(sb_floor) > 0:
-                ex_e_sb = np.asarray(b.metrics.XPD_early_db - sb_floor, dtype=float)
-                ex_l_sb = np.asarray(b.metrics.XPD_late_db - sb_floor, dtype=float)
+                minus_e_sb = np.asarray(b.metrics.XPD_early_db - sb_floor, dtype=float)
+                minus_l_sb = np.asarray(b.metrics.XPD_late_db - sb_floor, dtype=float)
                 c_e_sb = [
                     _claim_caution_flag(float(xx), float(uu), mode=str(args.claim_caution_mode), scale=float(args.claim_caution_scale))
-                    for xx, uu in zip(ex_e_sb.tolist(), sb_unc.tolist())
+                    for xx, uu in zip(minus_e_sb.tolist(), sb_unc.tolist())
                 ]
                 c_l_sb = [
                     _claim_caution_flag(float(xx), float(uu), mode=str(args.claim_caution_mode), scale=float(args.claim_caution_scale))
-                    for xx, uu in zip(ex_l_sb.tolist(), sb_unc.tolist())
+                    for xx, uu in zip(minus_l_sb.tolist(), sb_unc.tolist())
                 ]
                 b.metrics.extras["xpd_floor_subbands"] = sb_rows
                 b.metrics.extras["xpd_floor_subband_db"] = sb_floor.tolist()
                 b.metrics.extras["xpd_floor_uncert_subband_db"] = sb_unc.tolist()
-                b.metrics.extras["XPD_early_excess_subband_db"] = ex_e_sb.tolist()
-                b.metrics.extras["XPD_late_excess_subband_db"] = ex_l_sb.tolist()
+                b.metrics.extras["XPD_early_minus_floor_subband_db"] = minus_e_sb.tolist()
+                b.metrics.extras["XPD_late_minus_floor_subband_db"] = minus_l_sb.tolist()
                 b.metrics.extras["claim_caution_early_subband"] = c_e_sb
                 b.metrics.extras["claim_caution_late_subband"] = c_l_sb
 
