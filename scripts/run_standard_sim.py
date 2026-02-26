@@ -6,6 +6,7 @@ import argparse
 from datetime import datetime, timezone
 import json
 from pathlib import Path
+import re
 import shlex
 import subprocess
 import sys
@@ -32,7 +33,7 @@ from rt_core.tracer import trace_paths
 from rt_io.standard_outputs_hdf5 import export_csv, save_run
 from rt_types.standard_outputs import RayTable, SCHEMA_VERSION, StandardOutputBundle
 from scenarios import A2_pec_plane, A3_corner_2bounce, A4_dielectric_plane, A5_depol_stress, B0_room_box, C0_free_space
-from scenarios.common import default_antennas, paths_to_records, uwb_frequency
+from scenarios.common import default_antennas, make_los_blocker_plane, paths_to_records, uwb_frequency
 
 
 def _pctl(x: np.ndarray, q: float) -> float:
@@ -54,6 +55,25 @@ def _parse_float_list(raw: str, default: list[float]) -> list[float]:
         except ValueError:
             continue
     return out or list(default)
+
+
+def _parse_bool(raw: Any, default: bool = False) -> bool:
+    if raw is None:
+        return bool(default)
+    if isinstance(raw, bool):
+        return bool(raw)
+    s = str(raw).strip().lower()
+    if s in {"1", "true", "t", "yes", "y", "on"}:
+        return True
+    if s in {"0", "false", "f", "no", "n", "off"}:
+        return False
+    return bool(default)
+
+
+def _sanitize_token(s: Any) -> str:
+    out = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(s))
+    out = out.strip("._")
+    return out or "na"
 
 
 def _git_meta() -> tuple[str, str]:
@@ -405,10 +425,181 @@ def _floor_subbands_from_reference(reference: dict[str, Any]) -> tuple[list[dict
     return rows, np.asarray(f, dtype=float), np.asarray(u, dtype=float)
 
 
-def _run_room_case(kind: str, rx_x: float, rx_y: float, f_hz: np.ndarray, basis: str = "circular") -> list[dict[str, Any]]:
-    tx, rx = default_antennas(basis=basis)
-    tx.position[:] = [2.0, 0.0, 1.5]
-    rx.position[:] = [rx_x, rx_y, 1.5]
+def _case_label(scenario_id: str, params: dict[str, Any]) -> str:
+    s = str(scenario_id).upper()
+    p = dict(params)
+    if s == "C0":
+        return (
+            f"d={float(p.get('distance_m', np.nan)):.2f}m"
+            f"_yaw={float(p.get('yaw_deg', 0.0)):+.1f}"
+            f"_pitch={float(p.get('pitch_deg', 0.0)):+.1f}"
+            f"_rep={int(p.get('rep_id', 0))}"
+        )
+    if s == "A2":
+        return (
+            f"d={float(p.get('distance_m', np.nan)):.2f}m"
+            f"_y={float(p.get('y_plane', np.nan)):.2f}"
+            f"_rep={int(p.get('rep_id', 0))}"
+        )
+    if s == "A3":
+        return (
+            f"off={float(p.get('offset', np.nan)):.2f}"
+            f"_rx=({float(p.get('rx_x', np.nan)):.2f},{float(p.get('rx_y', np.nan)):.2f})"
+            f"_rep={int(p.get('rep_id', 0))}"
+        )
+    if s == "A4":
+        return (
+            f"mat={_sanitize_token(p.get('material', 'na'))}"
+            f"_y={float(p.get('y_plane', np.nan)):.2f}"
+            f"_d={float(p.get('distance_m', np.nan)):.2f}"
+            f"_rep={int(p.get('rep_id', 0))}"
+        )
+    if s == "A5":
+        return (
+            f"rho={float(p.get('rho', np.nan)):.2f}"
+            f"_rep={int(p.get('rep_id', 0))}"
+            f"_outer={int(p.get('rep_outer', 0))}"
+        )
+    if s.startswith("B"):
+        return f"rx=({float(p.get('rx_x', np.nan)):.2f},{float(p.get('rx_y', np.nan)):.2f})"
+    return _sanitize_token(params)
+
+
+def _plane_material_name(plane: Plane) -> str:
+    try:
+        mat = plane.material
+        name = str(getattr(mat, "name", "") or "")
+        if name:
+            return name
+        return str(getattr(mat, "kind", "unknown"))
+    except Exception:
+        return "unknown"
+
+
+def _plane_vertices_xyz(plane: Plane) -> np.ndarray:
+    p0 = np.asarray(plane.p0, dtype=float)
+    u, v = plane.local_axes()
+    hu = float(plane.half_extent_u) if plane.half_extent_u is not None else 0.0
+    hv = float(plane.half_extent_v) if plane.half_extent_v is not None else 0.0
+    if hu <= 0.0 or hv <= 0.0:
+        return np.asarray([p0], dtype=float)
+    return np.asarray(
+        [
+            p0 + hu * u + hv * v,
+            p0 + hu * u - hv * v,
+            p0 - hu * u - hv * v,
+            p0 - hu * u + hv * v,
+        ],
+        dtype=float,
+    )
+
+
+def _plane_object_type(plane: Plane, scenario_id: str) -> str:
+    pid = int(getattr(plane, "id", -1))
+    mat_name = _plane_material_name(plane).lower()
+    sid = str(scenario_id).upper()
+    if "absorber" in mat_name:
+        return "absorber"
+    if pid >= 9500:
+        return "furniture"
+    if pid in {201, 301, 302}:
+        return "obstacle"
+    if sid.startswith("B") and pid in {101, 102, 103, 104}:
+        return "wall"
+    if sid.startswith("B") and pid in {105, 106}:
+        return "floor_ceiling"
+    if sid in {"A2", "A3", "A4", "A5"}:
+        return "reflector"
+    return "object"
+
+
+def _serialize_scene_objects(scene: list[Plane], scenario_id: str) -> list[dict[str, Any]]:
+    objects: list[dict[str, Any]] = []
+    for idx, plane in enumerate(scene):
+        verts = _plane_vertices_xyz(plane)
+        poly_xy = [[float(v[0]), float(v[1])] for v in verts]
+        objects.append(
+            {
+                "name": f"plane_{int(getattr(plane, 'id', idx))}",
+                "type": _plane_object_type(plane, scenario_id),
+                "material": _plane_material_name(plane),
+                "poly_xy": poly_xy,
+                "closed": bool(len(poly_xy) >= 3),
+            }
+        )
+    return objects
+
+
+def _estimate_path_power_lin(path_rec: dict[str, Any]) -> float:
+    sg = np.asarray(path_rec.get("scalar_gain_f", []), dtype=complex)
+    if len(sg) > 0:
+        return float(np.mean(np.abs(sg) ** 2))
+    af = np.asarray(path_rec.get("A_f", []), dtype=complex)
+    if len(af) > 0:
+        return float(np.mean(np.abs(af) ** 2))
+    return 0.0
+
+
+def _extract_rays_topk(path_records: list[dict[str, Any]], k: int) -> list[dict[str, Any]]:
+    if int(k) <= 0:
+        return []
+    scored = []
+    for i, p in enumerate(path_records):
+        points = p.get("points", [])
+        if not points:
+            continue
+        p_lin = _estimate_path_power_lin(p)
+        scored.append((float(p_lin), int(i), p))
+    scored.sort(key=lambda t: t[0], reverse=True)
+    out = []
+    for p_lin, i, p in scored[: int(k)]:
+        seg_count = int(p.get("segment_count", 0))
+        n_bounce = int(max(0, seg_count - 1))
+        out.append(
+            {
+                "ray_id": int(i),
+                "n_bounce": int(n_bounce),
+                "P_lin": float(p_lin),
+                "tau_s": float(p.get("tau_s", np.nan)),
+                "vertices_xyz": [[float(x), float(y), float(z)] for x, y, z in np.asarray(p.get("points", []), dtype=float)],
+            }
+        )
+    return out
+
+
+def _scene_bounds(
+    tx: np.ndarray,
+    rx: np.ndarray,
+    objects: list[dict[str, Any]],
+    rays: list[dict[str, Any]],
+) -> dict[str, float]:
+    xs: list[float] = [float(tx[0]), float(rx[0])]
+    ys: list[float] = [float(tx[1]), float(rx[1])]
+    for obj in objects:
+        for pt in obj.get("poly_xy", []):
+            if isinstance(pt, (list, tuple)) and len(pt) >= 2:
+                xs.append(float(pt[0]))
+                ys.append(float(pt[1]))
+    for r in rays:
+        for p in r.get("vertices_xyz", []):
+            if isinstance(p, (list, tuple)) and len(p) >= 2:
+                xs.append(float(p[0]))
+                ys.append(float(p[1]))
+    if not xs or not ys:
+        return {"xmin": -1.0, "xmax": 1.0, "ymin": -1.0, "ymax": 1.0}
+    xmin, xmax = float(np.nanmin(xs)), float(np.nanmax(xs))
+    ymin, ymax = float(np.nanmin(ys)), float(np.nanmax(ys))
+    pad_x = 0.05 * max(1.0, xmax - xmin)
+    pad_y = 0.05 * max(1.0, ymax - ymin)
+    return {
+        "xmin": float(xmin - pad_x),
+        "xmax": float(xmax + pad_x),
+        "ymin": float(ymin - pad_y),
+        "ymax": float(ymax + pad_y),
+    }
+
+
+def _build_room_scene(kind: str) -> list[Plane]:
     scene = B0_room_box.build_scene()
     if kind == "B2":
         scene.append(
@@ -448,6 +639,134 @@ def _run_room_case(kind: str, rx_x: float, rx_y: float, f_hz: np.ndarray, basis:
                 ),
             ]
         )
+    return scene
+
+
+def _build_scene_snapshot(
+    scenario_id: str,
+    params: dict[str, Any],
+    *,
+    basis: str,
+    los_block_mode: str,
+    a5_stress_mode: str,
+    a5_scatterer_count: int,
+) -> tuple[np.ndarray, np.ndarray, list[Plane]]:
+    s = str(scenario_id).upper()
+    tx, rx = default_antennas(basis=basis)
+    scene: list[Plane] = []
+    los_blocker = str(los_block_mode).lower().strip() == "occluder"
+
+    if s == "C0":
+        rx.position[:] = [float(params.get("distance_m", 1.0)), 0.0, 1.5]
+        return np.asarray(tx.position, dtype=float), np.asarray(rx.position, dtype=float), scene
+
+    if s == "A2":
+        rx.position[:] = [float(params.get("distance_m", 6.0)), 0.0, 1.5]
+        scene = A2_pec_plane.build_scene(y_plane=float(params.get("y_plane", 2.0)))
+        if los_blocker:
+            scene.append(make_los_blocker_plane(tx.position, rx.position, plane_id=9101))
+        return np.asarray(tx.position, dtype=float), np.asarray(rx.position, dtype=float), scene
+
+    if s == "A3":
+        tx.position[:] = [0.0, 0.0, 1.5]
+        rx.position[:] = [float(params.get("rx_x", 3.5)), float(params.get("rx_y", 4.5)), 1.5]
+        scene = A3_corner_2bounce.build_scene(offset=float(params.get("offset", 3.5)))
+        if los_blocker:
+            scene.append(make_los_blocker_plane(tx.position, rx.position, plane_id=9201))
+        return np.asarray(tx.position, dtype=float), np.asarray(rx.position, dtype=float), scene
+
+    if s == "A4":
+        rx.position[:] = [float(params.get("distance_m", 6.0)), 0.0, 1.5]
+        scene = A4_dielectric_plane.build_scene(
+            str(params.get("material", "wood")),
+            y_plane=float(params.get("y_plane", 2.0)),
+        )
+        if los_blocker:
+            scene.append(make_los_blocker_plane(tx.position, rx.position, plane_id=9301))
+        return np.asarray(tx.position, dtype=float), np.asarray(rx.position, dtype=float), scene
+
+    if s == "A5":
+        rx.position[:] = [float(params.get("rx_x", 3.5)), float(params.get("rx_y", 4.5)), 1.5]
+        scene = A5_depol_stress.build_scene(offset=float(params.get("offset", 3.5)))
+        mode = str(a5_stress_mode).lower().strip()
+        if mode in {"geometry", "hybrid"} and int(a5_scatterer_count) > 0:
+            append_fn = getattr(A5_depol_stress, "_append_stress_scatterers", None)
+            if callable(append_fn):
+                append_fn(
+                    scene,
+                    seed=int(params.get("seed", A5_depol_stress.BASE_SEED)),
+                    count=int(a5_scatterer_count),
+                )
+        if los_blocker:
+            scene.append(make_los_blocker_plane(tx.position, rx.position, plane_id=9401))
+        return np.asarray(tx.position, dtype=float), np.asarray(rx.position, dtype=float), scene
+
+    if s in {"B1", "B2", "B3"}:
+        tx.position[:] = [2.0, 0.0, 1.5]
+        rx.position[:] = [float(params.get("rx_x", 2.0)), float(params.get("rx_y", 0.0)), 1.5]
+        scene = _build_room_scene(s)
+        return np.asarray(tx.position, dtype=float), np.asarray(rx.position, dtype=float), scene
+
+    return np.asarray(tx.position, dtype=float), np.asarray(rx.position, dtype=float), scene
+
+
+def _export_scene_debug_for_case(
+    case_rec: dict[str, Any],
+    *,
+    out_dir: Path,
+    basis: str,
+    los_block_mode: str,
+    a5_stress_mode: str,
+    a5_scatterer_count: int,
+    debug_rays_k: int,
+    scene_plane: str,
+    git_hash: str,
+    cmdline: str,
+    seed: int,
+) -> Path:
+    scenario_id = str(case_rec.get("scenario_id", "NA"))
+    case_id = str(case_rec.get("case_id", "NA"))
+    params = dict(case_rec.get("params", {}))
+    tx, rx, scene = _build_scene_snapshot(
+        scenario_id,
+        params,
+        basis=basis,
+        los_block_mode=los_block_mode,
+        a5_stress_mode=a5_stress_mode,
+        a5_scatterer_count=int(a5_scatterer_count),
+    )
+    rays_topk = _extract_rays_topk(list(case_rec.get("paths", [])), int(debug_rays_k))
+    objects = _serialize_scene_objects(scene, scenario_id=scenario_id)
+    bounds = _scene_bounds(tx=tx, rx=rx, objects=objects, rays=rays_topk)
+    case_label = str(case_rec.get("case_label", _case_label(scenario_id, params)))
+    scene_dict = {
+        "scene_schema": "scene_debug_v1",
+        "scenario_id": scenario_id,
+        "case_id": case_id,
+        "case_label": case_label,
+        "coord_frame": {"units": "m", "plane": str(scene_plane), "z_up": True},
+        "bounds": bounds,
+        "tx": {"x": float(tx[0]), "y": float(tx[1]), "z": float(tx[2])},
+        "rx": {"x": float(rx[0]), "y": float(rx[1]), "z": float(rx[2])},
+        "objects": objects,
+        "rays_topk": rays_topk,
+        "meta": {
+            "git_hash": str(git_hash),
+            "cmd": str(cmdline),
+            "seed": int(seed),
+        },
+    }
+    fname = f"{_sanitize_token(scenario_id)}__{_sanitize_token(case_id)}__scene_debug.json"
+    out_path = out_dir / fname
+    out_path.write_text(json.dumps(scene_dict, indent=2), encoding="utf-8")
+    return out_path
+
+
+def _run_room_case(kind: str, rx_x: float, rx_y: float, f_hz: np.ndarray, basis: str = "circular") -> list[dict[str, Any]]:
+    tx, rx = default_antennas(basis=basis)
+    tx.position[:] = [2.0, 0.0, 1.5]
+    rx.position[:] = [rx_x, rx_y, 1.5]
+    scene = _build_room_scene(kind)
     paths = trace_paths(scene, tx, rx, f_hz, max_bounce=2, los_enabled=True)
     return paths_to_records(paths)
 
@@ -707,6 +1026,9 @@ def main() -> None:
     parser.add_argument("--grid-step-m", type=float, default=1.0)
     parser.add_argument("--room-target-los-n", type=int, default=0)
     parser.add_argument("--room-target-nlos-n", type=int, default=0)
+    parser.add_argument("--export-scene-debug", type=str, default="true")
+    parser.add_argument("--debug-rays-k", type=int, default=20)
+    parser.add_argument("--scene-plane", type=str, default="xy")
     args = parser.parse_args()
 
     np.random.seed(int(args.seed))
@@ -723,6 +1045,27 @@ def main() -> None:
     case_records = _build_case_records(args, f_hz=f_hz)
     if int(args.max_links) > 0:
         case_records = case_records[: int(args.max_links)]
+
+    scene_debug_files: list[str] = []
+    scene_debug_dir = Path(args.out_dir) / "scene_debug"
+    if _parse_bool(args.export_scene_debug, default=True):
+        scene_debug_dir.mkdir(parents=True, exist_ok=True)
+        cmdline = " ".join(shlex.quote(x) for x in sys.argv)
+        for c in case_records:
+            scene_path = _export_scene_debug_for_case(
+                c,
+                out_dir=scene_debug_dir,
+                basis=str(args.basis),
+                los_block_mode=str(args.los_block_mode),
+                a5_stress_mode=str(args.a5_stress_mode) if bool(args.stress_flag) else "none",
+                a5_scatterer_count=int(args.a5_scatterer_count) if bool(args.stress_flag) else 0,
+                debug_rays_k=int(args.debug_rays_k),
+                scene_plane=str(args.scene_plane),
+                git_hash=commit,
+                cmdline=cmdline,
+                seed=int(args.seed),
+            )
+            scene_debug_files.append(str(scene_path))
 
     bundles: list[StandardOutputBundle] = []
     for c in case_records:
@@ -952,6 +1295,8 @@ def main() -> None:
         "floor_reference_json": str(args.floor_reference_json or (Path(args.out_dir) / "floor_reference.json"))
         if str(args.scenario).upper() == "C0" or args.floor_reference_json
         else "",
+        "scene_debug_dir": str(scene_debug_dir) if _parse_bool(args.export_scene_debug, default=True) else "",
+        "scene_debug_files": scene_debug_files,
     }
     out_summary = Path(args.out_dir) / "run_summary.json"
     out_summary.write_text(json.dumps(summary, indent=2), encoding="utf-8")
