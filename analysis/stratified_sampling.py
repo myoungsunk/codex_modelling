@@ -32,6 +32,25 @@ def stratified_sample(
     bin_cfg = dict(bins or {"EL_proxy_db": 4, "LOSflag": 2})
     rng = np.random.default_rng(int(seed))
 
+    key_specs: dict[str, dict[str, Any]] = {}
+    for k, nb in bin_cfg.items():
+        if int(nb) <= 1:
+            key_specs[k] = {"mode": "raw"}
+            continue
+        vals = np.asarray([float(r.get(k, np.nan)) for r in rows], dtype=float)
+        vals = vals[np.isfinite(vals)]
+        if len(vals) == 0:
+            key_specs[k] = {"mode": "raw"}
+            continue
+        rounded = np.round(vals)
+        unique_int = np.unique(rounded.astype(int))
+        if np.all(np.isclose(vals, rounded)) and len(unique_int) <= int(nb):
+            key_specs[k] = {"mode": "categorical_int"}
+            continue
+        q = np.linspace(0.0, 1.0, int(nb) + 1)
+        edges = np.quantile(vals, q)
+        key_specs[k] = {"mode": "quantile", "edges": np.asarray(edges, dtype=float)}
+
     idx_by_key: dict[str, list[int]] = {}
     for i, r in enumerate(rows):
         parts = []
@@ -39,19 +58,18 @@ def stratified_sample(
             if k not in r:
                 parts.append(f"{k}=NA")
                 continue
+            spec = key_specs.get(k, {"mode": "raw"})
             try:
                 x = float(r.get(k, np.nan))
                 if np.isfinite(x) and int(nb) > 1:
-                    # temporary global quantization using fixed range from whole rows
-                    all_vals = np.asarray([float(rr.get(k, np.nan)) for rr in rows], dtype=float)
-                    all_vals = all_vals[np.isfinite(all_vals)]
-                    if len(all_vals) == 0:
-                        parts.append(f"{k}=NA")
-                        continue
-                    q = np.linspace(0.0, 1.0, int(nb) + 1)
-                    edges = np.quantile(all_vals, q)
-                    b = int(np.searchsorted(edges[1:-1], x, side="right"))
-                    parts.append(f"{k}={b}")
+                    if spec.get("mode") == "categorical_int":
+                        parts.append(f"{k}={int(np.round(x))}")
+                    elif spec.get("mode") == "quantile":
+                        edges = np.asarray(spec.get("edges", []), dtype=float)
+                        b = int(np.searchsorted(edges[1:-1], x, side="right"))
+                        parts.append(f"{k}={b}")
+                    else:
+                        parts.append(f"{k}={str(r.get(k))}")
                 else:
                     parts.append(f"{k}={str(r.get(k))}")
             except Exception:

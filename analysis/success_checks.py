@@ -81,7 +81,7 @@ def _bootstrap_spearman_ci(x: np.ndarray, y: np.ndarray, B: int = 300, seed: int
 
 def check_C0_floor(rows: list[dict[str, Any]]) -> dict[str, Any]:
     c0 = [r for r in rows if str(r.get("scenario_id", "")).upper() == "C0"]
-    x_key = _pick_metric_key(c0, "XPD_early_excess_db", "XPD_early_db")
+    x_key = "XPD_early_db" if len(_vals(c0, "XPD_early_db")) > 0 else _pick_metric_key(c0, "XPD_early_excess_db", "XPD_early_db")
     x = _vals(c0, x_key)
     if len(x) == 0:
         return {"n": 0, "status": "NO_DATA"}
