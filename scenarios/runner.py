@@ -7,6 +7,7 @@ Example:
 from __future__ import annotations
 
 import argparse
+import csv
 import inspect
 import json
 from pathlib import Path
@@ -16,7 +17,9 @@ import sys
 from typing import Any
 
 import numpy as np
+import matplotlib.pyplot as plt
 
+from analysis.dualcp_metrics import compute_dualcp_metrics_from_rt_paths
 from analysis.reciprocity import reciprocity_sanity
 from analysis.measurement_compare import (
     compare_measured_to_dataset,
@@ -138,6 +141,102 @@ def _gof_by_bucket(
             pinned_tol_db=pinned_tol_db,
         )
     return out
+
+
+def _parse_float_list(raw: str | None) -> list[float]:
+    if raw is None:
+        return []
+    out: list[float] = []
+    for tok in str(raw).split(","):
+        s = tok.strip()
+        if not s:
+            continue
+        try:
+            out.append(float(s))
+        except ValueError:
+            continue
+    return out
+
+
+def _load_json_file(path: str | Path | None) -> dict[str, Any] | None:
+    if not path:
+        return None
+    p = Path(path)
+    if not p.exists():
+        raise ValueError(f"JSON file not found: {p}")
+    obj = json.loads(p.read_text(encoding="utf-8"))
+    if not isinstance(obj, dict):
+        raise ValueError(f"JSON root must be object: {p}")
+    return obj
+
+
+def _scalar_csv_value(v: Any) -> Any:
+    if isinstance(v, (str, int, float, bool, np.bool_)):
+        return v
+    if isinstance(v, np.generic):
+        return v.item()
+    return None
+
+
+def _write_dualcp_outputs(
+    rows: list[dict[str, Any]],
+    out_csv: Path,
+    out_json: Path,
+    meta: dict[str, Any],
+) -> None:
+    out_csv.parent.mkdir(parents=True, exist_ok=True)
+    out_json.parent.mkdir(parents=True, exist_ok=True)
+
+    keys = sorted(
+        {
+            k
+            for r in rows
+            for k, v in r.items()
+            if _scalar_csv_value(v) is not None
+        }
+    )
+    with out_csv.open("w", encoding="utf-8", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=keys)
+        w.writeheader()
+        for r in rows:
+            w.writerow({k: _scalar_csv_value(r.get(k)) for k in keys})
+
+    payload = {"meta": meta, "rows": rows}
+    out_json.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
+
+
+def _plot_dualcp_metrics(rows: list[dict[str, Any]], out_dir: Path) -> dict[str, str]:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    x = np.arange(len(rows), dtype=int)
+    xpd_e = np.asarray([float(r.get("xpd_early_db", np.nan)) for r in rows], dtype=float)
+    xpd_l = np.asarray([float(r.get("xpd_late_db", np.nan)) for r in rows], dtype=float)
+    tau_rms = np.asarray([float(r.get("tau_rms_ns", np.nan)) for r in rows], dtype=float)
+
+    fig, ax = plt.subplots(figsize=(9, 4))
+    ax.plot(x, xpd_e, "o-", label="XPD early")
+    ax.plot(x, xpd_l, "s-", label="XPD late")
+    ax.set_xlabel("case index")
+    ax.set_ylabel("XPD [dB]")
+    ax.set_title("Dual-CP XPD Early/Late by Case")
+    ax.grid(True, alpha=0.3)
+    ax.legend(fontsize=8)
+    fig.tight_layout()
+    p1 = out_dir / "dualcp_metrics_xpd.png"
+    fig.savefig(p1, dpi=180)
+    plt.close(fig)
+
+    fig2, ax2 = plt.subplots(figsize=(9, 4))
+    ax2.plot(x, tau_rms, "o-", color="tab:green", label="tau_rms")
+    ax2.set_xlabel("case index")
+    ax2.set_ylabel("tau_rms [ns]")
+    ax2.set_title("Dual-CP Delay Spread by Case")
+    ax2.grid(True, alpha=0.3)
+    ax2.legend(fontsize=8)
+    fig2.tight_layout()
+    p2 = out_dir / "dualcp_metrics_delay.png"
+    fig2.savefig(p2, dpi=180)
+    plt.close(fig2)
+    return {"xpd_plot": str(p1), "delay_plot": str(p2)}
 
 
 def _git_meta() -> tuple[str, bool]:
@@ -1450,6 +1549,19 @@ def main() -> None:
     parser.add_argument("--measurement-eval-basis", type=str, default=None, choices=["linear", "circular"])
     parser.add_argument("--measurement-eval-convention", type=str, default=None)
     parser.add_argument("--measurement-plots-dir", type=str, default=None)
+    parser.add_argument("--dualcp-metrics", type=str, default="off", choices=["on", "off"])
+    parser.add_argument("--dualcp-metrics-csv", type=str, default="outputs/dualcp_metrics.csv")
+    parser.add_argument("--dualcp-metrics-json", type=str, default="outputs/dualcp_metrics.json")
+    parser.add_argument("--calibration-floor-json", type=str, default=None)
+    parser.add_argument("--early-window-ns", type=float, default=3.0)
+    parser.add_argument("--early-window-sensitivity-ns", type=str, default="")
+    parser.add_argument("--tmax-ns", type=float, default=30.0)
+    parser.add_argument("--noise-tail-ns", type=float, default=8.0)
+    parser.add_argument("--threshold-db", type=float, default=6.0)
+    parser.add_argument("--dualcp-metrics-nfft", type=int, default=2048)
+    parser.add_argument("--dualcp-metrics-window", type=str, default="hann", choices=["hann", "kaiser", "none"])
+    parser.add_argument("--dualcp-delay-spread-source", type=str, default="total", choices=["total", "co"])
+    parser.add_argument("--dualcp-detect-power", type=str, default="total", choices=["total", "co"])
     parser.add_argument("--release-mode", action="store_true")
     parser.add_argument("--reciprocity-scenarios", type=str, default="all")
     parser.add_argument("--reciprocity-tau-tol-s", type=float, default=1e-12)
@@ -1519,6 +1631,9 @@ def main() -> None:
     bases = _parse_bases(args.basis, args.bases)
     multi = len(bases) > 1
     release_gate_failures: list[str] = []
+    dualcp_on = str(args.dualcp_metrics).lower() == "on"
+    dualcp_floor = _load_json_file(args.calibration_floor_json) if args.calibration_floor_json else None
+    dualcp_sens = tuple(_parse_float_list(args.early_window_sensitivity_ns))
 
     for b in bases:
         data = build_dataset(
@@ -1711,6 +1826,64 @@ def main() -> None:
                 out_dir=meas_plot_dir,
                 create_plots=True,
             )
+
+        dualcp_rows: list[dict[str, Any]] = []
+        dualcp_meta: dict[str, Any] | None = None
+        if dualcp_on:
+            freq = np.asarray(data["frequency"], dtype=float)
+            dualcp_params = {
+                "nfft": int(max(64, args.dualcp_metrics_nfft)),
+                "window": str(args.dualcp_metrics_window),
+                "early_window_ns": float(max(0.0, args.early_window_ns)),
+                "early_window_sensitivity_ns": list(dualcp_sens),
+                "tmax_ns": float(max(0.0, args.tmax_ns)),
+                "noise_tail_ns": float(max(0.0, args.noise_tail_ns)),
+                "threshold_db": float(args.threshold_db),
+                "detect_power": str(args.dualcp_detect_power),
+                "delay_spread_source": str(args.dualcp_delay_spread_source),
+                "eval_basis": "circular",
+                "convention": str(args.convention),
+            }
+            for sid, sc in data.get("scenarios", {}).items():
+                for cid, case in sc.get("cases", {}).items():
+                    paths = case.get("paths", [])
+                    m = compute_dualcp_metrics_from_rt_paths(
+                        paths=paths,
+                        f_hz=freq,
+                        params=dualcp_params,
+                        matrix_source=str(args.xpd_matrix_source),
+                        input_basis=str(b),
+                        eval_basis="circular",
+                        convention=str(args.convention),
+                        calibration_floor=dualcp_floor,
+                    )
+                    m["scenario_id"] = str(sid)
+                    m["case_id"] = str(cid)
+                    m["path_count"] = int(len(paths))
+                    params_case = case.get("params", {}) or {}
+                    if "distance_d_m" in params_case:
+                        m["distance_d_m"] = float(params_case.get("distance_d_m"))
+                    dualcp_rows.append(m)
+
+            dualcp_csv = _basis_output_path(args.dualcp_metrics_csv, b, multi)
+            dualcp_json = _basis_output_path(args.dualcp_metrics_json, b, multi)
+            dualcp_plots = _plot_dualcp_metrics(dualcp_rows, out_dir=Path(out_plot) / "dualcp_metrics") if dualcp_rows else {}
+            dualcp_meta = {
+                "enabled": True,
+                "n_cases": int(len(dualcp_rows)),
+                "params": dualcp_params,
+                "calibration_floor_json": str(args.calibration_floor_json or ""),
+                "basis_input": str(b),
+                "basis_eval": "circular",
+                "convention": str(args.convention),
+                "plots": dualcp_plots,
+            }
+            _write_dualcp_outputs(dualcp_rows, out_csv=dualcp_csv, out_json=dualcp_json, meta=dualcp_meta)
+            data.setdefault("meta", {})["dualcp_metrics_outputs"] = {
+                "csv": str(dualcp_csv),
+                "json": str(dualcp_json),
+                "plots": dualcp_plots,
+            }
 
         report_path = build_quality_report(
             data,
