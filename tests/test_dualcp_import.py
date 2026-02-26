@@ -9,7 +9,7 @@ from pathlib import Path
 
 import numpy as np
 
-from analysis.measurement_compare import load_measurement_dualcp_two_csv
+from analysis.measurement_compare import load_measurement_dualcp_three_csv, load_measurement_dualcp_two_csv
 
 
 class DualCpImportTests(unittest.TestCase):
@@ -50,6 +50,29 @@ class DualCpImportTests(unittest.TestCase):
             np.testing.assert_allclose(m.H_f[:, 1, 1], 0.0, atol=1e-15)
             self.assertEqual(str(m.meta.get("basis")), "circular")
             self.assertEqual(str(m.meta.get("convention")), "IEEE-RHCP")
+
+    def test_dualcp_three_csv_reports_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            co_pre_csv = Path(td) / "co_pre.csv"
+            cross_csv = Path(td) / "cross.csv"
+            co_post_csv = Path(td) / "co_post.csv"
+            f = [6.0e9, 6.1e9]
+            co_pre_rows = [(f[0], 1.0 + 0.0j), (f[1], 1.0 + 0.0j)]
+            cross_rows = [(f[0], 0.1 + 0.0j), (f[1], 0.1 + 0.0j)]
+            co_post_rows = [(f[0], 10 ** (1.0 / 20.0) + 0.0j), (f[1], 10 ** (1.0 / 20.0) + 0.0j)]  # +1 dB
+            self._write_trace_csv_re_im(co_pre_csv, co_pre_rows)
+            self._write_trace_csv_re_im(cross_csv, cross_rows)
+            self._write_trace_csv_re_im(co_post_csv, co_post_rows)
+
+            m = load_measurement_dualcp_three_csv(
+                co_pre_csv=co_pre_csv,
+                cross_csv=cross_csv,
+                co_post_csv=co_post_csv,
+            )
+            self.assertEqual(m.H_f.shape, (2, 2, 2))
+            np.testing.assert_allclose(m.H_f[:, 0, 0], np.asarray([x[1] for x in co_pre_rows], dtype=np.complex128), atol=1e-12)
+            self.assertTrue(float(m.meta.get("drift_co_db", 0.0)) > 0.9)
+            self.assertEqual(str(m.meta.get("format")), "dualcp_three_csv")
 
 
 if __name__ == "__main__":

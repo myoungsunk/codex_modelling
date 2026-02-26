@@ -82,6 +82,43 @@ def _quantile_rank_corr(a: np.ndarray, b: np.ndarray) -> float:
     return float(corr.correlation) if np.isfinite(float(corr.correlation)) else float("nan")
 
 
+def _sample_resid(model: dict[str, Any], n: int, rng: np.random.Generator) -> np.ndarray:
+    rd = model.get("residual_dist", {}) or {}
+    fam = str(rd.get("family", model.get("dist_family", "normal"))).lower()
+    if fam == "student_t":
+        df = float(rd.get("df", 5.0))
+        loc = float(rd.get("loc", 0.0))
+        scl = float(max(float(rd.get("scale", 1.0)), 1e-9))
+        return scl * rng.standard_t(df, size=int(n)) + loc
+    if fam == "laplace":
+        loc = float(rd.get("loc", 0.0))
+        scl = float(max(float(rd.get("scale", 1.0)), 1e-9))
+        return rng.laplace(loc=loc, scale=scl, size=int(n))
+    return rng.standard_normal(int(n))
+
+
+def _fdr_bh(pvals: list[float]) -> list[float]:
+    m = len(pvals)
+    if m == 0:
+        return []
+    arr = np.asarray([float(x) for x in pvals], dtype=float)
+    valid = np.isfinite(arr)
+    out = np.full((m,), np.nan, dtype=float)
+    idx = np.where(valid)[0]
+    if len(idx) == 0:
+        return out.tolist()
+    p = arr[idx]
+    ord_idx = np.argsort(p)
+    p_ord = p[ord_idx]
+    q_ord = p_ord * float(len(p_ord)) / np.arange(1, len(p_ord) + 1, dtype=float)
+    q_ord = np.minimum.accumulate(q_ord[::-1])[::-1]
+    q_ord = np.clip(q_ord, 0.0, 1.0)
+    q = np.empty_like(q_ord)
+    q[ord_idx] = q_ord
+    out[idx] = q
+    return out.tolist()
+
+
 def _plot_z_summary(
     rows: list[dict[str, Any]],
     z_key: str,
@@ -103,7 +140,11 @@ def _plot_z_summary(
     sigma_a = sigma_a[np.isfinite(sigma_a)]
 
     rng = np.random.default_rng(0)
-    z_synth = rng.normal(mu_a, np.maximum(sigma_a, 1e-6)) if len(mu_a) else np.asarray([], dtype=float)
+    if len(mu_a):
+        eps = _sample_resid(model, len(mu_a), rng)
+        z_synth = mu_a + np.maximum(sigma_a, 1e-6) * eps
+    else:
+        z_synth = np.asarray([], dtype=float)
 
     fig, ax = plt.subplots(figsize=(7, 4))
     if len(z):
@@ -163,6 +204,11 @@ def main() -> None:
     parser.add_argument("--rt-features-csv", type=str, default=None)
     parser.add_argument("--out-model-json", type=str, default="outputs/proxy_model.json")
     parser.add_argument("--out-report", type=str, default="outputs/proxy_report.md")
+    parser.add_argument("--dist-family", type=str, default="student_t", choices=["normal", "student_t", "laplace"])
+    parser.add_argument("--robust-regression", dest="robust_regression", action="store_true")
+    parser.add_argument("--no-robust-regression", dest="robust_regression", action="store_false")
+    parser.add_argument("--min-bucket-n", type=int, default=3)
+    parser.set_defaults(robust_regression=True)
     parser.add_argument(
         "--z-keys",
         type=str,
@@ -200,12 +246,17 @@ def main() -> None:
     models: dict[str, Any] = {}
     bridge_eval: dict[str, Any] = {}
     plots: dict[str, Any] = {}
+    z_ksp: list[float] = []
+    z_names: list[str] = []
     report_lines = ["# Dual-CP Proxy Report", ""]
     report_lines.append(f"- generated_at: {datetime.now(timezone.utc).isoformat()}")
     report_lines.append(f"- input_metrics_csv: {args.metrics_csv}")
     report_lines.append(f"- input_rt_features_csv: {args.rt_features_csv or ''}")
     report_lines.append(f"- calibration_json: {args.calibration_json or ''}")
     report_lines.append(f"- u_keys: {u_keys}")
+    report_lines.append(f"- dist_family: {args.dist_family}")
+    report_lines.append(f"- robust_regression: {bool(args.robust_regression)}")
+    report_lines.append(f"- min_bucket_n: {int(args.min_bucket_n)}")
     report_lines.append("")
 
     plot_dir = Path(args.out_report).with_suffix("").with_name(Path(args.out_report).stem + "_plots")
@@ -221,7 +272,16 @@ def main() -> None:
         zvals = _finite_vals(rows_z, zk)
         if len(zvals) == 0:
             continue
-        model = fit_proxy_model(rows_z, z_key=zk, u_keys=u_keys, method="binned+regression", seed=0)
+        model = fit_proxy_model(
+            rows_z,
+            z_key=zk,
+            u_keys=u_keys,
+            method="binned+regression",
+            seed=0,
+            dist_family=str(args.dist_family),
+            robust_regression=bool(args.robust_regression),
+            min_bucket_n=int(args.min_bucket_n),
+        )
         models[zk] = model
 
         mu_pred = []
@@ -249,6 +309,8 @@ def main() -> None:
             "wasserstein": wd,
             "rank_corr_quantile": rank_corr,
         }
+        z_names.append(str(zk))
+        z_ksp.append(float(gof.get("ks_p", np.nan)))
 
         p = _plot_z_summary(rows_z, z_key=zk, model=model, out_dir=plot_dir, u_keys=u_keys)
         plots[zk] = p
@@ -275,6 +337,16 @@ def main() -> None:
         report_lines.append(f"- effect_size_range_by_{gk}: {effect:.4f}")
         report_lines.append(f"- cdf_plot: {p['cdf_png']}")
         report_lines.append(f"- boxplot: {p['boxplot_png']}")
+        report_lines.append("")
+
+    qvals = _fdr_bh(z_ksp)
+    if z_names:
+        report_lines.append("## Multiple Testing (FDR-BH on GOF KS p-values)")
+        report_lines.append("")
+        for zk, p_raw, qv in zip(z_names, z_ksp, qvals):
+            report_lines.append(f"- {zk}: ks_p_raw={p_raw:.6f}, ks_p_fdr={qv:.6f}")
+            if zk in bridge_eval:
+                bridge_eval[zk]["ks_p_fdr"] = float(qv) if np.isfinite(float(qv)) else float("nan")
         report_lines.append("")
 
     bundle = {

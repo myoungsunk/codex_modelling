@@ -79,6 +79,56 @@ def _bootstrap_spearman_ci(x: np.ndarray, y: np.ndarray, B: int = 300, seed: int
     return float(np.percentile(arr, 2.5)), float(np.percentile(arr, 97.5))
 
 
+def _anova_oneway(rows: list[dict[str, Any]], value_key: str, factor_key: str) -> dict[str, float]:
+    groups: dict[str, list[float]] = {}
+    for r in rows:
+        v = float(r.get(value_key, np.nan))
+        if not np.isfinite(v):
+            continue
+        raw = r.get(factor_key, "NA")
+        try:
+            rv = float(raw)
+            g = f"{rv:.6f}"
+        except Exception:
+            g = str(raw)
+        groups.setdefault(g, []).append(v)
+    valid = [np.asarray(v, dtype=float) for v in groups.values() if len(v) >= 2]
+    if len(valid) < 2:
+        return {"p": float("nan"), "eta2": float("nan"), "n_groups": float(len(valid))}
+    try:
+        fstat, pval = stats.f_oneway(*valid)
+    except Exception:
+        return {"p": float("nan"), "eta2": float("nan"), "n_groups": float(len(valid))}
+    allv = np.concatenate(valid)
+    grand = float(np.mean(allv))
+    ss_between = float(sum(len(g) * (float(np.mean(g)) - grand) ** 2 for g in valid))
+    ss_total = float(np.sum((allv - grand) ** 2))
+    eta2 = float(ss_between / ss_total) if ss_total > 0 else float("nan")
+    _ = fstat
+    return {"p": float(pval), "eta2": eta2, "n_groups": float(len(valid))}
+
+
+def _fdr_bh(pvals: list[float]) -> list[float]:
+    if not pvals:
+        return []
+    arr = np.asarray([float(x) for x in pvals], dtype=float)
+    out = np.full(arr.shape, np.nan, dtype=float)
+    valid = np.isfinite(arr)
+    idx = np.where(valid)[0]
+    if len(idx) == 0:
+        return out.tolist()
+    p = arr[idx]
+    ord_idx = np.argsort(p)
+    p_ord = p[ord_idx]
+    q_ord = p_ord * float(len(p_ord)) / np.arange(1, len(p_ord) + 1, dtype=float)
+    q_ord = np.minimum.accumulate(q_ord[::-1])[::-1]
+    q_ord = np.clip(q_ord, 0.0, 1.0)
+    q = np.empty_like(q_ord)
+    q[ord_idx] = q_ord
+    out[idx] = q
+    return out.tolist()
+
+
 def check_C0_floor(rows: list[dict[str, Any]]) -> dict[str, Any]:
     c0 = [r for r in rows if str(r.get("scenario_id", "")).upper() == "C0"]
     x_key = "XPD_early_db" if len(_vals(c0, "XPD_early_db")) > 0 else _pick_metric_key(c0, "XPD_early_excess_db", "XPD_early_db")
@@ -90,6 +140,8 @@ def check_C0_floor(rows: list[dict[str, Any]]) -> dict[str, Any]:
     x_y, yaw = _paired_vals(c0, x_key, "yaw_deg")
     corr_d = _safe_spearman(d, x_d)
     corr_yaw = _safe_spearman(yaw, x_y)
+    anova_d = _anova_oneway(c0, x_key, "d_m")
+    anova_y = _anova_oneway(c0, x_key, "yaw_deg")
     return {
         "n": int(len(x)),
         "metric_key": str(x_key),
@@ -100,6 +152,10 @@ def check_C0_floor(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "delta_floor_db": float(p95 - p5),
         "distance_rank_corr": corr_d,
         "yaw_rank_corr": corr_yaw,
+        "anova_distance_p": float(anova_d.get("p", np.nan)),
+        "anova_distance_eta2": float(anova_d.get("eta2", np.nan)),
+        "anova_yaw_p": float(anova_y.get("p", np.nan)),
+        "anova_yaw_eta2": float(anova_y.get("eta2", np.nan)),
         "dominant_factor": "yaw_or_pitch" if abs(corr_yaw) > abs(corr_d) else "distance_or_drift",
         "status": "OK",
     }
@@ -184,6 +240,7 @@ def check_B_space_consistency(rows: list[dict[str, Any]]) -> dict[str, Any]:
     b = [r for r in rows if str(r.get("scenario_id", "")).upper().startswith("B")]
     key = _pick_metric_key(b, "XPD_early_excess_db", "XPD_early_db")
     x, el = _paired_vals(b, key, "EL_proxy_db")
+    d, los_num = _paired_vals(b, "d_m", "LOSflag")
     corr = float("nan")
     ci_lo = float("nan")
     ci_hi = float("nan")
@@ -203,6 +260,7 @@ def check_B_space_consistency(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "spearman_xpd_early_vs_minus_el_proxy": corr,
         "spearman_ci95_lo": ci_lo,
         "spearman_ci95_hi": ci_hi,
+        "distance_vs_losflag_rank_corr": _safe_spearman(d, los_num),
         "n_LOS": int(len(los)),
         "n_NLOS": int(len(nlos)),
         "ks_p_los_vs_nlos_xpd_early": ks_p,
@@ -211,9 +269,27 @@ def check_B_space_consistency(rows: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def evaluate_success_criteria(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    c0 = check_C0_floor(rows)
+    a23 = check_A2_A3_parity_sign(rows)
+    a45 = check_A4_A5_breaking(rows)
+    b = check_B_space_consistency(rows)
+    labels = ["A2_vs_A3_ks", "B_los_vs_nlos_ks", "C0_anova_distance", "C0_anova_yaw"]
+    p_raw = [
+        float(a23.get("ks_p_A2_vs_A3", np.nan)),
+        float(b.get("ks_p_los_vs_nlos_xpd_early", np.nan)),
+        float(c0.get("anova_distance_p", np.nan)),
+        float(c0.get("anova_yaw_p", np.nan)),
+    ]
+    p_fdr = _fdr_bh(p_raw)
+    mt = {
+        "labels": labels,
+        "p_raw": p_raw,
+        "p_fdr_bh": p_fdr,
+    }
     return {
-        "C0_floor": check_C0_floor(rows),
-        "A2_A3_parity_sign": check_A2_A3_parity_sign(rows),
-        "A4_A5_breaking": check_A4_A5_breaking(rows),
-        "B_space": check_B_space_consistency(rows),
+        "C0_floor": c0,
+        "A2_A3_parity_sign": a23,
+        "A4_A5_breaking": a45,
+        "B_space": b,
+        "multiple_testing": mt,
     }

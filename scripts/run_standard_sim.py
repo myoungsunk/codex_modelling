@@ -26,6 +26,7 @@ from analysis.windowing import estimate_tau0, make_early_late_masks
 from calibration.floor_model import AngleSensitiveFloorXPD, ConstantFloorXPD, FloorXPDModel, FreqDependentFloorXPD
 from polarization.xpr_models import BaseXPRModel, BinnedXPR, ConditionalLinearXPR, ConstantXPR
 from rt_core.geometry import Material, Plane
+from rt_core.materials import DEFAULT_MATERIAL_SPECS
 from rt_core.tracer import trace_paths
 from rt_io.standard_outputs_hdf5 import export_csv, save_run
 from rt_types.standard_outputs import RayTable, SCHEMA_VERSION, StandardOutputBundle
@@ -179,8 +180,25 @@ def _build_floor_reference(bundles: list[StandardOutputBundle], bin_keys: list[s
 
 
 def _lookup_floor(reference: dict[str, Any], U: dict[str, Any]) -> tuple[float, float]:
-    base = float(reference.get("xpd_floor_db", np.nan))
-    delta = float(reference.get("delta_floor_db", np.nan))
+    raw_base = reference.get("xpd_floor_db", np.nan)
+    if isinstance(raw_base, list):
+        arr = np.asarray(raw_base, dtype=float)
+        arr = arr[np.isfinite(arr)]
+        base = float(np.median(arr)) if len(arr) else float("nan")
+    else:
+        base = float(raw_base)
+    raw_delta = reference.get("delta_floor_db", np.nan)
+    if isinstance(raw_delta, list):
+        arrd = np.asarray(raw_delta, dtype=float)
+        arrd = arrd[np.isfinite(arrd)]
+        delta = float(np.median(arrd)) if len(arrd) else float("nan")
+    else:
+        delta = float(raw_delta)
+    if not np.isfinite(delta):
+        u = np.asarray(reference.get("xpd_floor_uncert_db", []), dtype=float)
+        u = u[np.isfinite(u)]
+        if len(u):
+            delta = float(np.median(u))
     groups = list(reference.get("groups", []))
     if not groups:
         return base, delta
@@ -213,8 +231,57 @@ def _lookup_floor(reference: dict[str, Any], U: dict[str, Any]) -> tuple[float, 
     return float(gg.get("xpd_floor_db", base)), float(gg.get("delta_floor_db", delta))
 
 
-def _run_room_case(kind: str, rx_x: float, rx_y: float, f_hz: np.ndarray) -> list[dict[str, Any]]:
-    tx, rx = default_antennas(basis="circular")
+def _claim_caution_flag(excess_db: float, uncert_db: float, mode: str, scale: float) -> bool:
+    m = str(mode).lower().strip()
+    if m == "off":
+        return False
+    if not (np.isfinite(excess_db) and np.isfinite(uncert_db)):
+        return False
+    thr = abs(float(uncert_db))
+    if m == "scaled":
+        thr = thr * max(float(scale), 0.0)
+    return bool(abs(float(excess_db)) <= thr)
+
+
+def _floor_curve_from_reference(reference: dict[str, Any]) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    freq = np.asarray(reference.get("frequency_hz", []), dtype=float)
+    floor = np.asarray(reference.get("xpd_floor_db", []), dtype=float)
+    uncert = np.asarray(reference.get("xpd_floor_uncert_db", []), dtype=float)
+    if freq.ndim != 1 or floor.ndim != 1 or len(freq) == 0 or len(freq) != len(floor):
+        return np.asarray([], dtype=float), np.asarray([], dtype=float), np.asarray([], dtype=float)
+    if len(uncert) != len(floor):
+        uncert = np.full((len(floor),), np.nan, dtype=float)
+    return freq, floor, uncert
+
+
+def _floor_subbands_from_reference(reference: dict[str, Any]) -> tuple[list[dict[str, float]], np.ndarray, np.ndarray]:
+    sb = reference.get("subbands", [])
+    if not isinstance(sb, list):
+        return [], np.asarray([], dtype=float), np.asarray([], dtype=float)
+    rows: list[dict[str, float]] = []
+    f = []
+    u = []
+    for i, r in enumerate(sb):
+        if not isinstance(r, dict):
+            continue
+        xf = float(r.get("xpd_floor_db", np.nan))
+        xu = float(r.get("xpd_floor_uncert_db", np.nan))
+        rows.append(
+            {
+                "index": float(r.get("index", i)),
+                "f_lo_hz": float(r.get("f_lo_hz", np.nan)),
+                "f_hi_hz": float(r.get("f_hi_hz", np.nan)),
+                "xpd_floor_db": xf,
+                "xpd_floor_uncert_db": xu,
+            }
+        )
+        f.append(xf)
+        u.append(xu)
+    return rows, np.asarray(f, dtype=float), np.asarray(u, dtype=float)
+
+
+def _run_room_case(kind: str, rx_x: float, rx_y: float, f_hz: np.ndarray, basis: str = "circular") -> list[dict[str, Any]]:
+    tx, rx = default_antennas(basis=basis)
     tx.position[:] = [2.0, 0.0, 1.5]
     rx.position[:] = [rx_x, rx_y, 1.5]
     scene = B0_room_box.build_scene()
@@ -262,115 +329,186 @@ def _run_room_case(kind: str, rx_x: float, rx_y: float, f_hz: np.ndarray) -> lis
 
 def _build_case_records(args: argparse.Namespace, f_hz: np.ndarray) -> list[dict[str, Any]]:
     s = str(args.scenario).upper()
+    basis = str(args.basis)
+    n_rep = max(1, int(args.n_rep))
+    los_block_mode = str(args.los_block_mode).lower().strip()
+    los_blocker = bool(los_block_mode == "occluder")
     out: list[dict[str, Any]] = []
     if s == "C0":
-        dlist = _parse_float_list(args.dist_list, [3.0, 6.0, 9.0])
-        yaw_list = _parse_float_list(args.yaw_list, [0.0])
+        dlist = _parse_float_list(args.dist_list, [1.0, 2.0, 3.0, 4.0, 5.0])
+        yaw_list = _parse_float_list(args.yaw_list, [-10.0, 0.0, 10.0])
         pitch_list = _parse_float_list(args.pitch_list, [0.0])
         cid = 0
         for d in dlist:
             for yaw in yaw_list:
                 for pit in pitch_list:
-                    paths = C0_free_space.run_case({"distance_m": d}, f_hz, basis="circular")
+                    for rep_id in range(n_rep):
+                        paths = C0_free_space.run_case({"distance_m": d, "yaw_deg": yaw, "pitch_deg": pit}, f_hz, basis=basis)
+                        out.append(
+                            {
+                                "case_id": str(cid),
+                                "scenario_id": "C0",
+                                "link_id": f"C0_{cid}",
+                                "params": {"distance_m": d, "yaw_deg": yaw, "pitch_deg": pit, "rep_id": int(rep_id)},
+                                "paths": paths_to_records(paths),
+                                "meta": {
+                                    "d_m": d,
+                                    "yaw_deg": yaw,
+                                    "pitch_deg": pit,
+                                    "rep_id": int(rep_id),
+                                    "material_class": "free_space",
+                                    "basis": basis,
+                                },
+                            }
+                        )
+                        cid += 1
+        return out
+
+    if s == "A2":
+        dlist = _parse_float_list(args.dist_list, [4.0, 6.0, 8.0])
+        ylist = _parse_float_list(args.a2_y_list, [1.5, 2.0, 2.5])
+        cid = 0
+        for d in dlist:
+            for y in ylist:
+                for rep_id in range(n_rep):
+                    p = {"y_plane": float(y), "distance_m": float(d), "rep_id": int(rep_id)}
+                    paths = A2_pec_plane.run_case(
+                        p,
+                        f_hz,
+                        basis=basis,
+                        los_blocker=bool(los_blocker),
+                    )
                     out.append(
                         {
                             "case_id": str(cid),
-                            "scenario_id": "C0",
-                            "link_id": f"C0_{cid}",
-                            "params": {"distance_m": d, "yaw_deg": yaw, "pitch_deg": pit},
+                            "scenario_id": "A2",
+                            "link_id": f"A2_{cid}",
+                            "params": p,
                             "paths": paths_to_records(paths),
                             "meta": {
-                                "d_m": d,
-                                "yaw_deg": yaw,
-                                "pitch_deg": pit,
-                                "material_class": "free_space",
+                                "d_m": float(d),
+                                "material_class": "PEC",
+                                "obstacle_flag": 1,
+                                "rep_id": int(rep_id),
+                                "los_block_method": "physical_occluder" if bool(los_blocker) else "synthetic_los_off",
+                                "basis": basis,
                             },
                         }
                     )
                     cid += 1
         return out
 
-    if s == "A2":
-        dlist = _parse_float_list(args.dist_list, [4.0, 6.0, 8.0])
-        cid = 0
-        for d in dlist:
-            p = {"y_plane": 2.0, "distance_m": d}
-            paths = A2_pec_plane.run_case(p, f_hz, basis="circular")
-            out.append(
-                {
-                    "case_id": str(cid),
-                    "scenario_id": "A2",
-                    "link_id": f"A2_{cid}",
-                    "params": p,
-                    "paths": paths_to_records(paths),
-                    "meta": {"d_m": d, "material_class": "PEC", "obstacle_flag": 1},
-                }
-            )
-            cid += 1
-        return out
-
     if s == "A3":
         base = A3_corner_2bounce.build_sweep_params()
         cid = 0
-        for p in base:
-            paths = A3_corner_2bounce.run_case(p, f_hz, basis="circular")
-            d = float(np.linalg.norm(np.asarray([p["rx_x"], p["rx_y"], 1.5]) - np.asarray([0.0, 0.0, 1.5])))
-            out.append(
-                {
-                    "case_id": str(cid),
-                    "scenario_id": "A3",
-                    "link_id": f"A3_{cid}",
-                    "params": p,
-                    "paths": paths_to_records(paths),
-                    "meta": {"d_m": d, "material_class": "PEC", "obstacle_flag": 1},
-                }
-            )
-            cid += 1
-        return out
-
-    if s == "A4":
-        mats = [m.strip() for m in str(args.material_list).split(",") if m.strip()] or ["glass", "wood"]
-        cid = 0
-        for m in mats:
-            for y in [1.5, 2.5]:
-                p = {"material": m, "y_plane": y, "distance_m": 6.0}
-                paths = A4_dielectric_plane.run_case(p, f_hz, basis="circular")
+        for p0 in base:
+            for rep_id in range(n_rep):
+                p = dict(p0)
+                p["rep_id"] = int(rep_id)
+                paths = A3_corner_2bounce.run_case(
+                    p,
+                    f_hz,
+                    basis=basis,
+                    los_blocker=bool(los_blocker),
+                )
+                d = float(np.linalg.norm(np.asarray([p["rx_x"], p["rx_y"], 1.5]) - np.asarray([0.0, 0.0, 1.5])))
                 out.append(
                     {
                         "case_id": str(cid),
-                        "scenario_id": "A4",
-                        "link_id": f"A4_{cid}",
+                        "scenario_id": "A3",
+                        "link_id": f"A3_{cid}",
                         "params": p,
                         "paths": paths_to_records(paths),
-                        "meta": {"d_m": 6.0, "material_class": m, "obstacle_flag": 1},
+                        "meta": {
+                            "d_m": d,
+                            "material_class": "PEC",
+                            "obstacle_flag": 1,
+                            "rep_id": int(rep_id),
+                            "los_block_method": "physical_occluder" if bool(los_blocker) else "synthetic_los_off",
+                            "basis": basis,
+                        },
                     }
                 )
                 cid += 1
         return out
 
+    if s == "A4":
+        mats = [m.strip() for m in str(args.material_list).split(",") if m.strip()] or list(DEFAULT_MATERIAL_SPECS.keys())
+        yvals = _parse_float_list(args.a4_y_list, [1.5, 2.0, 2.5])
+        dvals = _parse_float_list(args.dist_list, [6.0])
+        cid = 0
+        for m in mats:
+            for y in yvals:
+                for d in dvals:
+                    for rep_id in range(n_rep):
+                        p = {"material": m, "y_plane": float(y), "distance_m": float(d), "rep_id": int(rep_id)}
+                        paths = A4_dielectric_plane.run_case(
+                            p,
+                            f_hz,
+                            basis=basis,
+                            los_blocker=bool(los_blocker),
+                        )
+                        out.append(
+                            {
+                                "case_id": str(cid),
+                                "scenario_id": "A4",
+                                "link_id": f"A4_{cid}",
+                                "params": p,
+                                "paths": paths_to_records(paths),
+                                "meta": {
+                                    "d_m": float(d),
+                                    "material_class": m,
+                                    "obstacle_flag": 1,
+                                    "rep_id": int(rep_id),
+                                    "los_block_method": "physical_occluder" if bool(los_blocker) else "synthetic_los_off",
+                                    "basis": basis,
+                                },
+                            }
+                        )
+                        cid += 1
+        return out
+
     if s == "A5":
         cid = 0
-        params = A5_depol_stress.build_sweep_params()[:8]
-        for p in params:
-            paths = A5_depol_stress.run_case(p, f_hz, basis="circular")
-            d = float(np.linalg.norm(np.asarray([p["rx_x"], p["rx_y"], 1.5]) - np.asarray([0.0, 0.0, 1.5])))
-            out.append(
-                {
-                    "case_id": str(cid),
-                    "scenario_id": "A5",
-                    "link_id": f"A5_{cid}",
-                    "params": p,
-                    "paths": paths_to_records(paths),
-                    "meta": {
-                        "d_m": d,
-                        "material_class": "PEC",
-                        "roughness_flag": int(bool(args.stress_flag)),
-                        "human_flag": int(bool(args.stress_flag)),
-                        "obstacle_flag": 1,
-                    },
-                }
-            )
-            cid += 1
+        params = A5_depol_stress.build_sweep_params()
+        if int(args.a5_max_cases) > 0:
+            params = params[: int(args.a5_max_cases)]
+        stress_on = bool(args.stress_flag)
+        stress_mode = str(args.a5_stress_mode) if stress_on else "none"
+        for rep_outer in range(n_rep):
+            for p0 in params:
+                p = dict(p0)
+                p["rep_outer"] = int(rep_outer)
+                p["seed"] = int(p.get("seed", 0)) + int(rep_outer) * 10000
+                paths = A5_depol_stress.run_case(
+                    p,
+                    f_hz,
+                    basis=basis,
+                    stress_mode=stress_mode,
+                    scatterer_count=int(args.a5_scatterer_count) if stress_on else 0,
+                    los_blocker=bool(los_blocker),
+                )
+                d = float(np.linalg.norm(np.asarray([p["rx_x"], p["rx_y"], 1.5]) - np.asarray([0.0, 0.0, 1.5])))
+                out.append(
+                    {
+                        "case_id": str(cid),
+                        "scenario_id": "A5",
+                        "link_id": f"A5_{cid}",
+                        "params": p,
+                        "paths": paths_to_records(paths),
+                        "meta": {
+                            "d_m": d,
+                            "material_class": "PEC",
+                            "roughness_flag": int(stress_on),
+                            "human_flag": int(stress_on),
+                            "obstacle_flag": 1,
+                            "stress_mode": str(stress_mode),
+                            "los_block_method": "physical_occluder" if bool(los_blocker) else "synthetic_los_off",
+                            "basis": basis,
+                        },
+                    }
+                )
+                cid += 1
         return out
 
     # B1/B2/B3 room-grid style
@@ -380,7 +518,7 @@ def _build_case_records(args: argparse.Namespace, f_hz: np.ndarray) -> list[dict
     cid = 0
     for x in x_vals:
         for y in y_vals:
-            paths = _run_room_case(kind=kind, rx_x=float(x), rx_y=float(y), f_hz=f_hz)
+            paths = _run_room_case(kind=kind, rx_x=float(x), rx_y=float(y), f_hz=f_hz, basis=basis)
             out.append(
                 {
                     "case_id": str(cid),
@@ -394,6 +532,7 @@ def _build_case_records(args: argparse.Namespace, f_hz: np.ndarray) -> list[dict
                         "obstacle_flag": int(kind in {"B2", "B3"}),
                         "rx_x": float(x),
                         "rx_y": float(y),
+                        "basis": basis,
                     },
                 }
             )
@@ -404,6 +543,7 @@ def _build_case_records(args: argparse.Namespace, f_hz: np.ndarray) -> list[dict
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--scenario", required=True, choices=["C0", "A2", "A3", "A4", "A5", "B1", "B2", "B3"])
+    parser.add_argument("--basis", type=str, default="circular", choices=["circular", "linear"])
     parser.add_argument("--out-h5", type=str, required=True)
     parser.add_argument("--out-dir", type=str, default="outputs/standard")
     parser.add_argument("--run-id", type=str, default=None)
@@ -417,20 +557,31 @@ def main() -> None:
     parser.add_argument("--floor-model-config", type=str, default=None)
     parser.add_argument("--floor-reference-json", type=str, default=None)
     parser.add_argument("--floor-reference-out", type=str, default="")
+    parser.add_argument("--claim-caution-mode", type=str, default="scaled", choices=["scaled", "half_width", "off"])
+    parser.add_argument("--claim-caution-scale", type=float, default=1.0)
     parser.add_argument("--dist-list", type=str, default="")
     parser.add_argument("--yaw-list", type=str, default="0")
     parser.add_argument("--pitch-list", type=str, default="0")
+    parser.add_argument("--n-rep", type=int, default=5)
+    parser.add_argument("--a2-y-list", type=str, default="1.5,2.0,2.5")
+    parser.add_argument("--a4-y-list", type=str, default="1.5,2.0,2.5")
+    parser.add_argument("--los-block-mode", type=str, default="occluder", choices=["synthetic", "occluder"])
+    parser.add_argument("--a5-stress-mode", type=str, default="hybrid", choices=["none", "synthetic", "geometry", "hybrid"])
+    parser.add_argument("--a5-scatterer-count", type=int, default=3)
+    parser.add_argument("--a5-max-cases", type=int, default=0)
     parser.add_argument("--material-list", type=str, default="")
     parser.add_argument("--stress-flag", action="store_true")
     parser.add_argument("--strict-los-blocked", action="store_true")
     parser.add_argument("--max-links", type=int, default=0)
     parser.add_argument("--ds-reference", type=str, default="total", choices=["total", "co"])
     parser.add_argument("--el-proxy-mode", type=str, default="early_sum", choices=["early_sum", "dominant_early_ray"])
-    parser.add_argument("--grid-x-min", type=float, default=3.0)
-    parser.add_argument("--grid-x-max", type=float, default=7.0)
-    parser.add_argument("--grid-y-min", type=float, default=-2.0)
-    parser.add_argument("--grid-y-max", type=float, default=2.0)
-    parser.add_argument("--grid-step-m", type=float, default=2.0)
+    parser.add_argument("--grid-x-min", type=float, default=2.0)
+    parser.add_argument("--grid-x-max", type=float, default=8.0)
+    parser.add_argument("--grid-y-min", type=float, default=-3.0)
+    parser.add_argument("--grid-y-max", type=float, default=3.0)
+    parser.add_argument("--grid-step-m", type=float, default=1.0)
+    parser.add_argument("--room-target-los-n", type=int, default=0)
+    parser.add_argument("--room-target-nlos-n", type=int, default=0)
     args = parser.parse_args()
 
     np.random.seed(int(args.seed))
@@ -466,6 +617,7 @@ def main() -> None:
         delay_tau_s = np.arange(0.0, max(float(args.Tmax_ns), float(args.Te_ns)) * 1e-9 + dt, dt, dtype=float)
         synth_U = {
             "scenario_id": scenario_id,
+            "basis": str(args.basis),
             "f_center_hz": float(args.f_center_hz),
             "yaw_deg": float(c.get("meta", {}).get("yaw_deg", 0.0)),
             "pitch_deg": float(c.get("meta", {}).get("pitch_deg", 0.0)),
@@ -567,26 +719,81 @@ def main() -> None:
         out_floor.write_text(json.dumps(floor_ref_use, indent=2), encoding="utf-8")
 
     if floor_ref_use is not None:
+        f_curve_hz, f_curve_db, f_curve_unc = _floor_curve_from_reference(floor_ref_use)
+        sb_rows, sb_floor, sb_unc = _floor_subbands_from_reference(floor_ref_use)
         for b in bundles:
             u_dict = b.conditions.to_dict()
             floor_db, delta = _lookup_floor(floor_ref_use, u_dict)
             if np.isfinite(floor_db):
                 ex_e = float(b.metrics.XPD_early_db - floor_db)
                 ex_l = float(b.metrics.XPD_late_db - floor_db)
-                caution_e = bool(np.isfinite(delta) and abs(ex_e) <= abs(delta))
-                caution_l = bool(np.isfinite(delta) and abs(ex_l) <= abs(delta))
+                caution_e = _claim_caution_flag(ex_e, float(delta), mode=str(args.claim_caution_mode), scale=float(args.claim_caution_scale))
+                caution_l = _claim_caution_flag(ex_l, float(delta), mode=str(args.claim_caution_mode), scale=float(args.claim_caution_scale))
                 b.metrics.extras["xpd_floor_db"] = float(floor_db)
                 b.metrics.extras["delta_floor_db"] = float(delta) if np.isfinite(delta) else np.nan
                 b.metrics.extras["XPD_early_excess_db"] = ex_e
                 b.metrics.extras["XPD_late_excess_db"] = ex_l
                 b.metrics.extras["claim_caution_early"] = caution_e
                 b.metrics.extras["claim_caution_late"] = caution_l
+                b.metrics.extras["claim_caution_mode"] = str(args.claim_caution_mode)
+                b.metrics.extras["claim_caution_scale"] = float(args.claim_caution_scale)
+
+            if len(f_curve_db) > 0:
+                ex_e_curve = np.asarray(b.metrics.XPD_early_db - f_curve_db, dtype=float)
+                ex_l_curve = np.asarray(b.metrics.XPD_late_db - f_curve_db, dtype=float)
+                c_e_curve = [
+                    _claim_caution_flag(float(xx), float(uu), mode=str(args.claim_caution_mode), scale=float(args.claim_caution_scale))
+                    for xx, uu in zip(ex_e_curve.tolist(), f_curve_unc.tolist())
+                ]
+                c_l_curve = [
+                    _claim_caution_flag(float(xx), float(uu), mode=str(args.claim_caution_mode), scale=float(args.claim_caution_scale))
+                    for xx, uu in zip(ex_l_curve.tolist(), f_curve_unc.tolist())
+                ]
+                b.metrics.extras["xpd_floor_freq_hz"] = np.asarray(f_curve_hz, dtype=float).tolist()
+                b.metrics.extras["xpd_floor_curve_db"] = np.asarray(f_curve_db, dtype=float).tolist()
+                b.metrics.extras["xpd_floor_uncert_curve_db"] = np.asarray(f_curve_unc, dtype=float).tolist()
+                b.metrics.extras["XPD_early_excess_curve_db"] = ex_e_curve.tolist()
+                b.metrics.extras["XPD_late_excess_curve_db"] = ex_l_curve.tolist()
+                b.metrics.extras["claim_caution_early_curve"] = c_e_curve
+                b.metrics.extras["claim_caution_late_curve"] = c_l_curve
+
+            if len(sb_floor) > 0:
+                ex_e_sb = np.asarray(b.metrics.XPD_early_db - sb_floor, dtype=float)
+                ex_l_sb = np.asarray(b.metrics.XPD_late_db - sb_floor, dtype=float)
+                c_e_sb = [
+                    _claim_caution_flag(float(xx), float(uu), mode=str(args.claim_caution_mode), scale=float(args.claim_caution_scale))
+                    for xx, uu in zip(ex_e_sb.tolist(), sb_unc.tolist())
+                ]
+                c_l_sb = [
+                    _claim_caution_flag(float(xx), float(uu), mode=str(args.claim_caution_mode), scale=float(args.claim_caution_scale))
+                    for xx, uu in zip(ex_l_sb.tolist(), sb_unc.tolist())
+                ]
+                b.metrics.extras["xpd_floor_subbands"] = sb_rows
+                b.metrics.extras["xpd_floor_subband_db"] = sb_floor.tolist()
+                b.metrics.extras["xpd_floor_uncert_subband_db"] = sb_unc.tolist()
+                b.metrics.extras["XPD_early_excess_subband_db"] = ex_e_sb.tolist()
+                b.metrics.extras["XPD_late_excess_subband_db"] = ex_l_sb.tolist()
+                b.metrics.extras["claim_caution_early_subband"] = c_e_sb
+                b.metrics.extras["claim_caution_late_subband"] = c_l_sb
+
+    warnings: list[str] = []
+    if str(args.scenario).upper().startswith("B"):
+        los_n = int(sum(int(b.conditions.LOSflag) == 1 for b in bundles))
+        nlos_n = int(sum(int(b.conditions.LOSflag) == 0 for b in bundles))
+        t_los = int(max(0, args.room_target_los_n))
+        t_nlos = int(max(0, args.room_target_nlos_n))
+        if t_los > 0 and los_n < t_los:
+            warnings.append(f"room_target_los_n unmet: {los_n} < {t_los}")
+        if t_nlos > 0 and nlos_n < t_nlos:
+            warnings.append(f"room_target_nlos_n unmet: {nlos_n} < {t_nlos}")
 
     run_meta = {
         "schema_version": SCHEMA_VERSION,
         "run_id": run_id,
         "scenario_id": str(args.scenario),
+        "basis": str(args.basis),
         "seed": int(args.seed),
+        "n_rep": int(max(1, args.n_rep)),
         "nf": int(args.nf),
         "f_center_hz": float(args.f_center_hz),
         "Te_s": float(args.Te_ns) * 1e-9,
@@ -596,6 +803,7 @@ def main() -> None:
         "git_commit": commit,
         "git_branch": branch,
         "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "warnings": list(warnings),
     }
     save_run(run_meta, bundles, out_h5=args.out_h5, run_id=run_id)
     csv_out = export_csv(bundles, out_dir=args.out_dir)
@@ -603,9 +811,11 @@ def main() -> None:
         "run_id": run_id,
         "out_h5": str(args.out_h5),
         "out_dir": str(args.out_dir),
+        "basis": str(args.basis),
         "n_links": len(bundles),
         "link_metrics_csv": csv_out["link_metrics_csv"],
         "rays_csv": csv_out["rays_csv"],
+        "warnings": list(warnings),
         "floor_reference_json": str(args.floor_reference_json or (Path(args.out_dir) / "floor_reference.json"))
         if str(args.scenario).upper() == "C0" or args.floor_reference_json
         else "",
