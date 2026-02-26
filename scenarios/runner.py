@@ -1861,8 +1861,32 @@ def main() -> None:
                     m["case_id"] = str(cid)
                     m["path_count"] = int(len(paths))
                     params_case = case.get("params", {}) or {}
+                    m["material"] = str(params_case.get("material", "NA"))
+                    m["scatter_stress"] = str(params_case.get("scatter_stress", params_case.get("stress", "NA")))
                     if "distance_d_m" in params_case:
                         m["distance_d_m"] = float(params_case.get("distance_d_m"))
+                    elif paths and np.isfinite(float(paths[0].get("path_length_m", np.nan))):
+                        m["distance_d_m"] = float(paths[0].get("path_length_m"))
+                    has_los = bool(any(int((p.get("meta", {}) or {}).get("bounce_count", 0)) == 0 for p in paths))
+                    m["los_blocked"] = int(not has_los)
+                    if paths:
+                        pwr = np.asarray([_path_power(p, matrix_source=str(args.xpd_matrix_source)) for p in paths], dtype=float)
+                        j = int(np.argmax(pwr))
+                        meta_j = (paths[j].get("meta", {}) or {})
+                        bc = int(meta_j.get("bounce_count", 0))
+                        m["bounce_count"] = bc
+                        m["parity"] = "even" if (bc % 2 == 0) else "odd"
+                        m["incidence_angle_bin"] = incidence_angle_bin_label(
+                            meta_j.get("incidence_angles", []),
+                            bins_deg=[0.0, 20.0, 40.0, 60.0, 90.0],
+                        )
+                    else:
+                        m["bounce_count"] = -1
+                        m["parity"] = "NA"
+                        m["incidence_angle_bin"] = "NA"
+                    pwr_lin = max(float(m.get("window_energy_total", 0.0)), 1e-18)
+                    m["pathloss_proxy_db"] = float(10.0 * np.log10(pwr_lin))
+                    m["excess_loss_proxy_db"] = float(-10.0 * np.log10(pwr_lin))
                     dualcp_rows.append(m)
 
             dualcp_csv = _basis_output_path(args.dualcp_metrics_csv, b, multi)

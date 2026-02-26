@@ -9,6 +9,9 @@ import shlex
 import sys
 from typing import Any
 
+if __package__ is None or __package__ == "":
+    sys.path.append(str(Path(__file__).resolve().parents[1]))
+
 from analysis.measurement_compare import load_measurement_dualcp_two_csv
 from rt_io.measurement_hdf5 import append_measurement_case, build_provenance
 

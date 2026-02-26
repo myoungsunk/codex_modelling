@@ -6,9 +6,13 @@ import argparse
 import json
 from pathlib import Path
 from typing import Any
+import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
+
+if __package__ is None or __package__ == "":
+    sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from analysis.dualcp_calibration import dualcp_xpd_db_from_Hf, estimate_xpd_floor_from_cases
 from analysis.measurement_compare import load_measurement_dualcp_two_csv
