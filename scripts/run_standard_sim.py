@@ -23,6 +23,7 @@ from analysis.link_metrics import compute_link_metrics
 from analysis.pdp_synthesis import synthesize_dualcp_pdp
 from analysis.ray_table import build_ray_table_from_rt
 from analysis.windowing import estimate_tau0, make_early_late_masks
+from analysis.xpd_stats import make_subbands
 from calibration.floor_model import AngleSensitiveFloorXPD, ConstantFloorXPD, FloorXPDModel, FreqDependentFloorXPD
 from polarization.xpr_models import BaseXPRModel, BinnedXPR, ConditionalLinearXPR, ConstantXPR
 from rt_core.geometry import Material, Plane
@@ -176,6 +177,129 @@ def _build_floor_reference(bundles: list[StandardOutputBundle], bin_keys: list[s
             }
         )
     out["groups"] = groups
+    return out
+
+
+def _eval_floor_curve_for_case(
+    floor_model: FloorXPDModel,
+    freq_hz: np.ndarray,
+    yaw_deg: float,
+    pitch_deg: float,
+) -> np.ndarray:
+    f = np.asarray(freq_hz, dtype=float)
+    if len(f) == 0:
+        return np.asarray([], dtype=float)
+    if isinstance(floor_model, ConstantFloorXPD):
+        return np.full((len(f),), float(floor_model.xpd_floor_db), dtype=float)
+    if isinstance(floor_model, AngleSensitiveFloorXPD):
+        mu = (
+            float(floor_model.base_db)
+            + float(floor_model.yaw_slope_db_per_deg) * abs(float(yaw_deg))
+            + float(floor_model.pitch_slope_db_per_deg) * abs(float(pitch_deg))
+        )
+        return np.full((len(f),), mu, dtype=float)
+    if isinstance(floor_model, FreqDependentFloorXPD):
+        ref_f = np.asarray(floor_model.freq_hz, dtype=float)
+        ref_x = np.asarray(floor_model.xpd_floor_db, dtype=float)
+        if len(ref_f) == 0 or len(ref_x) == 0:
+            return np.full((len(f),), np.nan, dtype=float)
+        return np.interp(f, ref_f, ref_x, left=float(ref_x[0]), right=float(ref_x[-1])).astype(float)
+    return np.asarray(
+        [
+            float(
+                floor_model.sample_floor_xpd_db(
+                    f_hz=float(ff),
+                    yaw_deg=float(yaw_deg),
+                    pitch_deg=float(pitch_deg),
+                    rng=None,
+                )
+            )
+            for ff in f
+        ],
+        dtype=float,
+    )
+
+
+def _build_floor_subbands(
+    freq_hz: np.ndarray,
+    floor_curve_db: np.ndarray,
+    floor_uncert_db: np.ndarray,
+    num_subbands: int = 4,
+) -> list[dict[str, Any]]:
+    f = np.asarray(freq_hz, dtype=float)
+    x = np.asarray(floor_curve_db, dtype=float)
+    u = np.asarray(floor_uncert_db, dtype=float)
+    if len(f) == 0 or len(x) != len(f):
+        return []
+    if len(u) != len(f):
+        u = np.full((len(f),), np.nan, dtype=float)
+    out: list[dict[str, Any]] = []
+    for idx, (s, e) in enumerate(make_subbands(len(f), max(1, int(num_subbands)))):
+        out.append(
+            {
+                "index": int(idx),
+                "start_idx": int(s),
+                "end_idx": int(e),
+                "f_lo_hz": float(f[s]),
+                "f_hi_hz": float(f[e - 1]),
+                "xpd_floor_db": float(np.nanmedian(x[s:e])),
+                "xpd_floor_uncert_db": float(np.nanmedian(u[s:e])),
+            }
+        )
+    return out
+
+
+def _build_floor_reference_with_curve(
+    bundles: list[StandardOutputBundle],
+    floor_model: FloorXPDModel,
+    freq_hz: np.ndarray,
+    bin_keys: list[str] | None = None,
+    num_subbands: int = 4,
+) -> dict[str, Any]:
+    out = _build_floor_reference(bundles, bin_keys=bin_keys)
+    f = np.asarray(freq_hz, dtype=float)
+    if len(f) == 0:
+        return out
+    rows = []
+    for b in bundles:
+        if str(b.scenario_id).upper() != "C0":
+            continue
+        u = b.conditions.to_dict()
+        rows.append(
+            {
+                "yaw_deg": float(u.get("yaw_deg", 0.0)),
+                "pitch_deg": float(u.get("pitch_deg", 0.0)),
+            }
+        )
+    if not rows:
+        return out
+    curves = []
+    for r in rows:
+        curves.append(
+            _eval_floor_curve_for_case(
+                floor_model=floor_model,
+                freq_hz=f,
+                yaw_deg=float(r["yaw_deg"]),
+                pitch_deg=float(r["pitch_deg"]),
+            )
+        )
+    X = np.asarray(curves, dtype=float)
+    floor_curve = np.nanmedian(X, axis=0)
+    p_lo = np.nanpercentile(X, 5.0, axis=0)
+    p_hi = np.nanpercentile(X, 95.0, axis=0)
+    uncert = 0.5 * (p_hi - p_lo)
+    out["frequency_hz"] = f.tolist()
+    out["xpd_floor_db"] = np.asarray(floor_curve, dtype=float).tolist()
+    out["xpd_floor_uncert_db"] = np.asarray(uncert, dtype=float).tolist()
+    out["xpd_floor_p_lo_db"] = np.asarray(p_lo, dtype=float).tolist()
+    out["xpd_floor_p_hi_db"] = np.asarray(p_hi, dtype=float).tolist()
+    out["percentiles"] = [5.0, 95.0]
+    out["subbands"] = _build_floor_subbands(
+        freq_hz=f,
+        floor_curve_db=floor_curve,
+        floor_uncert_db=uncert,
+        num_subbands=int(num_subbands),
+    )
     return out
 
 
@@ -560,7 +684,7 @@ def main() -> None:
     parser.add_argument("--claim-caution-mode", type=str, default="scaled", choices=["scaled", "half_width", "off"])
     parser.add_argument("--claim-caution-scale", type=float, default=1.0)
     parser.add_argument("--dist-list", type=str, default="")
-    parser.add_argument("--yaw-list", type=str, default="0")
+    parser.add_argument("--yaw-list", type=str, default="-10,0,10")
     parser.add_argument("--pitch-list", type=str, default="0")
     parser.add_argument("--n-rep", type=int, default=5)
     parser.add_argument("--a2-y-list", type=str, default="1.5,2.0,2.5")
@@ -713,7 +837,13 @@ def main() -> None:
     if floor_ref_in:
         floor_ref_use = dict(floor_ref_in)
     elif str(args.scenario).upper() == "C0":
-        floor_ref_use = _build_floor_reference(bundles, bin_keys=["yaw_deg", "pitch_deg"])
+        floor_ref_use = _build_floor_reference_with_curve(
+            bundles,
+            floor_model=floor_model,
+            freq_hz=f_hz,
+            bin_keys=["yaw_deg", "pitch_deg"],
+            num_subbands=4,
+        )
         out_floor = Path(args.floor_reference_out) if str(args.floor_reference_out).strip() else (Path(args.out_dir) / "floor_reference.json")
         out_floor.parent.mkdir(parents=True, exist_ok=True)
         out_floor.write_text(json.dumps(floor_ref_use, indent=2), encoding="utf-8")
