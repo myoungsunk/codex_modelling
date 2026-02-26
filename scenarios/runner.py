@@ -20,6 +20,7 @@ import numpy as np
 from analysis.reciprocity import reciprocity_sanity
 from analysis.measurement_compare import (
     compare_measured_to_dataset,
+    load_measurement_dualcp_two_csv,
     load_measurement_four_csv,
     load_measurement_matrix_csv,
 )
@@ -1423,12 +1424,19 @@ def main() -> None:
     parser.add_argument("--model-offdiag-amp-ratio-min", type=float, default=1e-3)
     parser.add_argument("--model-seed", type=int, default=0)
     parser.add_argument("--measurement-compare", action="store_true")
-    parser.add_argument("--measurement-format", type=str, default="matrix_csv", choices=["matrix_csv", "four_csv"])
+    parser.add_argument(
+        "--measurement-format",
+        type=str,
+        default="matrix_csv",
+        choices=["matrix_csv", "four_csv", "dualcp_two_csv"],
+    )
     parser.add_argument("--measurement-matrix-csv", type=str, default=None)
     parser.add_argument("--measurement-hh-csv", type=str, default=None)
     parser.add_argument("--measurement-hv-csv", type=str, default=None)
     parser.add_argument("--measurement-vh-csv", type=str, default=None)
     parser.add_argument("--measurement-vv-csv", type=str, default=None)
+    parser.add_argument("--measurement-co-csv", type=str, default=None)
+    parser.add_argument("--measurement-cross-csv", type=str, default=None)
     parser.add_argument("--measurement-scenario", type=str, default=None)
     parser.add_argument("--measurement-case", type=str, default=None)
     parser.add_argument(
@@ -1659,7 +1667,7 @@ def main() -> None:
                 if not args.measurement_matrix_csv:
                     raise SystemExit("--measurement-matrix-csv is required when --measurement-format matrix_csv")
                 measurement = load_measurement_matrix_csv(args.measurement_matrix_csv)
-            else:
+            elif args.measurement_format == "four_csv":
                 req = [args.measurement_hh_csv, args.measurement_hv_csv, args.measurement_vh_csv, args.measurement_vv_csv]
                 if any(x is None for x in req):
                     raise SystemExit(
@@ -1671,6 +1679,15 @@ def main() -> None:
                     args.measurement_hv_csv,
                     args.measurement_vh_csv,
                     args.measurement_vv_csv,
+                )
+            else:
+                if args.measurement_co_csv is None or args.measurement_cross_csv is None:
+                    raise SystemExit(
+                        "--measurement-co-csv/--measurement-cross-csv are required when --measurement-format dualcp_two_csv"
+                    )
+                measurement = load_measurement_dualcp_two_csv(
+                    co_csv=args.measurement_co_csv,
+                    cross_csv=args.measurement_cross_csv,
                 )
             if args.measurement_plots_dir:
                 meas_plot_dir = _basis_output_dir(args.measurement_plots_dir, b, multi)
