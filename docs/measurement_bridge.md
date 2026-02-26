@@ -34,6 +34,11 @@ Do not interpret CP same-hand/opposite-hand metrics from linear-basis data unles
   `--measurement-format matrix_csv --measurement-matrix-csv <file>`
 - Four trace CSVs:
   `--measurement-format four_csv --measurement-hh-csv <file> --measurement-hv-csv <file> --measurement-vh-csv <file> --measurement-vv-csv <file>`
+- Dual-CP sequential CSVs:
+  `--measurement-format dualcp_two_csv --measurement-co-csv <file> --measurement-cross-csv <file>`
+  - `co_csv`: RHCP->RHCP
+  - `cross_csv`: RHCP->LHCP
+  - imported as `H_f[:,0,0]=H_co`, `H_f[:,1,0]=H_cross`, other entries zero-filled.
 
 Supported complex column styles:
 
@@ -43,6 +48,12 @@ Supported complex column styles:
 Frequency column aliases:
 
 - `f_hz`, `freq_hz`, `frequency_hz`, `f`
+
+## Dual-CP Sequential Measurement Scope
+
+- This dual-CP bridge is intentionally power-metric-focused.
+- Do not over-claim per-ray complex 2x2 matrix recovery from sequential co/cross captures.
+- Unless explicit phase-lock evidence exists, treat co/cross inter-trace phase as inconsistent; use power-domain XPD/XPR style metrics.
 
 ## Mismatch Diagnosis Order
 

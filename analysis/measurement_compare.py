@@ -13,7 +13,7 @@ Example:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import csv
 from pathlib import Path
 from typing import Any
@@ -34,6 +34,7 @@ class MeasurementData:
     frequency_hz: NDArray[np.float64]
     H_f: NDArray[np.complex128]
     source: str = "measurement"
+    meta: dict[str, Any] = field(default_factory=dict)
 
 
 def _norm_key(s: str) -> str:
@@ -172,6 +173,88 @@ def load_measurement_four_csv(
     return MeasurementData(frequency_hz=f, H_f=mats, source=f"{hh_csv},{hv_csv},{vh_csv},{vv_csv}")
 
 
+def load_measurement_dualcp_two_csv(
+    co_csv: str | Path,
+    cross_csv: str | Path,
+    basis: str = "circular",
+    convention: str = "IEEE-RHCP",
+) -> MeasurementData:
+    """Load dual-CP sequential measurement from two CSV traces.
+
+    Mapping:
+      H_f[:,0,0] = RHCP->RHCP (co)
+      H_f[:,1,0] = RHCP->LHCP (cross)
+      others are set to 0.
+    """
+
+    f_co, z_co = _parse_trace_csv(co_csv)
+    f_cross, z_cross = _parse_trace_csv(cross_csv)
+    f = np.asarray(f_co, dtype=float)
+    z_cross_i = _interp_complex(np.asarray(f_cross, dtype=float), np.asarray(z_cross, dtype=np.complex128), f)
+    mats = np.zeros((len(f), 2, 2), dtype=np.complex128)
+    mats[:, 0, 0] = np.asarray(z_co, dtype=np.complex128)
+    mats[:, 1, 0] = z_cross_i
+    return MeasurementData(
+        frequency_hz=f,
+        H_f=mats,
+        source=f"{co_csv},{cross_csv}",
+        meta={
+            "basis": str(basis),
+            "convention": str(convention),
+            "format": "dualcp_two_csv",
+        },
+    )
+
+
+def load_measurement_dualcp_three_csv(
+    co_pre_csv: str | Path,
+    cross_csv: str | Path,
+    co_post_csv: str | Path,
+    basis: str = "circular",
+    convention: str = "IEEE-RHCP",
+) -> MeasurementData:
+    """Load dual-CP sequential measurement with drift check.
+
+    Uses co_pre as the co trace for H_f mapping:
+      H_f[:,0,0] = co_pre
+      H_f[:,1,0] = cross
+    And computes drift from co_post against co_pre:
+      drift_co_db = median(|20log10(|co_post|/|co_pre|)|)
+    """
+
+    f_pre, z_pre = _parse_trace_csv(co_pre_csv)
+    f_cross, z_cross = _parse_trace_csv(cross_csv)
+    f_post, z_post = _parse_trace_csv(co_post_csv)
+    f = np.asarray(f_pre, dtype=float)
+    z_cross_i = _interp_complex(np.asarray(f_cross, dtype=float), np.asarray(z_cross, dtype=np.complex128), f)
+    z_post_i = _interp_complex(np.asarray(f_post, dtype=float), np.asarray(z_post, dtype=np.complex128), f)
+
+    mats = np.zeros((len(f), 2, 2), dtype=np.complex128)
+    mats[:, 0, 0] = np.asarray(z_pre, dtype=np.complex128)
+    mats[:, 1, 0] = z_cross_i
+
+    ratio_db = 20.0 * np.log10((np.abs(z_post_i) + EPS) / (np.abs(z_pre) + EPS))
+    drift_abs = np.abs(np.asarray(ratio_db, dtype=float))
+    drift_med = float(np.median(drift_abs)) if len(drift_abs) else float("nan")
+    drift_p95 = float(np.percentile(drift_abs, 95.0)) if len(drift_abs) else float("nan")
+
+    return MeasurementData(
+        frequency_hz=f,
+        H_f=mats,
+        source=f"{co_pre_csv},{cross_csv},{co_post_csv}",
+        meta={
+            "basis": str(basis),
+            "convention": str(convention),
+            "format": "dualcp_three_csv",
+            "co_pre_csv": str(co_pre_csv),
+            "co_post_csv": str(co_post_csv),
+            "drift_metric": "median_abs_delta_mag_db",
+            "drift_co_db": drift_med,
+            "drift_co_p95_db": drift_p95,
+        },
+    )
+
+
 def _select_case(dataset: dict[str, Any], scenario_id: str | None = None, case_id: str | None = None) -> tuple[str, str, dict[str, Any]]:
     scenarios = dataset.get("scenarios", {})
     if scenario_id is not None:
@@ -257,8 +340,9 @@ def compare_measured_to_dataset(
     matrix_source = "A" if str(channel_definition).lower().startswith("emb") else "J"
     rt_basis = str(dataset.get("meta", {}).get("basis", "linear"))
     rt_conv = str(dataset.get("meta", {}).get("convention", "IEEE-RHCP"))
-    meas_basis = str(measurement_basis or rt_basis)
-    meas_conv = str(measurement_convention or rt_conv)
+    meas_meta = measurement.meta if isinstance(measurement.meta, dict) else {}
+    meas_basis = str(measurement_basis or meas_meta.get("basis", rt_basis))
+    meas_conv = str(measurement_convention or meas_meta.get("convention", rt_conv))
     out_basis = str(eval_basis or rt_basis)
     out_conv = str(eval_convention or rt_conv)
 
@@ -369,4 +453,3 @@ def compare_measured_to_dataset(
         "has_synth_compare": bool(H_sy is not None),
         "plots": plots,
     }
-

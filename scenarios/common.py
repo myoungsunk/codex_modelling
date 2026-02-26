@@ -5,6 +5,7 @@ from __future__ import annotations
 import numpy as np
 
 from rt_core.antenna import Antenna
+from rt_core.geometry import Material, Plane, normalize
 
 
 def default_antennas(
@@ -63,3 +64,39 @@ def paths_to_records(paths: list) -> list[dict]:
             }
         )
     return rec
+
+
+def make_los_blocker_plane(
+    tx_pos: np.ndarray,
+    rx_pos: np.ndarray,
+    plane_id: int,
+    half_extent_u: float = 0.35,
+    half_extent_v: float = 0.55,
+    material: Material | None = None,
+) -> Plane:
+    """Build a finite los-blocker plate centered on the Tx-Rx midpoint.
+
+    The plate normal is aligned to the Tx->Rx direction so the direct segment is
+    physically occluded when LOS tracing is enabled.
+    """
+
+    tx = np.asarray(tx_pos, dtype=float)
+    rx = np.asarray(rx_pos, dtype=float)
+    n = normalize(rx - tx)
+    ref = np.array([0.0, 0.0, 1.0], dtype=float)
+    if abs(float(np.dot(n, ref))) > 0.9:
+        ref = np.array([0.0, 1.0, 0.0], dtype=float)
+    u = normalize(np.cross(ref, n))
+    v = normalize(np.cross(n, u))
+    p0 = 0.5 * (tx + rx)
+    mat = material if material is not None else Material.dielectric(eps_r=1.15, tan_delta=1.0, name="absorber_proxy")
+    return Plane(
+        id=int(plane_id),
+        p0=np.asarray(p0, dtype=float),
+        normal=np.asarray(n, dtype=float),
+        material=mat,
+        u_axis=u,
+        v_axis=v,
+        half_extent_u=float(half_extent_u),
+        half_extent_v=float(half_extent_v),
+    )
