@@ -116,11 +116,14 @@ def plot_scatter(
             fig.colorbar(sc, ax=ax, shrink=0.9)
         else:
             ax.scatter(xx, yy, s=28, alpha=0.85)
-        if add_fit and len(xx) >= 2:
-            z = np.polyfit(xx, yy, 1)
-            xf = np.linspace(float(np.min(xx)), float(np.max(xx)), 100)
-            yf = z[0] * xf + z[1]
-            ax.plot(xf, yf, "--", lw=1.8)
+        if add_fit and len(xx) >= 2 and len(np.unique(np.round(xx, 12))) >= 2:
+            try:
+                z = np.polyfit(xx, yy, 1)
+                xf = np.linspace(float(np.min(xx)), float(np.max(xx)), 100)
+                yf = z[0] * xf + z[1]
+                ax.plot(xf, yf, "--", lw=1.8)
+            except Exception:
+                pass
     ax.set_title(title)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
