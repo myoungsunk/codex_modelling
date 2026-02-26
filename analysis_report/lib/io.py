@@ -44,7 +44,12 @@ def _resolve_path(base_dir: Path, maybe_path: str | None) -> Path | None:
     p = Path(s)
     if p.is_absolute():
         return p
-    return (base_dir / p).resolve()
+    if p.exists():
+        return p.resolve()
+    q = (base_dir / p)
+    if q.exists():
+        return q.resolve()
+    return q.resolve()
 
 
 def _read_json(path: Path) -> dict[str, Any]:
