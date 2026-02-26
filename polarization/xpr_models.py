@@ -40,7 +40,16 @@ class ConditionalLinearXPR(BaseXPRModel):
         late = 1.0 if np.isfinite(tau) and np.isfinite(tau0) and tau > (tau0 + Te_s) else 0.0
         el = float(ray_row.get("EL_db", link_U.get("EL_proxy_db", 0.0)))
         inc = float(ray_row.get("incidence_deg", 0.0))
-        mat = str(ray_row.get("material_class", link_U.get("material_class", "NA")))
+        mat_ray = str(ray_row.get("material_class", "NA"))
+        mat_link = str(link_U.get("material_class", "NA"))
+        # Ray tables may carry surface ids (e.g., \"1\") instead of material labels.
+        # Prefer link-level material label when it matches configured material_bias keys.
+        if mat_ray in self.material_bias:
+            mat = mat_ray
+        elif mat_link in self.material_bias:
+            mat = mat_link
+        else:
+            mat = mat_ray if mat_ray not in {"", "NA", "nan", "None"} else mat_link
         m_bias = float(self.material_bias.get(mat, 0.0))
         rough = float(link_U.get("roughness_flag", 0))
         human = float(link_U.get("human_flag", 0))
