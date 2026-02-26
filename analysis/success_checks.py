@@ -41,6 +41,18 @@ def _pick_metric_key(rows: list[dict[str, Any]], preferred: str, fallback: str) 
     return fallback
 
 
+def _parity_str(v: Any) -> str:
+    return str(v).strip().lower()
+
+
+def _filter_expected_parity_rows(rows: list[dict[str, Any]], expected: str, min_n: int = 3) -> tuple[list[dict[str, Any]], bool]:
+    exp = str(expected).strip().lower()
+    matched = [r for r in rows if _parity_str(r.get("dominant_parity_early", "")) == exp]
+    if len(matched) >= int(min_n):
+        return matched, True
+    return rows, False
+
+
 def _paired_vals(rows: list[dict[str, Any]], key_x: str, key_y: str) -> tuple[np.ndarray, np.ndarray]:
     xs = []
     ys = []
@@ -164,9 +176,12 @@ def check_C0_floor(rows: list[dict[str, Any]]) -> dict[str, Any]:
 def check_A2_A3_parity_sign(rows: list[dict[str, Any]]) -> dict[str, Any]:
     a2_rows = [r for r in rows if str(r.get("scenario_id", "")).upper() == "A2"]
     a3_rows = [r for r in rows if str(r.get("scenario_id", "")).upper() == "A3"]
-    key = _pick_metric_key(a2_rows + a3_rows, "XPD_early_excess_db", "XPD_early_db")
-    a2 = _vals(a2_rows, key)
-    a3 = _vals(a3_rows, key)
+    # Prefer raw XPD for odd/even sign checks; excess can hide parity sign under large floor offsets.
+    key = _pick_metric_key(a2_rows + a3_rows, "XPD_early_db", "XPD_early_excess_db")
+    a2_use, a2_expected_used = _filter_expected_parity_rows(a2_rows, expected="odd")
+    a3_use, a3_expected_used = _filter_expected_parity_rows(a3_rows, expected="even")
+    a2 = _vals(a2_use, key)
+    a3 = _vals(a3_use, key)
     med_a2 = float(np.median(a2)) if len(a2) else float("nan")
     med_a3 = float(np.median(a3)) if len(a3) else float("nan")
     ks_p = float("nan")
@@ -178,6 +193,12 @@ def check_A2_A3_parity_sign(rows: list[dict[str, Any]]) -> dict[str, Any]:
     out_a3 = float(np.mean(a3 <= np.percentile(a3, 10))) if len(a3) else float("nan")
     return {
         "metric_key": key,
+        "n_A2_total": int(len(_vals(a2_rows, key))),
+        "n_A2_used": int(len(a2)),
+        "n_A3_total": int(len(_vals(a3_rows, key))),
+        "n_A3_used": int(len(a3)),
+        "used_expected_parity_subset_A2": bool(a2_expected_used),
+        "used_expected_parity_subset_A3": bool(a3_expected_used),
         "n_A2": int(len(a2)),
         "n_A3": int(len(a3)),
         "median_A2_xpd_early_db": med_a2,
@@ -193,8 +214,9 @@ def check_A2_A3_parity_sign(rows: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def check_A4_A5_breaking(rows: list[dict[str, Any]]) -> dict[str, Any]:
-    key = _pick_metric_key(rows, "XPD_early_excess_db", "XPD_early_db")
-    key_late = _pick_metric_key(rows, "XPD_late_excess_db", "XPD_late_db")
+    # Prefer raw XPD for stress breaking checks; floor-subtracted excess can dominate interpretation.
+    key = _pick_metric_key(rows, "XPD_early_db", "XPD_early_excess_db")
+    key_late = _pick_metric_key(rows, "XPD_late_db", "XPD_late_excess_db")
     a5 = [r for r in rows if str(r.get("scenario_id", "")).upper() == "A5"]
     base = [r for r in a5 if int(r.get("roughness_flag", 0)) == 0 and int(r.get("human_flag", 0)) == 0]
     if not base:
@@ -216,7 +238,7 @@ def check_A4_A5_breaking(rows: list[dict[str, Any]]) -> dict[str, Any]:
     pass_break = bool(
         np.isfinite(m_base)
         and np.isfinite(m_stress)
-        and (abs(m_stress) <= abs(m_base) or (np.isfinite(l_base) and np.isfinite(l_stress) and l_stress > l_base))
+        and (abs(m_stress) <= abs(m_base) or (np.isfinite(l_base) and np.isfinite(l_stress) and l_stress < l_base))
     )
     return {
         "metric_key_early": key,
