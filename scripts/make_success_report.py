@@ -47,6 +47,10 @@ def main() -> None:
         "delta_floor_db",
         "distance_rank_corr",
         "yaw_rank_corr",
+        "anova_distance_p",
+        "anova_distance_eta2",
+        "anova_yaw_p",
+        "anova_yaw_eta2",
         "dominant_factor",
     ]:
         if k in c0:
@@ -92,9 +96,21 @@ def main() -> None:
     lines.append(f"- spearman_xpd_early_vs_minus_el_proxy: {b.get('spearman_xpd_early_vs_minus_el_proxy')}")
     lines.append(f"- spearman_ci95_lo: {b.get('spearman_ci95_lo')}")
     lines.append(f"- spearman_ci95_hi: {b.get('spearman_ci95_hi')}")
+    lines.append(f"- distance_vs_losflag_rank_corr: {b.get('distance_vs_losflag_rank_corr')}")
     lines.append(f"- ks_p_los_vs_nlos_xpd_early: {b.get('ks_p_los_vs_nlos_xpd_early')}")
     lines.append(f"- wasserstein_los_vs_nlos_xpd_early: {b.get('wasserstein_los_vs_nlos_xpd_early')}")
     lines.append("")
+
+    mt = checks.get("multiple_testing", {})
+    labels = list(mt.get("labels", []))
+    p_raw = list(mt.get("p_raw", []))
+    p_fdr = list(mt.get("p_fdr_bh", []))
+    if labels:
+        lines.append("## Multiple Testing (FDR-BH)")
+        lines.append("")
+        for lb, pr, qv in zip(labels, p_raw, p_fdr):
+            lines.append(f"- {lb}: p_raw={pr}, p_fdr_bh={qv}")
+        lines.append("")
 
     lines.append("## Generated Plots")
     lines.append("")

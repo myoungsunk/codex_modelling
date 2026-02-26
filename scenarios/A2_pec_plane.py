@@ -8,7 +8,7 @@ import numpy as np
 
 from rt_core.geometry import Material, Plane
 from rt_core.tracer import trace_paths
-from scenarios.common import default_antennas
+from scenarios.common import default_antennas, make_los_blocker_plane
 
 
 def build_scene(y_plane: float = 2.0) -> list[Plane]:
@@ -42,10 +42,18 @@ def run_case(
     force_cp_swap_on_odd_reflection: bool = False,
     max_bounce_override: int | None = None,
     diffuse_config: dict[str, Any] | None = None,
+    los_blocker: bool = False,
+    los_enabled_override: bool | None = None,
 ):
     tx, rx = default_antennas(basis=basis, **(antenna_config or {}))
     rx.position[:] = [params["distance_m"], 0.0, 1.5]
     scene = build_scene(y_plane=params["y_plane"])
+    if bool(los_blocker):
+        scene.append(make_los_blocker_plane(tx.position, rx.position, plane_id=9101))
+    if los_enabled_override is None:
+        los_enabled = True if bool(los_blocker) else False
+    else:
+        los_enabled = bool(los_enabled_override)
     trace_kwargs = dict(diffuse_config or {})
     return trace_paths(
         scene,
@@ -53,7 +61,7 @@ def run_case(
         rx,
         f_hz,
         max_bounce=int(max_bounce_override) if max_bounce_override is not None else 1,
-        los_enabled=False,
+        los_enabled=bool(los_enabled),
         force_cp_swap_on_odd_reflection=force_cp_swap_on_odd_reflection,
         **trace_kwargs,
     )

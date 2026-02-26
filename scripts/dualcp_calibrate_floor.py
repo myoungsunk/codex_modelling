@@ -8,14 +8,17 @@ from pathlib import Path
 from typing import Any
 import sys
 
-import matplotlib.pyplot as plt
+import matplotlib
 import numpy as np
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 if __package__ is None or __package__ == "":
     sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from analysis.dualcp_calibration import dualcp_xpd_db_from_Hf, estimate_xpd_floor_from_cases
-from analysis.measurement_compare import load_measurement_dualcp_two_csv
+from analysis.measurement_compare import load_measurement_dualcp_three_csv, load_measurement_dualcp_two_csv
 from analysis.xpd_stats import make_subbands
 from rt_io.measurement_hdf5 import iter_measurement_cases
 
@@ -24,29 +27,40 @@ def _load_cases_from_h5(path: str | Path, scenario_id: str) -> list[dict[str, An
     raw = iter_measurement_cases(path, scenario_id=scenario_id)
     out: list[dict[str, Any]] = []
     for c in raw:
+        cmeta = dict(c.get("meta", {}).get("case_meta", {})) if isinstance(c.get("meta", {}), dict) else {}
         out.append(
             {
                 "scenario_id": str(c.get("scenario_id", scenario_id)),
                 "case_id": str(c.get("case_id", "0")),
                 "frequency_hz": np.asarray(c["frequency_hz"], dtype=float),
                 "H_f": np.asarray(c["H_f"], dtype=np.complex128),
+                "drift_co_db": float(cmeta.get("drift_co_db", np.nan)),
+                "drift_co_p95_db": float(cmeta.get("drift_co_p95_db", np.nan)),
             }
         )
     return out
 
 
-def _load_cases_from_csv_pairs(co_csv: list[str], cross_csv: list[str]) -> list[dict[str, Any]]:
+def _load_cases_from_csv_pairs(co_csv: list[str], cross_csv: list[str], co_post_csv: list[str] | None = None) -> list[dict[str, Any]]:
     if len(co_csv) != len(cross_csv):
         raise ValueError("--co-csv and --cross-csv counts must match")
+    post = list(co_post_csv or [])
+    if post and len(post) != len(co_csv):
+        raise ValueError("--co-post-csv count must match --co-csv count")
     out: list[dict[str, Any]] = []
     for i, (co, cr) in enumerate(zip(co_csv, cross_csv)):
-        m = load_measurement_dualcp_two_csv(co_csv=co, cross_csv=cr)
+        if post:
+            m = load_measurement_dualcp_three_csv(co_pre_csv=co, cross_csv=cr, co_post_csv=post[i])
+        else:
+            m = load_measurement_dualcp_two_csv(co_csv=co, cross_csv=cr)
         out.append(
             {
                 "scenario_id": "CSV",
                 "case_id": f"csv_{i}",
                 "frequency_hz": np.asarray(m.frequency_hz, dtype=float),
                 "H_f": np.asarray(m.H_f, dtype=np.complex128),
+                "drift_co_db": float(dict(m.meta).get("drift_co_db", np.nan)),
+                "drift_co_p95_db": float(dict(m.meta).get("drift_co_p95_db", np.nan)),
             }
         )
     return out
@@ -129,6 +143,8 @@ def main() -> None:
     parser.add_argument("--scenario-id", type=str, default="C0")
     parser.add_argument("--co-csv", action="append", default=[])
     parser.add_argument("--cross-csv", action="append", default=[])
+    parser.add_argument("--co-post-csv", action="append", default=[])
+    parser.add_argument("--max-drift-db", type=float, default=-1.0)
     parser.add_argument("--out-json", type=str, default="outputs/calibration_floor.json")
     parser.add_argument("--plots-dir", type=str, default="outputs/plots")
     parser.add_argument("--num-subbands", type=int, default=4)
@@ -139,10 +155,32 @@ def main() -> None:
     cases: list[dict[str, Any]] = []
     if args.measurement_h5:
         cases.extend(_load_cases_from_h5(args.measurement_h5, scenario_id=args.scenario_id))
-    if args.co_csv or args.cross_csv:
-        cases.extend(_load_cases_from_csv_pairs(list(args.co_csv), list(args.cross_csv)))
+    if args.co_csv or args.cross_csv or args.co_post_csv:
+        cases.extend(_load_cases_from_csv_pairs(list(args.co_csv), list(args.cross_csv), list(args.co_post_csv)))
     if not cases:
         raise SystemExit("No input cases. Use --measurement-h5 or --co-csv/--cross-csv.")
+
+    drift_thr = float(args.max_drift_db)
+    drift_summary = {
+        "max_drift_db": drift_thr,
+        "n_before": int(len(cases)),
+        "n_rejected": 0,
+        "n_after": int(len(cases)),
+    }
+    if np.isfinite(drift_thr) and drift_thr >= 0.0:
+        keep = []
+        rej = 0
+        for c in cases:
+            d = float(c.get("drift_co_db", np.nan))
+            if np.isfinite(d) and d > drift_thr:
+                rej += 1
+                continue
+            keep.append(c)
+        cases = keep
+        drift_summary["n_rejected"] = int(rej)
+        drift_summary["n_after"] = int(len(cases))
+        if len(cases) == 0:
+            raise SystemExit("All input cases rejected by drift filter.")
 
     nf = len(np.asarray(cases[0]["frequency_hz"], dtype=float))
     subbands = make_subbands(nf, max(1, int(args.num_subbands)))
@@ -158,6 +196,7 @@ def main() -> None:
         "scenario_id": str(args.scenario_id),
         "n_cases": int(len(cases)),
     }
+    result["drift_filter"] = drift_summary
 
     plots = _save_plots(args.plots_dir, result=result, cases=cases)
     result["plots"] = plots

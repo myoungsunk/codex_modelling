@@ -12,7 +12,7 @@ from typing import Any
 if __package__ is None or __package__ == "":
     sys.path.append(str(Path(__file__).resolve().parents[1]))
 
-from analysis.measurement_compare import load_measurement_dualcp_two_csv
+from analysis.measurement_compare import load_measurement_dualcp_three_csv, load_measurement_dualcp_two_csv
 from rt_io.measurement_hdf5 import append_measurement_case, build_provenance
 
 
@@ -31,6 +31,7 @@ def main() -> None:
     parser.add_argument("--case-id", required=True, type=str)
     parser.add_argument("--co-csv", required=True, type=str)
     parser.add_argument("--cross-csv", required=True, type=str)
+    parser.add_argument("--co-post-csv", type=str, default=None)
     parser.add_argument("--out-h5", required=True, type=str)
     parser.add_argument("--meta-json", type=str, default=None)
     args = parser.parse_args()
@@ -38,20 +39,36 @@ def main() -> None:
     meta = _load_meta_json(args.meta_json)
     basis = str(meta.get("basis", "circular"))
     convention = str(meta.get("convention", "IEEE-RHCP"))
-    meas = load_measurement_dualcp_two_csv(
-        co_csv=args.co_csv,
-        cross_csv=args.cross_csv,
-        basis=basis,
-        convention=convention,
-    )
+    if args.co_post_csv:
+        meas = load_measurement_dualcp_three_csv(
+            co_pre_csv=args.co_csv,
+            cross_csv=args.cross_csv,
+            co_post_csv=args.co_post_csv,
+            basis=basis,
+            convention=convention,
+        )
+    else:
+        meas = load_measurement_dualcp_two_csv(
+            co_csv=args.co_csv,
+            cross_csv=args.cross_csv,
+            basis=basis,
+            convention=convention,
+        )
 
     merged_meta = dict(meta)
+    merged_meta.update({k: v for k, v in dict(meas.meta).items() if k.startswith("drift_")})
+    if "drift_metric" in meas.meta:
+        merged_meta["drift_metric"] = meas.meta.get("drift_metric")
     merged_meta.setdefault("basis", str(meas.meta.get("basis", basis)))
     merged_meta.setdefault("convention", str(meas.meta.get("convention", convention)))
-    merged_meta.setdefault("format", "dualcp_two_csv")
+    merged_meta.setdefault("format", str(meas.meta.get("format", "dualcp_two_csv")))
 
     provenance = build_provenance(
-        source_paths={"co_csv": args.co_csv, "cross_csv": args.cross_csv},
+        source_paths={
+            "co_csv": args.co_csv,
+            "cross_csv": args.cross_csv,
+            **({"co_post_csv": args.co_post_csv} if args.co_post_csv else {}),
+        },
         command=" ".join(shlex.quote(x) for x in sys.argv),
         extra={
             "script": "scripts/ingest_measurement_dualcp.py",
