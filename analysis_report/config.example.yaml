@@ -1,0 +1,32 @@
+run_group: "2026-02-example"
+input_runs:
+  - "outputs/run_C0"
+  - "outputs/run_A2"
+scenario_map: {}
+floor_policy:
+  mode: "from_C0"           # from_C0 | from_calibration_json | none
+  calibration_json: ""
+  delta_method: "p5_p95"     # p5_p95 | iqr | std
+windows:
+  Te_ns: 10.0
+  Tmax_ns: 200.0
+  tau0_method: "threshold"
+  noise_tail_ns: 50.0
+  threshold_margin_db: 6.0
+measurement_sweep:
+  BW_Hz: 1.0e9
+  df_Hz: 1.0e6
+plots:
+  max_links_for_pdp_examples: 3
+  pdp_example_selection: "highest_energy"
+stats:
+  alpha: 0.05
+  bootstrap_n: 1000
+scene_plots:
+  enabled: true
+  source: "scene_debug_json" # scene_debug_json | rebuild_from_scenario
+  debug_rays_k: 20
+  ray_selection: "top_power"
+  max_cases_per_scenario: 9999
+  figure_size: [10, 6]
+  save_format: "png"
