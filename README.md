@@ -103,3 +103,38 @@ python3 scripts/fit_dualcp_proxy.py \
 ```
 
 See `docs/dualcp_proxy_model.md` for floor->metrics->conditional-fit->bridge details and sensitivity guidance.
+
+## Standard Outputs Runner (v1)
+
+Run standardized A/B/C/U outputs (HDF5 + CSV) for each scenario:
+
+```bash
+python3 scripts/run_standard_sim.py --scenario C0 --out-h5 outputs/std_c0.h5 --out-dir outputs/std_c0
+python3 scripts/run_standard_sim.py --scenario A2 --out-h5 outputs/std_a2.h5 --out-dir outputs/std_a2 --strict-los-blocked
+python3 scripts/run_standard_sim.py --scenario A3 --out-h5 outputs/std_a3.h5 --out-dir outputs/std_a3 --strict-los-blocked
+python3 scripts/run_standard_sim.py --scenario A4 --out-h5 outputs/std_a4.h5 --out-dir outputs/std_a4 --material-list glass,wood
+python3 scripts/run_standard_sim.py --scenario A5 --out-h5 outputs/std_a5.h5 --out-dir outputs/std_a5 --stress-flag --strict-los-blocked
+python3 scripts/run_standard_sim.py --scenario B1 --out-h5 outputs/std_b1.h5 --out-dir outputs/std_b1
+python3 scripts/run_standard_sim.py --scenario B2 --out-h5 outputs/std_b2.h5 --out-dir outputs/std_b2
+python3 scripts/run_standard_sim.py --scenario B3 --out-h5 outputs/std_b3.h5 --out-dir outputs/std_b3
+```
+
+Generate success checks + plots:
+
+```bash
+python3 scripts/make_success_report.py \
+  --link-metrics-csv outputs/std_b1/link_metrics.csv \
+  --out-report outputs/success_report.md \
+  --out-json outputs/success_report.json \
+  --plots-dir outputs/plots_standard
+```
+
+Select candidate measurement points (stratified by EL/LOS):
+
+```bash
+python3 scripts/select_measurement_points.py \
+  --link-metrics-csv outputs/std_b1/link_metrics.csv \
+  --out-csv outputs/selected_points.csv \
+  --bins EL_proxy_db:4,LOSflag:2 \
+  --per-bin 5
+```

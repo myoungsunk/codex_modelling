@@ -47,6 +47,10 @@ def build_link_U_from_scenario(
     rough = int(mm.get("roughness_flag", 0))
     human = int(mm.get("human_flag", 0))
     obst = int(mm.get("obstacle_flag", 0))
+    extras: dict[str, Any] = {}
+    for k in ["rx_x", "rx_y", "rx_z", "scenario_id", "case_id", "yaw_deg", "pitch_deg"]:
+        if k in mm:
+            extras[k] = mm.get(k)
     tau_lim = None
     if masks is not None and "delay_tau_s" in mm:
         tau = np.asarray(mm.get("delay_tau_s", []), dtype=float)
@@ -63,4 +67,5 @@ def build_link_U_from_scenario(
         human_flag=human,
         obstacle_flag=obst,
         dominant_parity_early=dom,
+        extras=extras,
     )

@@ -298,6 +298,8 @@ def _build_case_records(args: argparse.Namespace, f_hz: np.ndarray) -> list[dict
                         "LOSflag": int(1),
                         "material_class": "PEC",
                         "obstacle_flag": int(kind in {"B2", "B3"}),
+                        "rx_x": float(x),
+                        "rx_y": float(y),
                     },
                 }
             )
