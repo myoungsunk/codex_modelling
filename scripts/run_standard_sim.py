@@ -33,6 +33,14 @@ from scenarios import A2_pec_plane, A3_corner_2bounce, A4_dielectric_plane, A5_d
 from scenarios.common import default_antennas, paths_to_records, uwb_frequency
 
 
+def _pctl(x: np.ndarray, q: float) -> float:
+    arr = np.asarray(x, dtype=float)
+    arr = arr[np.isfinite(arr)]
+    if len(arr) == 0:
+        return float("nan")
+    return float(np.percentile(arr, float(q)))
+
+
 def _parse_float_list(raw: str, default: list[float]) -> list[float]:
     out = []
     for tok in str(raw).split(","):
@@ -116,6 +124,95 @@ def _make_floor_model(cfg: dict[str, Any]) -> FloorXPDModel:
     return ConstantFloorXPD(float(cfg.get("xpd_floor_db", 25.0)), sigma_db=float(cfg.get("sigma_db", 0.0)))
 
 
+def _build_floor_reference(bundles: list[StandardOutputBundle], bin_keys: list[str] | None = None) -> dict[str, Any]:
+    rows = []
+    for b in bundles:
+        if str(b.scenario_id).upper() != "C0":
+            continue
+        u = b.conditions.to_dict()
+        rows.append(
+            {
+                "xpd_early_db": float(b.metrics.XPD_early_db),
+                "yaw_deg": float(u.get("yaw_deg", np.nan)),
+                "pitch_deg": float(u.get("pitch_deg", np.nan)),
+                "d_m": float(u.get("d_m", np.nan)),
+            }
+        )
+    x = np.asarray([r["xpd_early_db"] for r in rows], dtype=float)
+    out = {
+        "version": "floor_reference_v1",
+        "source_scenario": "C0",
+        "count": int(len(x)),
+        "xpd_floor_db": float(np.nanmedian(x)) if len(x) else float("nan"),
+        "p5_db": _pctl(x, 5.0),
+        "p95_db": _pctl(x, 95.0),
+        "delta_floor_db": float(_pctl(x, 95.0) - _pctl(x, 5.0)) if len(x) else float("nan"),
+        "bin_keys": list(bin_keys or ["yaw_deg", "pitch_deg"]),
+        "groups": [],
+    }
+    if not rows:
+        return out
+    gkeys = list(out["bin_keys"])
+    buckets: dict[str, list[float]] = {}
+    centers: dict[str, dict[str, float]] = {}
+    for r in rows:
+        vals = [round(float(r.get(k, np.nan)), 6) for k in gkeys]
+        key = "|".join(str(v) for v in vals)
+        buckets.setdefault(key, []).append(float(r["xpd_early_db"]))
+        if key not in centers:
+            centers[key] = {k: float(r.get(k, np.nan)) for k in gkeys}
+    groups = []
+    for k in sorted(buckets.keys()):
+        vals = np.asarray(buckets[k], dtype=float)
+        groups.append(
+            {
+                **centers[k],
+                "count": int(len(vals)),
+                "xpd_floor_db": float(np.nanmedian(vals)),
+                "p5_db": _pctl(vals, 5.0),
+                "p95_db": _pctl(vals, 95.0),
+                "delta_floor_db": float(_pctl(vals, 95.0) - _pctl(vals, 5.0)),
+            }
+        )
+    out["groups"] = groups
+    return out
+
+
+def _lookup_floor(reference: dict[str, Any], U: dict[str, Any]) -> tuple[float, float]:
+    base = float(reference.get("xpd_floor_db", np.nan))
+    delta = float(reference.get("delta_floor_db", np.nan))
+    groups = list(reference.get("groups", []))
+    if not groups:
+        return base, delta
+    keys = list(reference.get("bin_keys", ["yaw_deg", "pitch_deg"]))
+    if not keys:
+        return base, delta
+    best = None
+    for g in groups:
+        dist = 0.0
+        valid = False
+        for k in keys:
+            if (k not in U) or (k not in g):
+                continue
+            try:
+                uv = float(U.get(k, np.nan))
+                gv = float(g.get(k, np.nan))
+            except Exception:
+                continue
+            if np.isfinite(uv) and np.isfinite(gv):
+                valid = True
+                dist += abs(uv - gv)
+        if not valid:
+            continue
+        score = (dist, -int(g.get("count", 0)))
+        if best is None or score < best[0]:
+            best = (score, g)
+    if best is None:
+        return base, delta
+    gg = best[1]
+    return float(gg.get("xpd_floor_db", base)), float(gg.get("delta_floor_db", delta))
+
+
 def _run_room_case(kind: str, rx_x: float, rx_y: float, f_hz: np.ndarray) -> list[dict[str, Any]]:
     tx, rx = default_antennas(basis="circular")
     tx.position[:] = [2.0, 0.0, 1.5]
@@ -184,7 +281,6 @@ def _build_case_records(args: argparse.Namespace, f_hz: np.ndarray) -> list[dict
                             "paths": paths_to_records(paths),
                             "meta": {
                                 "d_m": d,
-                                "LOSflag": 1,
                                 "yaw_deg": yaw,
                                 "pitch_deg": pit,
                                 "material_class": "free_space",
@@ -207,7 +303,7 @@ def _build_case_records(args: argparse.Namespace, f_hz: np.ndarray) -> list[dict
                     "link_id": f"A2_{cid}",
                     "params": p,
                     "paths": paths_to_records(paths),
-                    "meta": {"d_m": d, "LOSflag": 0, "material_class": "PEC", "obstacle_flag": 1},
+                    "meta": {"d_m": d, "material_class": "PEC", "obstacle_flag": 1},
                 }
             )
             cid += 1
@@ -226,14 +322,14 @@ def _build_case_records(args: argparse.Namespace, f_hz: np.ndarray) -> list[dict
                     "link_id": f"A3_{cid}",
                     "params": p,
                     "paths": paths_to_records(paths),
-                    "meta": {"d_m": d, "LOSflag": 0, "material_class": "PEC", "obstacle_flag": 1},
+                    "meta": {"d_m": d, "material_class": "PEC", "obstacle_flag": 1},
                 }
             )
             cid += 1
         return out
 
     if s == "A4":
-        mats = [m.strip() for m in str(args.material_list).split(",") if m.strip()] or ["concrete", "glass"]
+        mats = [m.strip() for m in str(args.material_list).split(",") if m.strip()] or ["glass", "wood"]
         cid = 0
         for m in mats:
             for y in [1.5, 2.5]:
@@ -246,7 +342,7 @@ def _build_case_records(args: argparse.Namespace, f_hz: np.ndarray) -> list[dict
                         "link_id": f"A4_{cid}",
                         "params": p,
                         "paths": paths_to_records(paths),
-                        "meta": {"d_m": 6.0, "LOSflag": 0, "material_class": m, "obstacle_flag": 1},
+                        "meta": {"d_m": 6.0, "material_class": m, "obstacle_flag": 1},
                     }
                 )
                 cid += 1
@@ -267,7 +363,6 @@ def _build_case_records(args: argparse.Namespace, f_hz: np.ndarray) -> list[dict
                     "paths": paths_to_records(paths),
                     "meta": {
                         "d_m": d,
-                        "LOSflag": 0,
                         "material_class": "PEC",
                         "roughness_flag": int(bool(args.stress_flag)),
                         "human_flag": int(bool(args.stress_flag)),
@@ -295,7 +390,6 @@ def _build_case_records(args: argparse.Namespace, f_hz: np.ndarray) -> list[dict
                     "paths": paths,
                     "meta": {
                         "d_m": float(np.linalg.norm(np.asarray([x, y, 1.5]) - np.asarray([2.0, 0.0, 1.5]))),
-                        "LOSflag": int(1),
                         "material_class": "PEC",
                         "obstacle_flag": int(kind in {"B2", "B3"}),
                         "rx_x": float(x),
@@ -321,6 +415,8 @@ def main() -> None:
     parser.add_argument("--Tmax-ns", type=float, default=30.0)
     parser.add_argument("--xpr-model-config", type=str, default=None)
     parser.add_argument("--floor-model-config", type=str, default=None)
+    parser.add_argument("--floor-reference-json", type=str, default=None)
+    parser.add_argument("--floor-reference-out", type=str, default="")
     parser.add_argument("--dist-list", type=str, default="")
     parser.add_argument("--yaw-list", type=str, default="0")
     parser.add_argument("--pitch-list", type=str, default="0")
@@ -344,6 +440,7 @@ def main() -> None:
     f_hz = uwb_frequency(nf=int(args.nf))
     xpr_cfg = _load_json(args.xpr_model_config)
     floor_cfg = _load_json(args.floor_model_config)
+    floor_ref_in = _load_json(args.floor_reference_json)
     xpr_model = _make_xpr_model(str(args.scenario), xpr_cfg)
     floor_model = _make_floor_model(floor_cfg)
 
@@ -360,8 +457,9 @@ def main() -> None:
         ray_rows = build_ray_table_from_rt(paths, matrix_source="A", include_material=True, include_angles=True)
         ray_rows = add_el_db(ray_rows, f_center_hz=float(args.f_center_hz), method="fspl")
 
+        los_link = int(any(int(r.get("los_flag_ray", 0)) == 1 for r in ray_rows))
         if scenario_id in {"A2", "A3", "A4", "A5"} and bool(args.strict_los_blocked):
-            if any(int(r.get("los_flag_ray", 0)) == 1 for r in ray_rows):
+            if los_link == 1:
                 raise SystemExit(f"LOS blocked check failed: scenario={scenario_id}, link_id={link_id}")
 
         dt = max(float(args.delay_bin_ns), 1e-6) * 1e-9
@@ -426,6 +524,9 @@ def main() -> None:
             f_center_hz=float(args.f_center_hz),
         )
         link_meta = dict(c.get("meta", {}))
+        link_meta["LOSflag"] = int(los_link)
+        link_meta["scenario_id"] = scenario_id
+        link_meta["case_id"] = case_id
         link_meta["delay_tau_s"] = pdp["delay_tau_s"].tolist()
         U = build_link_U_from_scenario(
             link_meta,
@@ -456,6 +557,31 @@ def main() -> None:
         )
         bundles.append(bundle)
 
+    floor_ref_use: dict[str, Any] | None = None
+    if floor_ref_in:
+        floor_ref_use = dict(floor_ref_in)
+    elif str(args.scenario).upper() == "C0":
+        floor_ref_use = _build_floor_reference(bundles, bin_keys=["yaw_deg", "pitch_deg"])
+        out_floor = Path(args.floor_reference_out) if str(args.floor_reference_out).strip() else (Path(args.out_dir) / "floor_reference.json")
+        out_floor.parent.mkdir(parents=True, exist_ok=True)
+        out_floor.write_text(json.dumps(floor_ref_use, indent=2), encoding="utf-8")
+
+    if floor_ref_use is not None:
+        for b in bundles:
+            u_dict = b.conditions.to_dict()
+            floor_db, delta = _lookup_floor(floor_ref_use, u_dict)
+            if np.isfinite(floor_db):
+                ex_e = float(b.metrics.XPD_early_db - floor_db)
+                ex_l = float(b.metrics.XPD_late_db - floor_db)
+                caution_e = bool(np.isfinite(delta) and abs(ex_e) <= abs(delta))
+                caution_l = bool(np.isfinite(delta) and abs(ex_l) <= abs(delta))
+                b.metrics.extras["xpd_floor_db"] = float(floor_db)
+                b.metrics.extras["delta_floor_db"] = float(delta) if np.isfinite(delta) else np.nan
+                b.metrics.extras["XPD_early_excess_db"] = ex_e
+                b.metrics.extras["XPD_late_excess_db"] = ex_l
+                b.metrics.extras["claim_caution_early"] = caution_e
+                b.metrics.extras["claim_caution_late"] = caution_l
+
     run_meta = {
         "schema_version": SCHEMA_VERSION,
         "run_id": run_id,
@@ -480,6 +606,9 @@ def main() -> None:
         "n_links": len(bundles),
         "link_metrics_csv": csv_out["link_metrics_csv"],
         "rays_csv": csv_out["rays_csv"],
+        "floor_reference_json": str(args.floor_reference_json or (Path(args.out_dir) / "floor_reference.json"))
+        if str(args.scenario).upper() == "C0" or args.floor_reference_json
+        else "",
     }
     out_summary = Path(args.out_dir) / "run_summary.json"
     out_summary.write_text(json.dumps(summary, indent=2), encoding="utf-8")

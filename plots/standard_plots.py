@@ -6,8 +6,11 @@ import csv
 from pathlib import Path
 from typing import Any
 
-import matplotlib.pyplot as plt
+import matplotlib
 import numpy as np
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 
 def _maybe_num(v: str) -> Any:
@@ -34,6 +37,13 @@ def _save(fig: plt.Figure, path: Path) -> str:
     return str(path)
 
 
+def _pick_key(rows: list[dict[str, Any]], preferred: str, fallback: str) -> str:
+    vals = np.asarray([float(r.get(preferred, np.nan)) for r in rows], dtype=float)
+    if np.any(np.isfinite(vals)):
+        return preferred
+    return fallback
+
+
 def generate_standard_plots_from_rows(
     rows: list[dict[str, Any]],
     out_dir: str | Path,
@@ -45,7 +55,8 @@ def generate_standard_plots_from_rows(
     # C0 floor plots
     c0 = [r for r in rows if str(r.get("scenario_id", "")).upper() == "C0"]
     if c0:
-        xpd = np.asarray([float(r.get("XPD_early_db", np.nan)) for r in c0], dtype=float)
+        key = _pick_key(c0, "XPD_early_excess_db", "XPD_early_db")
+        xpd = np.asarray([float(r.get(key, np.nan)) for r in c0], dtype=float)
         yaw = np.asarray([float(r.get("yaw_deg", np.nan)) for r in c0], dtype=float)
         d = np.asarray([float(r.get("d_m", np.nan)) for r in c0], dtype=float)
 
@@ -53,7 +64,7 @@ def generate_standard_plots_from_rows(
         ax.scatter(yaw, xpd, c=d, cmap="viridis")
         ax.set_title("C0: XPD_floor vs yaw")
         ax.set_xlabel("yaw [deg]")
-        ax.set_ylabel("XPD_early [dB]")
+        ax.set_ylabel(f"{key} [dB]")
         ax.grid(True, alpha=0.3)
         saved["c0_floor_vs_yaw"] = _save(fig, out / "c0_floor_vs_yaw.png")
 
@@ -63,7 +74,7 @@ def generate_standard_plots_from_rows(
             yv = np.arange(1, len(xv) + 1) / float(len(xv))
             ax2.plot(xv, yv)
         ax2.set_title("C0: XPD_floor CDF")
-        ax2.set_xlabel("XPD_early [dB]")
+        ax2.set_xlabel(f"{key} [dB]")
         ax2.set_ylabel("CDF")
         ax2.grid(True, alpha=0.3)
         saved["c0_floor_cdf"] = _save(fig2, out / "c0_floor_cdf.png")
@@ -71,18 +82,19 @@ def generate_standard_plots_from_rows(
     # A2/A3 parity plot
     a23 = [r for r in rows if str(r.get("scenario_id", "")).upper() in {"A2", "A3"}]
     if a23:
+        key = _pick_key(a23, "XPD_early_excess_db", "XPD_early_db")
         fig, ax = plt.subplots(figsize=(7, 4))
         for sid, marker in [("A2", "o"), ("A3", "s")]:
             rr = [r for r in a23 if str(r.get("scenario_id", "")).upper() == sid]
             if not rr:
                 continue
             ang = np.arange(len(rr), dtype=int)
-            xpd = np.asarray([float(r.get("XPD_early_db", np.nan)) for r in rr], dtype=float)
+            xpd = np.asarray([float(r.get(key, np.nan)) for r in rr], dtype=float)
             ax.plot(ang, xpd, marker=marker, linestyle="-", label=sid)
         ax.axhline(0.0, color="k", linewidth=1.0, alpha=0.5)
         ax.set_title("A2/A3: XPD_early trend")
         ax.set_xlabel("sample index")
-        ax.set_ylabel("XPD_early [dB]")
+        ax.set_ylabel(f"{key} [dB]")
         ax.grid(True, alpha=0.3)
         ax.legend(fontsize=8)
         saved["a2_a3_xpd_early"] = _save(fig, out / "a2_a3_xpd_early.png")
@@ -90,16 +102,17 @@ def generate_standard_plots_from_rows(
     # A4 material scatter
     a4 = [r for r in rows if str(r.get("scenario_id", "")).upper() == "A4"]
     if a4:
+        key = _pick_key(a4, "XPD_early_excess_db", "XPD_early_db")
         fig, ax = plt.subplots(figsize=(7, 4))
         mats = sorted(set(str(r.get("material_class", "NA")) for r in a4))
         for m in mats:
             rr = [r for r in a4 if str(r.get("material_class", "NA")) == m]
             el = np.asarray([float(r.get("EL_proxy_db", np.nan)) for r in rr], dtype=float)
-            xpd = np.asarray([float(r.get("XPD_early_db", np.nan)) for r in rr], dtype=float)
+            xpd = np.asarray([float(r.get(key, np.nan)) for r in rr], dtype=float)
             ax.scatter(el, xpd, label=m, alpha=0.8)
         ax.set_title("A4: XPD_early vs EL_proxy")
         ax.set_xlabel("EL_proxy [dB]")
-        ax.set_ylabel("XPD_early [dB]")
+        ax.set_ylabel(f"{key} [dB]")
         ax.grid(True, alpha=0.3)
         ax.legend(fontsize=8)
         saved["a4_material_scatter"] = _save(fig, out / "a4_material_scatter.png")
@@ -107,12 +120,13 @@ def generate_standard_plots_from_rows(
     # A5 stress comparison
     a5 = [r for r in rows if str(r.get("scenario_id", "")).upper() == "A5"]
     if a5:
+        key = _pick_key(a5, "XPD_early_excess_db", "XPD_early_db")
         base = np.asarray(
-            [float(r.get("XPD_early_db", np.nan)) for r in a5 if int(r.get("roughness_flag", 0)) == 0 and int(r.get("human_flag", 0)) == 0],
+            [float(r.get(key, np.nan)) for r in a5 if int(r.get("roughness_flag", 0)) == 0 and int(r.get("human_flag", 0)) == 0],
             dtype=float,
         )
         stress = np.asarray(
-            [float(r.get("XPD_early_db", np.nan)) for r in a5 if int(r.get("roughness_flag", 0)) == 1 or int(r.get("human_flag", 0)) == 1],
+            [float(r.get(key, np.nan)) for r in a5 if int(r.get("roughness_flag", 0)) == 1 or int(r.get("human_flag", 0)) == 1],
             dtype=float,
         )
         fig, ax = plt.subplots(figsize=(7, 4))
@@ -124,7 +138,7 @@ def generate_standard_plots_from_rows(
             ys = np.arange(1, len(xs) + 1) / float(len(xs))
             ax.plot(xs, ys, label=label)
         ax.set_title("A5: baseline vs stress CDF (XPD_early)")
-        ax.set_xlabel("XPD_early [dB]")
+        ax.set_xlabel(f"{key} [dB]")
         ax.set_ylabel("CDF")
         ax.grid(True, alpha=0.3)
         ax.legend(fontsize=8)
@@ -133,9 +147,10 @@ def generate_standard_plots_from_rows(
     # B-space: heatmap-like and scatter
     b = [r for r in rows if str(r.get("scenario_id", "")).upper().startswith("B")]
     if b:
+        key = _pick_key(b, "XPD_early_excess_db", "XPD_early_db")
         x = np.asarray([float(r.get("rx_x", np.nan)) for r in b], dtype=float)
         y = np.asarray([float(r.get("rx_y", np.nan)) for r in b], dtype=float)
-        z = np.asarray([float(r.get("XPD_early_db", np.nan)) for r in b], dtype=float)
+        z = np.asarray([float(r.get(key, np.nan)) for r in b], dtype=float)
         if np.all(np.isfinite(x)) and np.all(np.isfinite(y)) and len(np.unique(x)) > 1 and len(np.unique(y)) > 1:
             xu = np.sort(np.unique(x))
             yu = np.sort(np.unique(y))
@@ -143,11 +158,11 @@ def generate_standard_plots_from_rows(
             for r in b:
                 ix = int(np.where(xu == float(r.get("rx_x", np.nan)))[0][0])
                 iy = int(np.where(yu == float(r.get("rx_y", np.nan)))[0][0])
-                Z[iy, ix] = float(r.get("XPD_early_db", np.nan))
+                Z[iy, ix] = float(r.get(key, np.nan))
             fig, ax = plt.subplots(figsize=(7, 4))
             im = ax.imshow(Z, origin="lower", aspect="auto", extent=[xu[0], xu[-1], yu[0], yu[-1]])
-            fig.colorbar(im, ax=ax, label="XPD_early [dB]")
-            ax.set_title("B-space: heatmap(XPD_early)")
+            fig.colorbar(im, ax=ax, label=f"{key} [dB]")
+            ax.set_title(f"B-space: heatmap({key})")
             ax.set_xlabel("x [m]")
             ax.set_ylabel("y [m]")
             saved["b_heatmap_xpd_early"] = _save(fig, out / "b_heatmap_xpd_early.png")
@@ -163,9 +178,54 @@ def generate_standard_plots_from_rows(
             ax2.plot(xx, yy, "r--", linewidth=1.2)
         ax2.set_title("B-space: XPD_early vs EL_proxy")
         ax2.set_xlabel("EL_proxy [dB]")
-        ax2.set_ylabel("XPD_early [dB]")
+        ax2.set_ylabel(f"{key} [dB]")
         ax2.grid(True, alpha=0.3)
         saved["b_scatter_xpd_vs_el"] = _save(fig2, out / "b_scatter_xpd_vs_el.png")
+
+        # LOS/NLOS CDF
+        los = np.asarray([float(r.get(key, np.nan)) for r in b if int(r.get("LOSflag", 0)) == 1], dtype=float)
+        nlos = np.asarray([float(r.get(key, np.nan)) for r in b if int(r.get("LOSflag", 0)) == 0], dtype=float)
+        fig3, ax3 = plt.subplots(figsize=(7, 4))
+        for arr, name in [(los, "LOS"), (nlos, "NLOS")]:
+            arr = arr[np.isfinite(arr)]
+            if len(arr) == 0:
+                continue
+            xs = np.sort(arr)
+            ys = np.arange(1, len(xs) + 1) / float(len(xs))
+            ax3.plot(xs, ys, label=name)
+        ax3.set_title(f"B-space: LOS vs NLOS CDF ({key})")
+        ax3.set_xlabel(f"{key} [dB]")
+        ax3.set_ylabel("CDF")
+        ax3.grid(True, alpha=0.3)
+        ax3.legend(fontsize=8)
+        saved["b_los_nlos_cdf"] = _save(fig3, out / "b_los_nlos_cdf.png")
+
+    # Global DS and early concentration diagnostics
+    key = _pick_key(rows, "XPD_early_excess_db", "XPD_early_db")
+    z = np.asarray([float(r.get(key, np.nan)) for r in rows], dtype=float)
+    ds = np.asarray([float(r.get("delay_spread_rms_s", np.nan)) for r in rows], dtype=float)
+    ef = np.asarray([float(r.get("early_energy_fraction", np.nan)) for r in rows], dtype=float)
+    rho = np.asarray([float(r.get("rho_early_db", np.nan)) for r in rows], dtype=float)
+
+    m = np.isfinite(z) & np.isfinite(ds)
+    if np.sum(m) >= 2:
+        fig4, ax4 = plt.subplots(figsize=(7, 4))
+        ax4.scatter(z[m], ds[m], alpha=0.7)
+        ax4.set_title(f"DS vs {key}")
+        ax4.set_xlabel(f"{key} [dB]")
+        ax4.set_ylabel("delay_spread_rms_s [s]")
+        ax4.grid(True, alpha=0.3)
+        saved["global_ds_vs_xpd"] = _save(fig4, out / "global_ds_vs_xpd.png")
+
+    m2 = np.isfinite(rho) & np.isfinite(ef)
+    if np.sum(m2) >= 2:
+        fig5, ax5 = plt.subplots(figsize=(7, 4))
+        ax5.scatter(rho[m2], ef[m2], alpha=0.7)
+        ax5.set_title("Early energy fraction vs rho_early_db")
+        ax5.set_xlabel("rho_early_db [dB]")
+        ax5.set_ylabel("early_energy_fraction")
+        ax5.grid(True, alpha=0.3)
+        saved["global_early_fraction_vs_rho"] = _save(fig5, out / "global_early_fraction_vs_rho.png")
 
     return saved
 

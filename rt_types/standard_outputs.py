@@ -66,9 +66,10 @@ class LinkMetricsZ:
     delay_spread_rms_s: float
     early_energy_fraction: float
     window: dict[str, Any] = field(default_factory=dict)
+    extras: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        out = {
             "XPD_early_db": float(self.XPD_early_db),
             "XPD_late_db": float(self.XPD_late_db),
             "rho_early_lin": float(self.rho_early_lin),
@@ -78,9 +79,22 @@ class LinkMetricsZ:
             "early_energy_fraction": float(self.early_energy_fraction),
             "window": dict(self.window),
         }
+        out.update(dict(self.extras))
+        return out
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "LinkMetricsZ":
+        known = {
+            "XPD_early_db",
+            "XPD_late_db",
+            "rho_early_lin",
+            "rho_early_db",
+            "L_pol_db",
+            "delay_spread_rms_s",
+            "early_energy_fraction",
+            "window",
+        }
+        extras = {k: v for k, v in data.items() if k not in known}
         return cls(
             XPD_early_db=float(data.get("XPD_early_db", np.nan)),
             XPD_late_db=float(data.get("XPD_late_db", np.nan)),
@@ -90,6 +104,7 @@ class LinkMetricsZ:
             delay_spread_rms_s=float(data.get("delay_spread_rms_s", np.nan)),
             early_energy_fraction=float(data.get("early_energy_fraction", np.nan)),
             window=dict(data.get("window", {})),
+            extras=extras,
         )
 
 
