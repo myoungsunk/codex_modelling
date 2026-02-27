@@ -21,10 +21,15 @@ python analysis_report/generate_diagnostic_report.py --config analysis_report/co
 ```bash
 python analysis_report/generate_intermediate_report.py --config analysis_report/config.yaml
 ```
+- 경고 보고서(진단 WARN/FAIL 케이스별 리뷰):
+```bash
+python analysis_report/generate_warning_report.py --config analysis_report/config.yaml
+```
 
 ## Outputs
 - `/Users/kimmyoungsun/Documents/codex/analysis_report/out/<run_group>/diagnostic_report.md`
 - `/Users/kimmyoungsun/Documents/codex/analysis_report/out/<run_group>/intermediate_report.md`
+- `/Users/kimmyoungsun/Documents/codex/analysis_report/out/<run_group>/warning_report.md`
 - `/Users/kimmyoungsun/Documents/codex/analysis_report/out/<run_group>/figures/*.png`
 - `/Users/kimmyoungsun/Documents/codex/analysis_report/out/<run_group>/tables/*.csv`
 - `/Users/kimmyoungsun/Documents/codex/analysis_report/out/<run_group>/index.csv`

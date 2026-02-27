@@ -1,0 +1,43 @@
+[
+  {
+    "item": "A3_coord_sanity",
+    "status": "WARN",
+    "detail": {
+      "status": "WARN",
+      "note": "Coordinate penetration sanity needs scenario geometry file review; not inferable from standard outputs only."
+    }
+  },
+  {
+    "item": "B_time_resolution::B2_status",
+    "status": "WARN",
+    "detail": {
+      "dt_res_s": 1e-09,
+      "tau_max_s": 1e-06,
+      "Te_s": 1e-08,
+      "Tmax_s": 2.0000000000000002e-07,
+      "B1_target_in_early_rate_A2": 0.0,
+      "B1_target_in_early_rate_A3": 0.0,
+      "B2_min_delay_gap_median_s": 0.0,
+      "B2_status": "WARN",
+      "B3_status": "PASS"
+    }
+  },
+  {
+    "item": "D_identifiability",
+    "status": "WARN",
+    "detail": {
+      "EL_iqr_db": 2.2431072202267295,
+      "corr_d_vs_LOS": -0.5493884215888136,
+      "strata_counts": {
+        "LOS0_q2": 106,
+        "LOS0_q1": 94,
+        "LOS0_q3": 96,
+        "LOS1_q1": 59,
+        "LOS1_q3": 37,
+        "LOS1_q2": 66
+      },
+      "min_strata_n": 37,
+      "status": "WARN"
+    }
+  }
+]

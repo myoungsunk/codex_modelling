@@ -5,6 +5,7 @@ This folder contains the uploaded report artifacts for the current experiment re
 ## Files
 - `diagnostic_report.md`
 - `intermediate_report.md`
+- `warning_report.md` (diagnostic WARN/FAIL case-by-case)
 - `index.csv`, `index.md`
 - `tables/` key numeric summaries
 - `figures/` figures referenced by the reports
