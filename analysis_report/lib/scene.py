@@ -13,6 +13,229 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
+def _to_float(v: Any, default: float = float("nan")) -> float:
+    try:
+        if v is None or v == "":
+            return float(default)
+        return float(v)
+    except Exception:
+        return float(default)
+
+
+def _rect_poly(cx: float, cy: float, hx: float, hy: float) -> list[list[float]]:
+    return [
+        [float(cx - hx), float(cy - hy)],
+        [float(cx + hx), float(cy - hy)],
+        [float(cx + hx), float(cy + hy)],
+        [float(cx - hx), float(cy + hy)],
+    ]
+
+
+def _arrow_xy(theta_deg: float) -> list[float]:
+    t = np.deg2rad(float(theta_deg))
+    return [float(np.cos(t)), float(np.sin(t))]
+
+
+def _extract_link_params(row: dict[str, Any]) -> dict[str, Any]:
+    prov = row.get("provenance_json", {})
+    if isinstance(prov, str):
+        s = prov.strip()
+        if s.startswith("{") and s.endswith("}"):
+            try:
+                prov = json.loads(s)
+            except Exception:
+                prov = {}
+        else:
+            prov = {}
+    if isinstance(prov, dict):
+        lp = prov.get("link_params", {})
+        if isinstance(lp, dict):
+            return lp
+    return {}
+
+
+def _layout_bounds(tx: tuple[float, float], rx: tuple[float, float], objects: list[dict[str, Any]]) -> dict[str, float]:
+    xs = [float(tx[0]), float(rx[0])]
+    ys = [float(tx[1]), float(rx[1])]
+    for o in objects:
+        for pt in o.get("poly_xy", []):
+            if isinstance(pt, (list, tuple)) and len(pt) >= 2:
+                xs.append(float(pt[0]))
+                ys.append(float(pt[1]))
+    xmin, xmax = float(np.nanmin(xs)), float(np.nanmax(xs))
+    ymin, ymax = float(np.nanmin(ys)), float(np.nanmax(ys))
+    padx = 0.08 * max(1.0, xmax - xmin)
+    pady = 0.08 * max(1.0, ymax - ymin)
+    return {
+        "xmin": float(xmin - padx),
+        "xmax": float(xmax + padx),
+        "ymin": float(ymin - pady),
+        "ymax": float(ymax + pady),
+    }
+
+
+def build_fallback_scene_from_link_row(row: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+    """Build a 2D layout-only scene from link row/provenance when scene_debug is absent."""
+
+    sid = str(row.get("scenario_id", "NA"))
+    cid = str(row.get("case_id", ""))
+    params = _extract_link_params(row)
+    warns: list[str] = []
+    objects: list[dict[str, Any]] = []
+    tx = (0.0, 0.0)
+    rx = (float(_to_float(row.get("d_m", 1.0), 1.0)), 0.0)
+    tx_bore = [1.0, 0.0]
+    rx_bore = [-1.0, 0.0]
+
+    if sid == "C0":
+        d = _to_float(params.get("distance_m", row.get("d_m", 1.0)), 1.0)
+        yaw = _to_float(params.get("yaw_deg", row.get("yaw_deg", 0.0)), 0.0)
+        tx = (0.0, 0.0)
+        rx = (float(d), 0.0)
+        tx_bore = [1.0, 0.0]
+        rx_bore = _arrow_xy(180.0 + yaw)
+
+    elif sid in {"A2", "A4"}:
+        d = _to_float(params.get("distance_m", row.get("d_m", 6.0)), 6.0)
+        y_plane = _to_float(params.get("y_plane", 2.0), 2.0)
+        tx = (0.0, 0.0)
+        rx = (float(d), 0.0)
+        x_mid = 0.5 * (tx[0] + rx[0])
+        objects.append(
+            {
+                "name": "reflector_plane",
+                "type": "reflector",
+                "material": str(params.get("material", row.get("material_class", "PEC"))),
+                "poly_xy": _rect_poly(cx=x_mid, cy=y_plane, hx=max(2.5, 0.6 * d), hy=0.06),
+                "closed": True,
+            }
+        )
+        if "physical_occluder" in str(row.get("los_block_method", "")):
+            objects.append(
+                {
+                    "name": "los_blocker",
+                    "type": "absorber",
+                    "material": "absorber_proxy",
+                    "poly_xy": _rect_poly(cx=x_mid, cy=0.0, hx=0.08, hy=0.5),
+                    "closed": True,
+                }
+            )
+
+    elif sid in {"A3", "A5"}:
+        off = _to_float(params.get("offset", 3.5), 3.5)
+        rx_x = _to_float(params.get("rx_x", row.get("rx_x", off)), off)
+        rx_y = _to_float(params.get("rx_y", row.get("rx_y", off + 1.0)), off + 1.0)
+        tx = (0.0, 0.0)
+        rx = (float(rx_x), float(rx_y))
+        objects.extend(
+            [
+                {
+                    "name": "plane_y",
+                    "type": "reflector",
+                    "material": "PEC",
+                    "poly_xy": _rect_poly(cx=0.5 * max(rx_x, off), cy=off, hx=max(2.5, 0.6 * max(rx_x, off)), hy=0.06),
+                    "closed": True,
+                },
+                {
+                    "name": "plane_x",
+                    "type": "reflector",
+                    "material": "PEC",
+                    "poly_xy": _rect_poly(cx=off, cy=0.5 * max(rx_y, off), hx=0.06, hy=max(2.5, 0.6 * max(rx_y, off))),
+                    "closed": True,
+                },
+            ]
+        )
+        if "physical_occluder" in str(row.get("los_block_method", "")):
+            x_mid = 0.5 * (tx[0] + rx[0])
+            y_mid = 0.5 * (tx[1] + rx[1])
+            objects.append(
+                {
+                    "name": "los_blocker",
+                    "type": "absorber",
+                    "material": "absorber_proxy",
+                    "poly_xy": _rect_poly(cx=x_mid, cy=y_mid, hx=0.08, hy=0.5),
+                    "closed": True,
+                }
+            )
+        if sid == "A5" and (int(_to_float(row.get("roughness_flag", 0), 0)) == 1 or int(_to_float(row.get("human_flag", 0), 0)) == 1):
+            objects.append(
+                {
+                    "name": "stress_scatter_region",
+                    "type": "furniture",
+                    "material": "stress_region",
+                    "poly_xy": _rect_poly(cx=0.65 * rx_x, cy=0.45 * rx_y, hx=0.45, hy=0.35),
+                    "closed": True,
+                }
+            )
+
+    elif sid in {"B1", "B2", "B3"}:
+        tx = (2.0, 0.0)
+        rx = (
+            _to_float(params.get("rx_x", row.get("rx_x", 2.0)), 2.0),
+            _to_float(params.get("rx_y", row.get("rx_y", 0.0)), 0.0),
+        )
+        # Room boundary in top view: x in [0,10], y in [-4,4].
+        objects.append(
+            {
+                "name": "room_boundary",
+                "type": "wall",
+                "material": "PEC",
+                "poly_xy": _rect_poly(cx=5.0, cy=0.0, hx=5.0, hy=4.0),
+                "closed": True,
+            }
+        )
+        if sid == "B2":
+            objects.append(
+                {
+                    "name": "partition",
+                    "type": "obstacle",
+                    "material": "PEC",
+                    "poly_xy": _rect_poly(cx=5.0, cy=0.0, hx=0.05, hy=1.8),
+                    "closed": True,
+                }
+            )
+        if sid == "B3":
+            objects.extend(
+                [
+                    {
+                        "name": "corner_wall_x",
+                        "type": "obstacle",
+                        "material": "PEC",
+                        "poly_xy": _rect_poly(cx=5.5, cy=1.5, hx=0.05, hy=1.5),
+                        "closed": True,
+                    },
+                    {
+                        "name": "corner_wall_y",
+                        "type": "obstacle",
+                        "material": "PEC",
+                        "poly_xy": _rect_poly(cx=5.5, cy=1.5, hx=1.5, hy=0.05),
+                        "closed": True,
+                    },
+                ]
+            )
+    else:
+        warns.append(f"fallback_layout_unknown_scenario:{sid}")
+
+    bounds = _layout_bounds(tx=tx, rx=rx, objects=objects)
+    scene = {
+        "scene_schema": "scene_debug_v1",
+        "scenario_id": sid,
+        "case_id": cid,
+        "case_label": str(row.get("case_label", row.get("link_id", cid))),
+        "coord_frame": {"units": "m", "plane": "xy", "z_up": True},
+        "bounds": bounds,
+        "tx": {"x": float(tx[0]), "y": float(tx[1]), "z": 1.5, "boresight_xy": tx_bore},
+        "rx": {"x": float(rx[0]), "y": float(rx[1]), "z": 1.5, "boresight_xy": rx_bore},
+        "objects": objects,
+        "rays_topk": [],
+        "meta": {
+            "source": "fallback_layout_from_link_row",
+            "note": "Ray polylines unavailable without scene_debug export.",
+        },
+    }
+    return scene, warns
+
+
 def load_scene_debug(path: str | Path) -> dict[str, Any]:
     p = Path(path)
     obj = json.loads(p.read_text(encoding="utf-8"))
@@ -105,6 +328,41 @@ def plot_scene(scene: dict[str, Any], out_png: str | Path, figure_size: tuple[fl
         ax.scatter([rx_xy[0]], [rx_xy[1]], s=120, marker="o", color="#1f77b4", label="Rx")
         ax.text(rx_xy[0], rx_xy[1], " Rx", fontsize=9)
 
+    tx_b = np.asarray(tx.get("boresight_xy", []), dtype=float)
+    if tx_b.shape == (2,) and np.all(np.isfinite(tx_b)) and np.isfinite(tx_xy[0]) and np.isfinite(tx_xy[1]):
+        n = float(np.linalg.norm(tx_b))
+        if n > 0:
+            tx_b = tx_b / n
+            ax.arrow(
+                tx_xy[0],
+                tx_xy[1],
+                0.5 * tx_b[0],
+                0.5 * tx_b[1],
+                head_width=0.12,
+                head_length=0.14,
+                fc="#d62728",
+                ec="#d62728",
+                alpha=0.85,
+                length_includes_head=True,
+            )
+    rx_b = np.asarray(rx.get("boresight_xy", []), dtype=float)
+    if rx_b.shape == (2,) and np.all(np.isfinite(rx_b)) and np.isfinite(rx_xy[0]) and np.isfinite(rx_xy[1]):
+        n = float(np.linalg.norm(rx_b))
+        if n > 0:
+            rx_b = rx_b / n
+            ax.arrow(
+                rx_xy[0],
+                rx_xy[1],
+                0.5 * rx_b[0],
+                0.5 * rx_b[1],
+                head_width=0.12,
+                head_length=0.14,
+                fc="#1f77b4",
+                ec="#1f77b4",
+                alpha=0.85,
+                length_includes_head=True,
+            )
+
     rays = scene.get("rays_topk", [])
     if isinstance(rays, list):
         for r in rays:
@@ -138,7 +396,14 @@ def plot_scene(scene: dict[str, Any], out_png: str | Path, figure_size: tuple[fl
     ax.set_ylabel("y (m)")
     ax.set_aspect("equal", adjustable="box")
     ax.grid(True, alpha=0.3)
-    ax.legend(loc="best", fontsize=8)
+    handles, labels = ax.get_legend_handles_labels()
+    if handles:
+        # Keep legend deterministic and deduplicated.
+        uniq = {}
+        for h, l in zip(handles, labels):
+            if l not in uniq:
+                uniq[l] = h
+        ax.legend(list(uniq.values()), list(uniq.keys()), loc="best", fontsize=8)
     fig.tight_layout()
     fig.savefig(p, dpi=140)
     plt.close(fig)

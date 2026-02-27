@@ -69,26 +69,44 @@ def _ensure_scene_plots(
     out_global: dict[str, str] = {}
     warns: list[str] = []
 
-    for k, scene_obj in sorted(scene_map.items(), key=lambda kv: (kv[0][0], kv[0][1])):
-        sid, cid = k
-        ok, probs = scene_lib.validate_scene_debug(scene_obj)
-        if not ok:
-            warns.append(f"scene_debug invalid: {sid}/{cid}: {';'.join(probs)}")
-        out_png = out_fig_dir / f"{sid}__{cid}__scene.png"
-        out_case[k] = scene_lib.plot_scene(scene_obj, out_png=out_png, figure_size=figure_size)
-
     # Global layout for B scenarios
     by_s: dict[str, list[dict[str, Any]]] = {}
     for r in link_rows:
         by_s.setdefault(str(r.get("scenario_id", "NA")), []).append(r)
+
+    # Case-level scene: use scene_debug first; fallback to layout synthesis.
+    for sid in sorted(by_s.keys()):
+        case_rows = sorted(by_s[sid], key=lambda x: str(x.get("case_id", "")))
+        seen: set[str] = set()
+        for r in case_rows:
+            cid = str(r.get("case_id", ""))
+            if cid in seen:
+                continue
+            seen.add(cid)
+            key = (sid, cid)
+            out_png = out_fig_dir / f"{sid}__{cid}__scene.png"
+            if key in scene_map:
+                scene_obj = scene_map[key]
+                ok, probs = scene_lib.validate_scene_debug(scene_obj)
+                if not ok:
+                    warns.append(f"scene_debug invalid: {sid}/{cid}: {';'.join(probs)}")
+                out_case[key] = scene_lib.plot_scene(scene_obj, out_png=out_png, figure_size=figure_size)
+            else:
+                fb_scene, fb_warns = scene_lib.build_fallback_scene_from_link_row(r)
+                out_case[key] = scene_lib.plot_scene(fb_scene, out_png=out_png, figure_size=figure_size)
+                warns.append(f"scene_debug missing: {sid}/{cid} -> fallback layout used")
+                for w in fb_warns:
+                    warns.append(f"{sid}/{cid}: {w}")
+
     for sid in ["B1", "B2", "B3"]:
         rows = by_s.get(sid, [])
         if not rows:
             continue
         cand = [k for k in scene_map.keys() if k[0] == sid]
-        if not cand:
-            continue
-        base = scene_map[cand[0]]
+        if cand:
+            base = scene_map[cand[0]]
+        else:
+            base, _ = scene_lib.build_fallback_scene_from_link_row(rows[0])
         rx_points = [(_num(r.get("rx_x", np.nan)), _num(r.get("rx_y", np.nan))) for r in rows]
         out_png = out_fig_dir / f"{sid}__GLOBAL__scene.png"
         out_global[sid] = scene_lib.plot_scene_global(base, rx_points=rx_points, out_png=out_png, figure_size=figure_size)

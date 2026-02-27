@@ -76,7 +76,7 @@ def _make_scene_plots(
     out_fig_dir: Path,
     link_rows: list[dict[str, Any]],
     scene_map: dict[tuple[str, str], dict[str, Any]],
-) -> tuple[list[dict[str, Any]], dict[str, str], list[str]]:
+) -> tuple[list[dict[str, Any]], dict[str, str], list[str], list[dict[str, Any]]]:
     scene_cfg = dict(config.get("scene_plots", {}))
     enabled = bool(scene_cfg.get("enabled", True))
     max_cases = int(scene_cfg.get("max_cases_per_scenario", 9999))
@@ -85,6 +85,7 @@ def _make_scene_plots(
     index_rows: list[dict[str, Any]] = []
     first_scene_by_scenario: dict[str, str] = {}
     warns: list[str] = []
+    warn_cases: list[dict[str, Any]] = []
 
     by_scenario: dict[str, list[dict[str, Any]]] = {}
     for r in link_rows:
@@ -109,10 +110,12 @@ def _make_scene_plots(
             scene_png = ""
             scene_json = ""
             plot_list: list[str] = []
+            warn_reason = ""
             if enabled and scene_obj is not None:
                 ok, problems = scene_lib.validate_scene_debug(scene_obj)
                 if not ok:
-                    warns.append(f"scene_debug invalid: {scenario_id}/{case_id}: {';'.join(problems)}")
+                    warn_reason = f"scene_debug invalid: {';'.join(problems)}"
+                    warns.append(f"{scenario_id}/{case_id}: {warn_reason}")
                 scenario_tag = f"{scenario_id}__{case_id}"
                 out_png = out_fig_dir / f"{scenario_tag}__scene.png"
                 scene_png = scene_lib.plot_scene(scene_obj, out_png=out_png, figure_size=figure_size)
@@ -121,7 +124,17 @@ def _make_scene_plots(
                 if scenario_id not in first_scene_by_scenario:
                     first_scene_by_scenario[scenario_id] = scene_png
             else:
-                warns.append(f"scene_debug missing: {scenario_id}/{case_id}")
+                scenario_tag = f"{scenario_id}__{case_id}"
+                out_png = out_fig_dir / f"{scenario_tag}__scene.png"
+                fb_scene, fb_warns = scene_lib.build_fallback_scene_from_link_row(r)
+                scene_png = scene_lib.plot_scene(fb_scene, out_png=out_png, figure_size=figure_size)
+                plot_list.append(scene_png)
+                warn_reason = "scene_debug missing; fallback layout used (ray polylines unavailable)"
+                warns.append(f"{scenario_id}/{case_id}: {warn_reason}")
+                for w in fb_warns:
+                    warns.append(f"{scenario_id}/{case_id}: {w}")
+                if scenario_id not in first_scene_by_scenario:
+                    first_scene_by_scenario[scenario_id] = scene_png
 
             index_rows.append(
                 {
@@ -133,6 +146,22 @@ def _make_scene_plots(
                     "key_plots": plot_list,
                 }
             )
+            if warn_reason:
+                warn_cases.append(
+                    {
+                        "scenario_id": scenario_id,
+                        "case_id": case_id,
+                        "case_label": case_label,
+                        "warning": warn_reason,
+                        "scene_png_path": scene_png,
+                        "link_id": str(r.get("link_id", "")),
+                        "XPD_early_excess_db": _num(r.get("XPD_early_excess_db", np.nan)),
+                        "XPD_late_excess_db": _num(r.get("XPD_late_excess_db", np.nan)),
+                        "L_pol_db": _num(r.get("L_pol_db", np.nan)),
+                        "EL_proxy_db": _num(r.get("EL_proxy_db", np.nan)),
+                        "LOSflag": _num(r.get("LOSflag", np.nan)),
+                    }
+                )
 
         # room scenario global layout
         if enabled and scenario_id in {"B1", "B2", "B3"}:
@@ -140,15 +169,19 @@ def _make_scene_plots(
             if candidates:
                 c0 = candidates[0]
                 sc = scene_map.get((scenario_id, str(c0.get("case_id", ""))))
-                if sc is not None:
-                    rx_points = []
-                    for rr in case_rows:
-                        rx_points.append((_num(rr.get("rx_x", np.nan)), _num(rr.get("rx_y", np.nan))))
-                    out_png = out_fig_dir / f"{scenario_id}__GLOBAL__scene.png"
-                    scene_lib.plot_scene_global(sc, rx_points=rx_points, out_png=out_png, figure_size=figure_size)
-                    first_scene_by_scenario[scenario_id] = str(out_png)
+            else:
+                sc = None
+            if sc is None and case_rows:
+                sc, _ = scene_lib.build_fallback_scene_from_link_row(case_rows[0])
+            if sc is not None:
+                rx_points = []
+                for rr in case_rows:
+                    rx_points.append((_num(rr.get("rx_x", np.nan)), _num(rr.get("rx_y", np.nan))))
+                out_png = out_fig_dir / f"{scenario_id}__GLOBAL__scene.png"
+                scene_lib.plot_scene_global(sc, rx_points=rx_points, out_png=out_png, figure_size=figure_size)
+                first_scene_by_scenario[scenario_id] = str(out_png)
 
-    return index_rows, first_scene_by_scenario, warns
+    return index_rows, first_scene_by_scenario, warns, warn_cases
 
 
 def _diagnostic_checks(
@@ -469,6 +502,7 @@ def _build_markdown(
     scenario_scene: dict[str, str],
     global_plots: dict[str, str],
     warns: list[str],
+    warn_cases: list[dict[str, Any]],
 ) -> str:
     lines: list[str] = []
     lines.append(f"# Diagnostic Report ({run_group})")
@@ -637,6 +671,38 @@ def _build_markdown(
             lines.append(f"- {w}")
         lines.append("")
 
+    if warn_cases:
+        lines.append("## Warning Case Drilldown")
+        lines.append("")
+        lines.append(
+            report_md.md_table(
+                warn_cases,
+                [
+                    "scenario_id",
+                    "case_id",
+                    "case_label",
+                    "warning",
+                    "link_id",
+                    "XPD_early_excess_db",
+                    "XPD_late_excess_db",
+                    "L_pol_db",
+                    "EL_proxy_db",
+                    "LOSflag",
+                ],
+            )
+        )
+        lines.append("")
+        for wc in warn_cases:
+            sid = str(wc.get("scenario_id", "NA"))
+            cid = str(wc.get("case_id", ""))
+            lines.append(f"### WARN Case {sid}/{cid}")
+            lines.append("")
+            lines.append(f"- reason: {wc.get('warning', '')}")
+            sp = str(wc.get("scene_png_path", ""))
+            if sp:
+                lines.append(f"![warn-{sid}-{cid}]({report_md.relpath(sp, out_root)})")
+            lines.append("")
+
     return "\n".join(lines) + "\n"
 
 
@@ -686,7 +752,7 @@ def main() -> None:
     global_plots = _make_diagnostic_plots(fig_dir, link_rows, ray_rows)
 
     # scene plots and index seed rows
-    idx_rows, first_scene_by_scenario, scene_warns = _make_scene_plots(
+    idx_rows, first_scene_by_scenario, scene_warns, warn_cases = _make_scene_plots(
         cfg,
         out_fig_dir=fig_dir,
         link_rows=link_rows,
@@ -728,6 +794,7 @@ def main() -> None:
         scenario_scene=first_scene_by_scenario,
         global_plots=global_plots,
         warns=scene_warns,
+        warn_cases=warn_cases,
     )
     out_md = out_root / "diagnostic_report.md"
     report_md.write_text(out_md, md)

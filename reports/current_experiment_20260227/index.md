@@ -2,477 +2,477 @@
 
 | scenario | case | label | scene |
 |---|---|---|---|
-| A2 | 0 | A2_0 |  |
-| A2 | 1 | A2_1 |  |
-| A2 | 10 | A2_10 |  |
-| A2 | 11 | A2_11 |  |
-| A2 | 12 | A2_12 |  |
-| A2 | 13 | A2_13 |  |
-| A2 | 14 | A2_14 |  |
-| A2 | 15 | A2_15 |  |
-| A2 | 16 | A2_16 |  |
-| A2 | 17 | A2_17 |  |
-| A2 | 18 | A2_18 |  |
-| A2 | 19 | A2_19 |  |
-| A2 | 2 | A2_2 |  |
-| A2 | 20 | A2_20 |  |
-| A2 | 21 | A2_21 |  |
-| A2 | 22 | A2_22 |  |
-| A2 | 23 | A2_23 |  |
-| A2 | 24 | A2_24 |  |
-| A2 | 25 | A2_25 |  |
-| A2 | 26 | A2_26 |  |
-| A2 | 3 | A2_3 |  |
-| A2 | 4 | A2_4 |  |
-| A2 | 5 | A2_5 |  |
-| A2 | 6 | A2_6 |  |
-| A2 | 7 | A2_7 |  |
-| A2 | 8 | A2_8 |  |
-| A2 | 9 | A2_9 |  |
-| A3 | 0 | A3_0 |  |
-| A3 | 1 | A3_1 |  |
-| A3 | 10 | A3_10 |  |
-| A3 | 11 | A3_11 |  |
-| A3 | 12 | A3_12 |  |
-| A3 | 13 | A3_13 |  |
-| A3 | 14 | A3_14 |  |
-| A3 | 15 | A3_15 |  |
-| A3 | 16 | A3_16 |  |
-| A3 | 17 | A3_17 |  |
-| A3 | 18 | A3_18 |  |
-| A3 | 19 | A3_19 |  |
-| A3 | 2 | A3_2 |  |
-| A3 | 20 | A3_20 |  |
-| A3 | 21 | A3_21 |  |
-| A3 | 22 | A3_22 |  |
-| A3 | 23 | A3_23 |  |
-| A3 | 3 | A3_3 |  |
-| A3 | 4 | A3_4 |  |
-| A3 | 5 | A3_5 |  |
-| A3 | 6 | A3_6 |  |
-| A3 | 7 | A3_7 |  |
-| A3 | 8 | A3_8 |  |
-| A3 | 9 | A3_9 |  |
-| A4 | 0 | A4_0 |  |
-| A4 | 1 | A4_1 |  |
-| A4 | 10 | A4_10 |  |
-| A4 | 11 | A4_11 |  |
-| A4 | 12 | A4_12 |  |
-| A4 | 13 | A4_13 |  |
-| A4 | 14 | A4_14 |  |
-| A4 | 15 | A4_15 |  |
-| A4 | 16 | A4_16 |  |
-| A4 | 17 | A4_17 |  |
-| A4 | 18 | A4_18 |  |
-| A4 | 19 | A4_19 |  |
-| A4 | 2 | A4_2 |  |
-| A4 | 20 | A4_20 |  |
-| A4 | 21 | A4_21 |  |
-| A4 | 22 | A4_22 |  |
-| A4 | 23 | A4_23 |  |
-| A4 | 24 | A4_24 |  |
-| A4 | 25 | A4_25 |  |
-| A4 | 26 | A4_26 |  |
-| A4 | 27 | A4_27 |  |
-| A4 | 28 | A4_28 |  |
-| A4 | 29 | A4_29 |  |
-| A4 | 3 | A4_3 |  |
-| A4 | 30 | A4_30 |  |
-| A4 | 31 | A4_31 |  |
-| A4 | 32 | A4_32 |  |
-| A4 | 33 | A4_33 |  |
-| A4 | 34 | A4_34 |  |
-| A4 | 35 | A4_35 |  |
-| A4 | 36 | A4_36 |  |
-| A4 | 37 | A4_37 |  |
-| A4 | 38 | A4_38 |  |
-| A4 | 39 | A4_39 |  |
-| A4 | 4 | A4_4 |  |
-| A4 | 40 | A4_40 |  |
-| A4 | 41 | A4_41 |  |
-| A4 | 42 | A4_42 |  |
-| A4 | 43 | A4_43 |  |
-| A4 | 44 | A4_44 |  |
-| A4 | 45 | A4_45 |  |
-| A4 | 46 | A4_46 |  |
-| A4 | 47 | A4_47 |  |
-| A4 | 48 | A4_48 |  |
-| A4 | 49 | A4_49 |  |
-| A4 | 5 | A4_5 |  |
-| A4 | 50 | A4_50 |  |
-| A4 | 51 | A4_51 |  |
-| A4 | 52 | A4_52 |  |
-| A4 | 53 | A4_53 |  |
-| A4 | 54 | A4_54 |  |
-| A4 | 55 | A4_55 |  |
-| A4 | 56 | A4_56 |  |
-| A4 | 57 | A4_57 |  |
-| A4 | 58 | A4_58 |  |
-| A4 | 59 | A4_59 |  |
-| A4 | 6 | A4_6 |  |
-| A4 | 60 | A4_60 |  |
-| A4 | 61 | A4_61 |  |
-| A4 | 62 | A4_62 |  |
-| A4 | 63 | A4_63 |  |
-| A4 | 64 | A4_64 |  |
-| A4 | 65 | A4_65 |  |
-| A4 | 66 | A4_66 |  |
-| A4 | 67 | A4_67 |  |
-| A4 | 68 | A4_68 |  |
-| A4 | 69 | A4_69 |  |
-| A4 | 7 | A4_7 |  |
-| A4 | 70 | A4_70 |  |
-| A4 | 71 | A4_71 |  |
-| A4 | 8 | A4_8 |  |
-| A4 | 9 | A4_9 |  |
-| A5 | 0 | A5_0 |  |
-| A5 | 1 | A5_1 |  |
-| A5 | 10 | A5_10 |  |
-| A5 | 11 | A5_11 |  |
-| A5 | 12 | A5_12 |  |
-| A5 | 13 | A5_13 |  |
-| A5 | 14 | A5_14 |  |
-| A5 | 15 | A5_15 |  |
-| A5 | 16 | A5_16 |  |
-| A5 | 17 | A5_17 |  |
-| A5 | 18 | A5_18 |  |
-| A5 | 19 | A5_19 |  |
-| A5 | 2 | A5_2 |  |
-| A5 | 20 | A5_20 |  |
-| A5 | 21 | A5_21 |  |
-| A5 | 22 | A5_22 |  |
-| A5 | 23 | A5_23 |  |
-| A5 | 24 | A5_24 |  |
-| A5 | 25 | A5_25 |  |
-| A5 | 26 | A5_26 |  |
-| A5 | 27 | A5_27 |  |
-| A5 | 28 | A5_28 |  |
-| A5 | 29 | A5_29 |  |
-| A5 | 3 | A5_3 |  |
-| A5 | 4 | A5_4 |  |
-| A5 | 5 | A5_5 |  |
-| A5 | 6 | A5_6 |  |
-| A5 | 7 | A5_7 |  |
-| A5 | 8 | A5_8 |  |
-| A5 | 9 | A5_9 |  |
-| B1 | 0 | B1_0 |  |
-| B1 | 1 | B1_1 |  |
-| B1 | 10 | B1_10 |  |
-| B1 | 11 | B1_11 |  |
-| B1 | 12 | B1_12 |  |
-| B1 | 13 | B1_13 |  |
-| B1 | 14 | B1_14 |  |
-| B1 | 15 | B1_15 |  |
-| B1 | 16 | B1_16 |  |
-| B1 | 17 | B1_17 |  |
-| B1 | 18 | B1_18 |  |
-| B1 | 19 | B1_19 |  |
-| B1 | 2 | B1_2 |  |
-| B1 | 20 | B1_20 |  |
-| B1 | 21 | B1_21 |  |
-| B1 | 22 | B1_22 |  |
-| B1 | 23 | B1_23 |  |
-| B1 | 24 | B1_24 |  |
-| B1 | 25 | B1_25 |  |
-| B1 | 26 | B1_26 |  |
-| B1 | 27 | B1_27 |  |
-| B1 | 28 | B1_28 |  |
-| B1 | 29 | B1_29 |  |
-| B1 | 3 | B1_3 |  |
-| B1 | 30 | B1_30 |  |
-| B1 | 31 | B1_31 |  |
-| B1 | 32 | B1_32 |  |
-| B1 | 33 | B1_33 |  |
-| B1 | 34 | B1_34 |  |
-| B1 | 35 | B1_35 |  |
-| B1 | 36 | B1_36 |  |
-| B1 | 37 | B1_37 |  |
-| B1 | 38 | B1_38 |  |
-| B1 | 39 | B1_39 |  |
-| B1 | 4 | B1_4 |  |
-| B1 | 40 | B1_40 |  |
-| B1 | 41 | B1_41 |  |
-| B1 | 42 | B1_42 |  |
-| B1 | 43 | B1_43 |  |
-| B1 | 44 | B1_44 |  |
-| B1 | 45 | B1_45 |  |
-| B1 | 46 | B1_46 |  |
-| B1 | 47 | B1_47 |  |
-| B1 | 48 | B1_48 |  |
-| B1 | 5 | B1_5 |  |
-| B1 | 6 | B1_6 |  |
-| B1 | 7 | B1_7 |  |
-| B1 | 8 | B1_8 |  |
-| B1 | 9 | B1_9 |  |
-| B2 | 0 | B2_0 |  |
-| B2 | 1 | B2_1 |  |
-| B2 | 10 | B2_10 |  |
-| B2 | 100 | B2_100 |  |
-| B2 | 101 | B2_101 |  |
-| B2 | 102 | B2_102 |  |
-| B2 | 103 | B2_103 |  |
-| B2 | 104 | B2_104 |  |
-| B2 | 105 | B2_105 |  |
-| B2 | 106 | B2_106 |  |
-| B2 | 107 | B2_107 |  |
-| B2 | 108 | B2_108 |  |
-| B2 | 109 | B2_109 |  |
-| B2 | 11 | B2_11 |  |
-| B2 | 110 | B2_110 |  |
-| B2 | 111 | B2_111 |  |
-| B2 | 112 | B2_112 |  |
-| B2 | 113 | B2_113 |  |
-| B2 | 114 | B2_114 |  |
-| B2 | 115 | B2_115 |  |
-| B2 | 116 | B2_116 |  |
-| B2 | 117 | B2_117 |  |
-| B2 | 118 | B2_118 |  |
-| B2 | 119 | B2_119 |  |
-| B2 | 12 | B2_12 |  |
-| B2 | 120 | B2_120 |  |
-| B2 | 13 | B2_13 |  |
-| B2 | 14 | B2_14 |  |
-| B2 | 15 | B2_15 |  |
-| B2 | 16 | B2_16 |  |
-| B2 | 17 | B2_17 |  |
-| B2 | 18 | B2_18 |  |
-| B2 | 19 | B2_19 |  |
-| B2 | 2 | B2_2 |  |
-| B2 | 20 | B2_20 |  |
-| B2 | 21 | B2_21 |  |
-| B2 | 22 | B2_22 |  |
-| B2 | 23 | B2_23 |  |
-| B2 | 24 | B2_24 |  |
-| B2 | 25 | B2_25 |  |
-| B2 | 26 | B2_26 |  |
-| B2 | 27 | B2_27 |  |
-| B2 | 28 | B2_28 |  |
-| B2 | 29 | B2_29 |  |
-| B2 | 3 | B2_3 |  |
-| B2 | 30 | B2_30 |  |
-| B2 | 31 | B2_31 |  |
-| B2 | 32 | B2_32 |  |
-| B2 | 33 | B2_33 |  |
-| B2 | 34 | B2_34 |  |
-| B2 | 35 | B2_35 |  |
-| B2 | 36 | B2_36 |  |
-| B2 | 37 | B2_37 |  |
-| B2 | 38 | B2_38 |  |
-| B2 | 39 | B2_39 |  |
-| B2 | 4 | B2_4 |  |
-| B2 | 40 | B2_40 |  |
-| B2 | 41 | B2_41 |  |
-| B2 | 42 | B2_42 |  |
-| B2 | 43 | B2_43 |  |
-| B2 | 44 | B2_44 |  |
-| B2 | 45 | B2_45 |  |
-| B2 | 46 | B2_46 |  |
-| B2 | 47 | B2_47 |  |
-| B2 | 48 | B2_48 |  |
-| B2 | 49 | B2_49 |  |
-| B2 | 5 | B2_5 |  |
-| B2 | 50 | B2_50 |  |
-| B2 | 51 | B2_51 |  |
-| B2 | 52 | B2_52 |  |
-| B2 | 53 | B2_53 |  |
-| B2 | 54 | B2_54 |  |
-| B2 | 55 | B2_55 |  |
-| B2 | 56 | B2_56 |  |
-| B2 | 57 | B2_57 |  |
-| B2 | 58 | B2_58 |  |
-| B2 | 59 | B2_59 |  |
-| B2 | 6 | B2_6 |  |
-| B2 | 60 | B2_60 |  |
-| B2 | 61 | B2_61 |  |
-| B2 | 62 | B2_62 |  |
-| B2 | 63 | B2_63 |  |
-| B2 | 64 | B2_64 |  |
-| B2 | 65 | B2_65 |  |
-| B2 | 66 | B2_66 |  |
-| B2 | 67 | B2_67 |  |
-| B2 | 68 | B2_68 |  |
-| B2 | 69 | B2_69 |  |
-| B2 | 7 | B2_7 |  |
-| B2 | 70 | B2_70 |  |
-| B2 | 71 | B2_71 |  |
-| B2 | 72 | B2_72 |  |
-| B2 | 73 | B2_73 |  |
-| B2 | 74 | B2_74 |  |
-| B2 | 75 | B2_75 |  |
-| B2 | 76 | B2_76 |  |
-| B2 | 77 | B2_77 |  |
-| B2 | 78 | B2_78 |  |
-| B2 | 79 | B2_79 |  |
-| B2 | 8 | B2_8 |  |
-| B2 | 80 | B2_80 |  |
-| B2 | 81 | B2_81 |  |
-| B2 | 82 | B2_82 |  |
-| B2 | 83 | B2_83 |  |
-| B2 | 84 | B2_84 |  |
-| B2 | 85 | B2_85 |  |
-| B2 | 86 | B2_86 |  |
-| B2 | 87 | B2_87 |  |
-| B2 | 88 | B2_88 |  |
-| B2 | 89 | B2_89 |  |
-| B2 | 9 | B2_9 |  |
-| B2 | 90 | B2_90 |  |
-| B2 | 91 | B2_91 |  |
-| B2 | 92 | B2_92 |  |
-| B2 | 93 | B2_93 |  |
-| B2 | 94 | B2_94 |  |
-| B2 | 95 | B2_95 |  |
-| B2 | 96 | B2_96 |  |
-| B2 | 97 | B2_97 |  |
-| B2 | 98 | B2_98 |  |
-| B2 | 99 | B2_99 |  |
-| B3 | 0 | B3_0 |  |
-| B3 | 1 | B3_1 |  |
-| B3 | 10 | B3_10 |  |
-| B3 | 100 | B3_100 |  |
-| B3 | 101 | B3_101 |  |
-| B3 | 102 | B3_102 |  |
-| B3 | 103 | B3_103 |  |
-| B3 | 104 | B3_104 |  |
-| B3 | 105 | B3_105 |  |
-| B3 | 106 | B3_106 |  |
-| B3 | 107 | B3_107 |  |
-| B3 | 108 | B3_108 |  |
-| B3 | 109 | B3_109 |  |
-| B3 | 11 | B3_11 |  |
-| B3 | 110 | B3_110 |  |
-| B3 | 111 | B3_111 |  |
-| B3 | 112 | B3_112 |  |
-| B3 | 113 | B3_113 |  |
-| B3 | 114 | B3_114 |  |
-| B3 | 115 | B3_115 |  |
-| B3 | 116 | B3_116 |  |
-| B3 | 117 | B3_117 |  |
-| B3 | 118 | B3_118 |  |
-| B3 | 119 | B3_119 |  |
-| B3 | 12 | B3_12 |  |
-| B3 | 120 | B3_120 |  |
-| B3 | 13 | B3_13 |  |
-| B3 | 14 | B3_14 |  |
-| B3 | 15 | B3_15 |  |
-| B3 | 16 | B3_16 |  |
-| B3 | 17 | B3_17 |  |
-| B3 | 18 | B3_18 |  |
-| B3 | 19 | B3_19 |  |
-| B3 | 2 | B3_2 |  |
-| B3 | 20 | B3_20 |  |
-| B3 | 21 | B3_21 |  |
-| B3 | 22 | B3_22 |  |
-| B3 | 23 | B3_23 |  |
-| B3 | 24 | B3_24 |  |
-| B3 | 25 | B3_25 |  |
-| B3 | 26 | B3_26 |  |
-| B3 | 27 | B3_27 |  |
-| B3 | 28 | B3_28 |  |
-| B3 | 29 | B3_29 |  |
-| B3 | 3 | B3_3 |  |
-| B3 | 30 | B3_30 |  |
-| B3 | 31 | B3_31 |  |
-| B3 | 32 | B3_32 |  |
-| B3 | 33 | B3_33 |  |
-| B3 | 34 | B3_34 |  |
-| B3 | 35 | B3_35 |  |
-| B3 | 36 | B3_36 |  |
-| B3 | 37 | B3_37 |  |
-| B3 | 38 | B3_38 |  |
-| B3 | 39 | B3_39 |  |
-| B3 | 4 | B3_4 |  |
-| B3 | 40 | B3_40 |  |
-| B3 | 41 | B3_41 |  |
-| B3 | 42 | B3_42 |  |
-| B3 | 43 | B3_43 |  |
-| B3 | 44 | B3_44 |  |
-| B3 | 45 | B3_45 |  |
-| B3 | 46 | B3_46 |  |
-| B3 | 47 | B3_47 |  |
-| B3 | 48 | B3_48 |  |
-| B3 | 49 | B3_49 |  |
-| B3 | 5 | B3_5 |  |
-| B3 | 50 | B3_50 |  |
-| B3 | 51 | B3_51 |  |
-| B3 | 52 | B3_52 |  |
-| B3 | 53 | B3_53 |  |
-| B3 | 54 | B3_54 |  |
-| B3 | 55 | B3_55 |  |
-| B3 | 56 | B3_56 |  |
-| B3 | 57 | B3_57 |  |
-| B3 | 58 | B3_58 |  |
-| B3 | 59 | B3_59 |  |
-| B3 | 6 | B3_6 |  |
-| B3 | 60 | B3_60 |  |
-| B3 | 61 | B3_61 |  |
-| B3 | 62 | B3_62 |  |
-| B3 | 63 | B3_63 |  |
-| B3 | 64 | B3_64 |  |
-| B3 | 65 | B3_65 |  |
-| B3 | 66 | B3_66 |  |
-| B3 | 67 | B3_67 |  |
-| B3 | 68 | B3_68 |  |
-| B3 | 69 | B3_69 |  |
-| B3 | 7 | B3_7 |  |
-| B3 | 70 | B3_70 |  |
-| B3 | 71 | B3_71 |  |
-| B3 | 72 | B3_72 |  |
-| B3 | 73 | B3_73 |  |
-| B3 | 74 | B3_74 |  |
-| B3 | 75 | B3_75 |  |
-| B3 | 76 | B3_76 |  |
-| B3 | 77 | B3_77 |  |
-| B3 | 78 | B3_78 |  |
-| B3 | 79 | B3_79 |  |
-| B3 | 8 | B3_8 |  |
-| B3 | 80 | B3_80 |  |
-| B3 | 81 | B3_81 |  |
-| B3 | 82 | B3_82 |  |
-| B3 | 83 | B3_83 |  |
-| B3 | 84 | B3_84 |  |
-| B3 | 85 | B3_85 |  |
-| B3 | 86 | B3_86 |  |
-| B3 | 87 | B3_87 |  |
-| B3 | 88 | B3_88 |  |
-| B3 | 89 | B3_89 |  |
-| B3 | 9 | B3_9 |  |
-| B3 | 90 | B3_90 |  |
-| B3 | 91 | B3_91 |  |
-| B3 | 92 | B3_92 |  |
-| B3 | 93 | B3_93 |  |
-| B3 | 94 | B3_94 |  |
-| B3 | 95 | B3_95 |  |
-| B3 | 96 | B3_96 |  |
-| B3 | 97 | B3_97 |  |
-| B3 | 98 | B3_98 |  |
-| B3 | 99 | B3_99 |  |
-| C0 | 0 | C0_0 |  |
-| C0 | 1 | C0_1 |  |
-| C0 | 10 | C0_10 |  |
-| C0 | 11 | C0_11 |  |
-| C0 | 12 | C0_12 |  |
-| C0 | 13 | C0_13 |  |
-| C0 | 14 | C0_14 |  |
-| C0 | 15 | C0_15 |  |
-| C0 | 16 | C0_16 |  |
-| C0 | 17 | C0_17 |  |
-| C0 | 18 | C0_18 |  |
-| C0 | 19 | C0_19 |  |
-| C0 | 2 | C0_2 |  |
-| C0 | 20 | C0_20 |  |
-| C0 | 21 | C0_21 |  |
-| C0 | 22 | C0_22 |  |
-| C0 | 23 | C0_23 |  |
-| C0 | 24 | C0_24 |  |
-| C0 | 25 | C0_25 |  |
-| C0 | 26 | C0_26 |  |
-| C0 | 27 | C0_27 |  |
-| C0 | 28 | C0_28 |  |
-| C0 | 29 | C0_29 |  |
-| C0 | 3 | C0_3 |  |
-| C0 | 4 | C0_4 |  |
-| C0 | 5 | C0_5 |  |
-| C0 | 6 | C0_6 |  |
-| C0 | 7 | C0_7 |  |
-| C0 | 8 | C0_8 |  |
-| C0 | 9 | C0_9 |  |
+| A2 | 0 | A2_0 | [A2__0__scene.png](analysis_report/out/report_20260227_current/figures/A2__0__scene.png) |
+| A2 | 1 | A2_1 | [A2__1__scene.png](analysis_report/out/report_20260227_current/figures/A2__1__scene.png) |
+| A2 | 10 | A2_10 | [A2__10__scene.png](analysis_report/out/report_20260227_current/figures/A2__10__scene.png) |
+| A2 | 11 | A2_11 | [A2__11__scene.png](analysis_report/out/report_20260227_current/figures/A2__11__scene.png) |
+| A2 | 12 | A2_12 | [A2__12__scene.png](analysis_report/out/report_20260227_current/figures/A2__12__scene.png) |
+| A2 | 13 | A2_13 | [A2__13__scene.png](analysis_report/out/report_20260227_current/figures/A2__13__scene.png) |
+| A2 | 14 | A2_14 | [A2__14__scene.png](analysis_report/out/report_20260227_current/figures/A2__14__scene.png) |
+| A2 | 15 | A2_15 | [A2__15__scene.png](analysis_report/out/report_20260227_current/figures/A2__15__scene.png) |
+| A2 | 16 | A2_16 | [A2__16__scene.png](analysis_report/out/report_20260227_current/figures/A2__16__scene.png) |
+| A2 | 17 | A2_17 | [A2__17__scene.png](analysis_report/out/report_20260227_current/figures/A2__17__scene.png) |
+| A2 | 18 | A2_18 | [A2__18__scene.png](analysis_report/out/report_20260227_current/figures/A2__18__scene.png) |
+| A2 | 19 | A2_19 | [A2__19__scene.png](analysis_report/out/report_20260227_current/figures/A2__19__scene.png) |
+| A2 | 2 | A2_2 | [A2__2__scene.png](analysis_report/out/report_20260227_current/figures/A2__2__scene.png) |
+| A2 | 20 | A2_20 | [A2__20__scene.png](analysis_report/out/report_20260227_current/figures/A2__20__scene.png) |
+| A2 | 21 | A2_21 | [A2__21__scene.png](analysis_report/out/report_20260227_current/figures/A2__21__scene.png) |
+| A2 | 22 | A2_22 | [A2__22__scene.png](analysis_report/out/report_20260227_current/figures/A2__22__scene.png) |
+| A2 | 23 | A2_23 | [A2__23__scene.png](analysis_report/out/report_20260227_current/figures/A2__23__scene.png) |
+| A2 | 24 | A2_24 | [A2__24__scene.png](analysis_report/out/report_20260227_current/figures/A2__24__scene.png) |
+| A2 | 25 | A2_25 | [A2__25__scene.png](analysis_report/out/report_20260227_current/figures/A2__25__scene.png) |
+| A2 | 26 | A2_26 | [A2__26__scene.png](analysis_report/out/report_20260227_current/figures/A2__26__scene.png) |
+| A2 | 3 | A2_3 | [A2__3__scene.png](analysis_report/out/report_20260227_current/figures/A2__3__scene.png) |
+| A2 | 4 | A2_4 | [A2__4__scene.png](analysis_report/out/report_20260227_current/figures/A2__4__scene.png) |
+| A2 | 5 | A2_5 | [A2__5__scene.png](analysis_report/out/report_20260227_current/figures/A2__5__scene.png) |
+| A2 | 6 | A2_6 | [A2__6__scene.png](analysis_report/out/report_20260227_current/figures/A2__6__scene.png) |
+| A2 | 7 | A2_7 | [A2__7__scene.png](analysis_report/out/report_20260227_current/figures/A2__7__scene.png) |
+| A2 | 8 | A2_8 | [A2__8__scene.png](analysis_report/out/report_20260227_current/figures/A2__8__scene.png) |
+| A2 | 9 | A2_9 | [A2__9__scene.png](analysis_report/out/report_20260227_current/figures/A2__9__scene.png) |
+| A3 | 0 | A3_0 | [A3__0__scene.png](analysis_report/out/report_20260227_current/figures/A3__0__scene.png) |
+| A3 | 1 | A3_1 | [A3__1__scene.png](analysis_report/out/report_20260227_current/figures/A3__1__scene.png) |
+| A3 | 10 | A3_10 | [A3__10__scene.png](analysis_report/out/report_20260227_current/figures/A3__10__scene.png) |
+| A3 | 11 | A3_11 | [A3__11__scene.png](analysis_report/out/report_20260227_current/figures/A3__11__scene.png) |
+| A3 | 12 | A3_12 | [A3__12__scene.png](analysis_report/out/report_20260227_current/figures/A3__12__scene.png) |
+| A3 | 13 | A3_13 | [A3__13__scene.png](analysis_report/out/report_20260227_current/figures/A3__13__scene.png) |
+| A3 | 14 | A3_14 | [A3__14__scene.png](analysis_report/out/report_20260227_current/figures/A3__14__scene.png) |
+| A3 | 15 | A3_15 | [A3__15__scene.png](analysis_report/out/report_20260227_current/figures/A3__15__scene.png) |
+| A3 | 16 | A3_16 | [A3__16__scene.png](analysis_report/out/report_20260227_current/figures/A3__16__scene.png) |
+| A3 | 17 | A3_17 | [A3__17__scene.png](analysis_report/out/report_20260227_current/figures/A3__17__scene.png) |
+| A3 | 18 | A3_18 | [A3__18__scene.png](analysis_report/out/report_20260227_current/figures/A3__18__scene.png) |
+| A3 | 19 | A3_19 | [A3__19__scene.png](analysis_report/out/report_20260227_current/figures/A3__19__scene.png) |
+| A3 | 2 | A3_2 | [A3__2__scene.png](analysis_report/out/report_20260227_current/figures/A3__2__scene.png) |
+| A3 | 20 | A3_20 | [A3__20__scene.png](analysis_report/out/report_20260227_current/figures/A3__20__scene.png) |
+| A3 | 21 | A3_21 | [A3__21__scene.png](analysis_report/out/report_20260227_current/figures/A3__21__scene.png) |
+| A3 | 22 | A3_22 | [A3__22__scene.png](analysis_report/out/report_20260227_current/figures/A3__22__scene.png) |
+| A3 | 23 | A3_23 | [A3__23__scene.png](analysis_report/out/report_20260227_current/figures/A3__23__scene.png) |
+| A3 | 3 | A3_3 | [A3__3__scene.png](analysis_report/out/report_20260227_current/figures/A3__3__scene.png) |
+| A3 | 4 | A3_4 | [A3__4__scene.png](analysis_report/out/report_20260227_current/figures/A3__4__scene.png) |
+| A3 | 5 | A3_5 | [A3__5__scene.png](analysis_report/out/report_20260227_current/figures/A3__5__scene.png) |
+| A3 | 6 | A3_6 | [A3__6__scene.png](analysis_report/out/report_20260227_current/figures/A3__6__scene.png) |
+| A3 | 7 | A3_7 | [A3__7__scene.png](analysis_report/out/report_20260227_current/figures/A3__7__scene.png) |
+| A3 | 8 | A3_8 | [A3__8__scene.png](analysis_report/out/report_20260227_current/figures/A3__8__scene.png) |
+| A3 | 9 | A3_9 | [A3__9__scene.png](analysis_report/out/report_20260227_current/figures/A3__9__scene.png) |
+| A4 | 0 | A4_0 | [A4__0__scene.png](analysis_report/out/report_20260227_current/figures/A4__0__scene.png) |
+| A4 | 1 | A4_1 | [A4__1__scene.png](analysis_report/out/report_20260227_current/figures/A4__1__scene.png) |
+| A4 | 10 | A4_10 | [A4__10__scene.png](analysis_report/out/report_20260227_current/figures/A4__10__scene.png) |
+| A4 | 11 | A4_11 | [A4__11__scene.png](analysis_report/out/report_20260227_current/figures/A4__11__scene.png) |
+| A4 | 12 | A4_12 | [A4__12__scene.png](analysis_report/out/report_20260227_current/figures/A4__12__scene.png) |
+| A4 | 13 | A4_13 | [A4__13__scene.png](analysis_report/out/report_20260227_current/figures/A4__13__scene.png) |
+| A4 | 14 | A4_14 | [A4__14__scene.png](analysis_report/out/report_20260227_current/figures/A4__14__scene.png) |
+| A4 | 15 | A4_15 | [A4__15__scene.png](analysis_report/out/report_20260227_current/figures/A4__15__scene.png) |
+| A4 | 16 | A4_16 | [A4__16__scene.png](analysis_report/out/report_20260227_current/figures/A4__16__scene.png) |
+| A4 | 17 | A4_17 | [A4__17__scene.png](analysis_report/out/report_20260227_current/figures/A4__17__scene.png) |
+| A4 | 18 | A4_18 | [A4__18__scene.png](analysis_report/out/report_20260227_current/figures/A4__18__scene.png) |
+| A4 | 19 | A4_19 | [A4__19__scene.png](analysis_report/out/report_20260227_current/figures/A4__19__scene.png) |
+| A4 | 2 | A4_2 | [A4__2__scene.png](analysis_report/out/report_20260227_current/figures/A4__2__scene.png) |
+| A4 | 20 | A4_20 | [A4__20__scene.png](analysis_report/out/report_20260227_current/figures/A4__20__scene.png) |
+| A4 | 21 | A4_21 | [A4__21__scene.png](analysis_report/out/report_20260227_current/figures/A4__21__scene.png) |
+| A4 | 22 | A4_22 | [A4__22__scene.png](analysis_report/out/report_20260227_current/figures/A4__22__scene.png) |
+| A4 | 23 | A4_23 | [A4__23__scene.png](analysis_report/out/report_20260227_current/figures/A4__23__scene.png) |
+| A4 | 24 | A4_24 | [A4__24__scene.png](analysis_report/out/report_20260227_current/figures/A4__24__scene.png) |
+| A4 | 25 | A4_25 | [A4__25__scene.png](analysis_report/out/report_20260227_current/figures/A4__25__scene.png) |
+| A4 | 26 | A4_26 | [A4__26__scene.png](analysis_report/out/report_20260227_current/figures/A4__26__scene.png) |
+| A4 | 27 | A4_27 | [A4__27__scene.png](analysis_report/out/report_20260227_current/figures/A4__27__scene.png) |
+| A4 | 28 | A4_28 | [A4__28__scene.png](analysis_report/out/report_20260227_current/figures/A4__28__scene.png) |
+| A4 | 29 | A4_29 | [A4__29__scene.png](analysis_report/out/report_20260227_current/figures/A4__29__scene.png) |
+| A4 | 3 | A4_3 | [A4__3__scene.png](analysis_report/out/report_20260227_current/figures/A4__3__scene.png) |
+| A4 | 30 | A4_30 | [A4__30__scene.png](analysis_report/out/report_20260227_current/figures/A4__30__scene.png) |
+| A4 | 31 | A4_31 | [A4__31__scene.png](analysis_report/out/report_20260227_current/figures/A4__31__scene.png) |
+| A4 | 32 | A4_32 | [A4__32__scene.png](analysis_report/out/report_20260227_current/figures/A4__32__scene.png) |
+| A4 | 33 | A4_33 | [A4__33__scene.png](analysis_report/out/report_20260227_current/figures/A4__33__scene.png) |
+| A4 | 34 | A4_34 | [A4__34__scene.png](analysis_report/out/report_20260227_current/figures/A4__34__scene.png) |
+| A4 | 35 | A4_35 | [A4__35__scene.png](analysis_report/out/report_20260227_current/figures/A4__35__scene.png) |
+| A4 | 36 | A4_36 | [A4__36__scene.png](analysis_report/out/report_20260227_current/figures/A4__36__scene.png) |
+| A4 | 37 | A4_37 | [A4__37__scene.png](analysis_report/out/report_20260227_current/figures/A4__37__scene.png) |
+| A4 | 38 | A4_38 | [A4__38__scene.png](analysis_report/out/report_20260227_current/figures/A4__38__scene.png) |
+| A4 | 39 | A4_39 | [A4__39__scene.png](analysis_report/out/report_20260227_current/figures/A4__39__scene.png) |
+| A4 | 4 | A4_4 | [A4__4__scene.png](analysis_report/out/report_20260227_current/figures/A4__4__scene.png) |
+| A4 | 40 | A4_40 | [A4__40__scene.png](analysis_report/out/report_20260227_current/figures/A4__40__scene.png) |
+| A4 | 41 | A4_41 | [A4__41__scene.png](analysis_report/out/report_20260227_current/figures/A4__41__scene.png) |
+| A4 | 42 | A4_42 | [A4__42__scene.png](analysis_report/out/report_20260227_current/figures/A4__42__scene.png) |
+| A4 | 43 | A4_43 | [A4__43__scene.png](analysis_report/out/report_20260227_current/figures/A4__43__scene.png) |
+| A4 | 44 | A4_44 | [A4__44__scene.png](analysis_report/out/report_20260227_current/figures/A4__44__scene.png) |
+| A4 | 45 | A4_45 | [A4__45__scene.png](analysis_report/out/report_20260227_current/figures/A4__45__scene.png) |
+| A4 | 46 | A4_46 | [A4__46__scene.png](analysis_report/out/report_20260227_current/figures/A4__46__scene.png) |
+| A4 | 47 | A4_47 | [A4__47__scene.png](analysis_report/out/report_20260227_current/figures/A4__47__scene.png) |
+| A4 | 48 | A4_48 | [A4__48__scene.png](analysis_report/out/report_20260227_current/figures/A4__48__scene.png) |
+| A4 | 49 | A4_49 | [A4__49__scene.png](analysis_report/out/report_20260227_current/figures/A4__49__scene.png) |
+| A4 | 5 | A4_5 | [A4__5__scene.png](analysis_report/out/report_20260227_current/figures/A4__5__scene.png) |
+| A4 | 50 | A4_50 | [A4__50__scene.png](analysis_report/out/report_20260227_current/figures/A4__50__scene.png) |
+| A4 | 51 | A4_51 | [A4__51__scene.png](analysis_report/out/report_20260227_current/figures/A4__51__scene.png) |
+| A4 | 52 | A4_52 | [A4__52__scene.png](analysis_report/out/report_20260227_current/figures/A4__52__scene.png) |
+| A4 | 53 | A4_53 | [A4__53__scene.png](analysis_report/out/report_20260227_current/figures/A4__53__scene.png) |
+| A4 | 54 | A4_54 | [A4__54__scene.png](analysis_report/out/report_20260227_current/figures/A4__54__scene.png) |
+| A4 | 55 | A4_55 | [A4__55__scene.png](analysis_report/out/report_20260227_current/figures/A4__55__scene.png) |
+| A4 | 56 | A4_56 | [A4__56__scene.png](analysis_report/out/report_20260227_current/figures/A4__56__scene.png) |
+| A4 | 57 | A4_57 | [A4__57__scene.png](analysis_report/out/report_20260227_current/figures/A4__57__scene.png) |
+| A4 | 58 | A4_58 | [A4__58__scene.png](analysis_report/out/report_20260227_current/figures/A4__58__scene.png) |
+| A4 | 59 | A4_59 | [A4__59__scene.png](analysis_report/out/report_20260227_current/figures/A4__59__scene.png) |
+| A4 | 6 | A4_6 | [A4__6__scene.png](analysis_report/out/report_20260227_current/figures/A4__6__scene.png) |
+| A4 | 60 | A4_60 | [A4__60__scene.png](analysis_report/out/report_20260227_current/figures/A4__60__scene.png) |
+| A4 | 61 | A4_61 | [A4__61__scene.png](analysis_report/out/report_20260227_current/figures/A4__61__scene.png) |
+| A4 | 62 | A4_62 | [A4__62__scene.png](analysis_report/out/report_20260227_current/figures/A4__62__scene.png) |
+| A4 | 63 | A4_63 | [A4__63__scene.png](analysis_report/out/report_20260227_current/figures/A4__63__scene.png) |
+| A4 | 64 | A4_64 | [A4__64__scene.png](analysis_report/out/report_20260227_current/figures/A4__64__scene.png) |
+| A4 | 65 | A4_65 | [A4__65__scene.png](analysis_report/out/report_20260227_current/figures/A4__65__scene.png) |
+| A4 | 66 | A4_66 | [A4__66__scene.png](analysis_report/out/report_20260227_current/figures/A4__66__scene.png) |
+| A4 | 67 | A4_67 | [A4__67__scene.png](analysis_report/out/report_20260227_current/figures/A4__67__scene.png) |
+| A4 | 68 | A4_68 | [A4__68__scene.png](analysis_report/out/report_20260227_current/figures/A4__68__scene.png) |
+| A4 | 69 | A4_69 | [A4__69__scene.png](analysis_report/out/report_20260227_current/figures/A4__69__scene.png) |
+| A4 | 7 | A4_7 | [A4__7__scene.png](analysis_report/out/report_20260227_current/figures/A4__7__scene.png) |
+| A4 | 70 | A4_70 | [A4__70__scene.png](analysis_report/out/report_20260227_current/figures/A4__70__scene.png) |
+| A4 | 71 | A4_71 | [A4__71__scene.png](analysis_report/out/report_20260227_current/figures/A4__71__scene.png) |
+| A4 | 8 | A4_8 | [A4__8__scene.png](analysis_report/out/report_20260227_current/figures/A4__8__scene.png) |
+| A4 | 9 | A4_9 | [A4__9__scene.png](analysis_report/out/report_20260227_current/figures/A4__9__scene.png) |
+| A5 | 0 | A5_0 | [A5__0__scene.png](analysis_report/out/report_20260227_current/figures/A5__0__scene.png) |
+| A5 | 1 | A5_1 | [A5__1__scene.png](analysis_report/out/report_20260227_current/figures/A5__1__scene.png) |
+| A5 | 10 | A5_10 | [A5__10__scene.png](analysis_report/out/report_20260227_current/figures/A5__10__scene.png) |
+| A5 | 11 | A5_11 | [A5__11__scene.png](analysis_report/out/report_20260227_current/figures/A5__11__scene.png) |
+| A5 | 12 | A5_12 | [A5__12__scene.png](analysis_report/out/report_20260227_current/figures/A5__12__scene.png) |
+| A5 | 13 | A5_13 | [A5__13__scene.png](analysis_report/out/report_20260227_current/figures/A5__13__scene.png) |
+| A5 | 14 | A5_14 | [A5__14__scene.png](analysis_report/out/report_20260227_current/figures/A5__14__scene.png) |
+| A5 | 15 | A5_15 | [A5__15__scene.png](analysis_report/out/report_20260227_current/figures/A5__15__scene.png) |
+| A5 | 16 | A5_16 | [A5__16__scene.png](analysis_report/out/report_20260227_current/figures/A5__16__scene.png) |
+| A5 | 17 | A5_17 | [A5__17__scene.png](analysis_report/out/report_20260227_current/figures/A5__17__scene.png) |
+| A5 | 18 | A5_18 | [A5__18__scene.png](analysis_report/out/report_20260227_current/figures/A5__18__scene.png) |
+| A5 | 19 | A5_19 | [A5__19__scene.png](analysis_report/out/report_20260227_current/figures/A5__19__scene.png) |
+| A5 | 2 | A5_2 | [A5__2__scene.png](analysis_report/out/report_20260227_current/figures/A5__2__scene.png) |
+| A5 | 20 | A5_20 | [A5__20__scene.png](analysis_report/out/report_20260227_current/figures/A5__20__scene.png) |
+| A5 | 21 | A5_21 | [A5__21__scene.png](analysis_report/out/report_20260227_current/figures/A5__21__scene.png) |
+| A5 | 22 | A5_22 | [A5__22__scene.png](analysis_report/out/report_20260227_current/figures/A5__22__scene.png) |
+| A5 | 23 | A5_23 | [A5__23__scene.png](analysis_report/out/report_20260227_current/figures/A5__23__scene.png) |
+| A5 | 24 | A5_24 | [A5__24__scene.png](analysis_report/out/report_20260227_current/figures/A5__24__scene.png) |
+| A5 | 25 | A5_25 | [A5__25__scene.png](analysis_report/out/report_20260227_current/figures/A5__25__scene.png) |
+| A5 | 26 | A5_26 | [A5__26__scene.png](analysis_report/out/report_20260227_current/figures/A5__26__scene.png) |
+| A5 | 27 | A5_27 | [A5__27__scene.png](analysis_report/out/report_20260227_current/figures/A5__27__scene.png) |
+| A5 | 28 | A5_28 | [A5__28__scene.png](analysis_report/out/report_20260227_current/figures/A5__28__scene.png) |
+| A5 | 29 | A5_29 | [A5__29__scene.png](analysis_report/out/report_20260227_current/figures/A5__29__scene.png) |
+| A5 | 3 | A5_3 | [A5__3__scene.png](analysis_report/out/report_20260227_current/figures/A5__3__scene.png) |
+| A5 | 4 | A5_4 | [A5__4__scene.png](analysis_report/out/report_20260227_current/figures/A5__4__scene.png) |
+| A5 | 5 | A5_5 | [A5__5__scene.png](analysis_report/out/report_20260227_current/figures/A5__5__scene.png) |
+| A5 | 6 | A5_6 | [A5__6__scene.png](analysis_report/out/report_20260227_current/figures/A5__6__scene.png) |
+| A5 | 7 | A5_7 | [A5__7__scene.png](analysis_report/out/report_20260227_current/figures/A5__7__scene.png) |
+| A5 | 8 | A5_8 | [A5__8__scene.png](analysis_report/out/report_20260227_current/figures/A5__8__scene.png) |
+| A5 | 9 | A5_9 | [A5__9__scene.png](analysis_report/out/report_20260227_current/figures/A5__9__scene.png) |
+| B1 | 0 | B1_0 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 1 | B1_1 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 10 | B1_10 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 11 | B1_11 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 12 | B1_12 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 13 | B1_13 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 14 | B1_14 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 15 | B1_15 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 16 | B1_16 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 17 | B1_17 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 18 | B1_18 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 19 | B1_19 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 2 | B1_2 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 20 | B1_20 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 21 | B1_21 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 22 | B1_22 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 23 | B1_23 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 24 | B1_24 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 25 | B1_25 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 26 | B1_26 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 27 | B1_27 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 28 | B1_28 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 29 | B1_29 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 3 | B1_3 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 30 | B1_30 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 31 | B1_31 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 32 | B1_32 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 33 | B1_33 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 34 | B1_34 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 35 | B1_35 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 36 | B1_36 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 37 | B1_37 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 38 | B1_38 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 39 | B1_39 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 4 | B1_4 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 40 | B1_40 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 41 | B1_41 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 42 | B1_42 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 43 | B1_43 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 44 | B1_44 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 45 | B1_45 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 46 | B1_46 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 47 | B1_47 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 48 | B1_48 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 5 | B1_5 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 6 | B1_6 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 7 | B1_7 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 8 | B1_8 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B1 | 9 | B1_9 | [B1__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B1__GLOBAL__scene.png) |
+| B2 | 0 | B2_0 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 1 | B2_1 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 10 | B2_10 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 100 | B2_100 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 101 | B2_101 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 102 | B2_102 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 103 | B2_103 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 104 | B2_104 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 105 | B2_105 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 106 | B2_106 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 107 | B2_107 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 108 | B2_108 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 109 | B2_109 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 11 | B2_11 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 110 | B2_110 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 111 | B2_111 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 112 | B2_112 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 113 | B2_113 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 114 | B2_114 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 115 | B2_115 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 116 | B2_116 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 117 | B2_117 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 118 | B2_118 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 119 | B2_119 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 12 | B2_12 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 120 | B2_120 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 13 | B2_13 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 14 | B2_14 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 15 | B2_15 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 16 | B2_16 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 17 | B2_17 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 18 | B2_18 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 19 | B2_19 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 2 | B2_2 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 20 | B2_20 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 21 | B2_21 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 22 | B2_22 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 23 | B2_23 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 24 | B2_24 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 25 | B2_25 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 26 | B2_26 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 27 | B2_27 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 28 | B2_28 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 29 | B2_29 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 3 | B2_3 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 30 | B2_30 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 31 | B2_31 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 32 | B2_32 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 33 | B2_33 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 34 | B2_34 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 35 | B2_35 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 36 | B2_36 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 37 | B2_37 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 38 | B2_38 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 39 | B2_39 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 4 | B2_4 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 40 | B2_40 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 41 | B2_41 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 42 | B2_42 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 43 | B2_43 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 44 | B2_44 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 45 | B2_45 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 46 | B2_46 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 47 | B2_47 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 48 | B2_48 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 49 | B2_49 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 5 | B2_5 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 50 | B2_50 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 51 | B2_51 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 52 | B2_52 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 53 | B2_53 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 54 | B2_54 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 55 | B2_55 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 56 | B2_56 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 57 | B2_57 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 58 | B2_58 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 59 | B2_59 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 6 | B2_6 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 60 | B2_60 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 61 | B2_61 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 62 | B2_62 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 63 | B2_63 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 64 | B2_64 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 65 | B2_65 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 66 | B2_66 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 67 | B2_67 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 68 | B2_68 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 69 | B2_69 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 7 | B2_7 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 70 | B2_70 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 71 | B2_71 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 72 | B2_72 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 73 | B2_73 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 74 | B2_74 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 75 | B2_75 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 76 | B2_76 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 77 | B2_77 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 78 | B2_78 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 79 | B2_79 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 8 | B2_8 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 80 | B2_80 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 81 | B2_81 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 82 | B2_82 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 83 | B2_83 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 84 | B2_84 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 85 | B2_85 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 86 | B2_86 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 87 | B2_87 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 88 | B2_88 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 89 | B2_89 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 9 | B2_9 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 90 | B2_90 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 91 | B2_91 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 92 | B2_92 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 93 | B2_93 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 94 | B2_94 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 95 | B2_95 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 96 | B2_96 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 97 | B2_97 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 98 | B2_98 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B2 | 99 | B2_99 | [B2__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B2__GLOBAL__scene.png) |
+| B3 | 0 | B3_0 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 1 | B3_1 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 10 | B3_10 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 100 | B3_100 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 101 | B3_101 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 102 | B3_102 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 103 | B3_103 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 104 | B3_104 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 105 | B3_105 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 106 | B3_106 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 107 | B3_107 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 108 | B3_108 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 109 | B3_109 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 11 | B3_11 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 110 | B3_110 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 111 | B3_111 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 112 | B3_112 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 113 | B3_113 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 114 | B3_114 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 115 | B3_115 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 116 | B3_116 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 117 | B3_117 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 118 | B3_118 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 119 | B3_119 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 12 | B3_12 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 120 | B3_120 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 13 | B3_13 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 14 | B3_14 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 15 | B3_15 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 16 | B3_16 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 17 | B3_17 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 18 | B3_18 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 19 | B3_19 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 2 | B3_2 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 20 | B3_20 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 21 | B3_21 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 22 | B3_22 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 23 | B3_23 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 24 | B3_24 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 25 | B3_25 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 26 | B3_26 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 27 | B3_27 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 28 | B3_28 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 29 | B3_29 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 3 | B3_3 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 30 | B3_30 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 31 | B3_31 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 32 | B3_32 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 33 | B3_33 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 34 | B3_34 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 35 | B3_35 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 36 | B3_36 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 37 | B3_37 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 38 | B3_38 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 39 | B3_39 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 4 | B3_4 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 40 | B3_40 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 41 | B3_41 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 42 | B3_42 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 43 | B3_43 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 44 | B3_44 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 45 | B3_45 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 46 | B3_46 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 47 | B3_47 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 48 | B3_48 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 49 | B3_49 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 5 | B3_5 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 50 | B3_50 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 51 | B3_51 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 52 | B3_52 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 53 | B3_53 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 54 | B3_54 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 55 | B3_55 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 56 | B3_56 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 57 | B3_57 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 58 | B3_58 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 59 | B3_59 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 6 | B3_6 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 60 | B3_60 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 61 | B3_61 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 62 | B3_62 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 63 | B3_63 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 64 | B3_64 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 65 | B3_65 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 66 | B3_66 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 67 | B3_67 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 68 | B3_68 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 69 | B3_69 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 7 | B3_7 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 70 | B3_70 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 71 | B3_71 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 72 | B3_72 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 73 | B3_73 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 74 | B3_74 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 75 | B3_75 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 76 | B3_76 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 77 | B3_77 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 78 | B3_78 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 79 | B3_79 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 8 | B3_8 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 80 | B3_80 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 81 | B3_81 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 82 | B3_82 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 83 | B3_83 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 84 | B3_84 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 85 | B3_85 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 86 | B3_86 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 87 | B3_87 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 88 | B3_88 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 89 | B3_89 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 9 | B3_9 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 90 | B3_90 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 91 | B3_91 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 92 | B3_92 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 93 | B3_93 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 94 | B3_94 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 95 | B3_95 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 96 | B3_96 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 97 | B3_97 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 98 | B3_98 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| B3 | 99 | B3_99 | [B3__GLOBAL__scene.png](analysis_report/out/report_20260227_current/figures/B3__GLOBAL__scene.png) |
+| C0 | 0 | C0_0 | [C0__0__scene.png](analysis_report/out/report_20260227_current/figures/C0__0__scene.png) |
+| C0 | 1 | C0_1 | [C0__1__scene.png](analysis_report/out/report_20260227_current/figures/C0__1__scene.png) |
+| C0 | 10 | C0_10 | [C0__10__scene.png](analysis_report/out/report_20260227_current/figures/C0__10__scene.png) |
+| C0 | 11 | C0_11 | [C0__11__scene.png](analysis_report/out/report_20260227_current/figures/C0__11__scene.png) |
+| C0 | 12 | C0_12 | [C0__12__scene.png](analysis_report/out/report_20260227_current/figures/C0__12__scene.png) |
+| C0 | 13 | C0_13 | [C0__13__scene.png](analysis_report/out/report_20260227_current/figures/C0__13__scene.png) |
+| C0 | 14 | C0_14 | [C0__14__scene.png](analysis_report/out/report_20260227_current/figures/C0__14__scene.png) |
+| C0 | 15 | C0_15 | [C0__15__scene.png](analysis_report/out/report_20260227_current/figures/C0__15__scene.png) |
+| C0 | 16 | C0_16 | [C0__16__scene.png](analysis_report/out/report_20260227_current/figures/C0__16__scene.png) |
+| C0 | 17 | C0_17 | [C0__17__scene.png](analysis_report/out/report_20260227_current/figures/C0__17__scene.png) |
+| C0 | 18 | C0_18 | [C0__18__scene.png](analysis_report/out/report_20260227_current/figures/C0__18__scene.png) |
+| C0 | 19 | C0_19 | [C0__19__scene.png](analysis_report/out/report_20260227_current/figures/C0__19__scene.png) |
+| C0 | 2 | C0_2 | [C0__2__scene.png](analysis_report/out/report_20260227_current/figures/C0__2__scene.png) |
+| C0 | 20 | C0_20 | [C0__20__scene.png](analysis_report/out/report_20260227_current/figures/C0__20__scene.png) |
+| C0 | 21 | C0_21 | [C0__21__scene.png](analysis_report/out/report_20260227_current/figures/C0__21__scene.png) |
+| C0 | 22 | C0_22 | [C0__22__scene.png](analysis_report/out/report_20260227_current/figures/C0__22__scene.png) |
+| C0 | 23 | C0_23 | [C0__23__scene.png](analysis_report/out/report_20260227_current/figures/C0__23__scene.png) |
+| C0 | 24 | C0_24 | [C0__24__scene.png](analysis_report/out/report_20260227_current/figures/C0__24__scene.png) |
+| C0 | 25 | C0_25 | [C0__25__scene.png](analysis_report/out/report_20260227_current/figures/C0__25__scene.png) |
+| C0 | 26 | C0_26 | [C0__26__scene.png](analysis_report/out/report_20260227_current/figures/C0__26__scene.png) |
+| C0 | 27 | C0_27 | [C0__27__scene.png](analysis_report/out/report_20260227_current/figures/C0__27__scene.png) |
+| C0 | 28 | C0_28 | [C0__28__scene.png](analysis_report/out/report_20260227_current/figures/C0__28__scene.png) |
+| C0 | 29 | C0_29 | [C0__29__scene.png](analysis_report/out/report_20260227_current/figures/C0__29__scene.png) |
+| C0 | 3 | C0_3 | [C0__3__scene.png](analysis_report/out/report_20260227_current/figures/C0__3__scene.png) |
+| C0 | 4 | C0_4 | [C0__4__scene.png](analysis_report/out/report_20260227_current/figures/C0__4__scene.png) |
+| C0 | 5 | C0_5 | [C0__5__scene.png](analysis_report/out/report_20260227_current/figures/C0__5__scene.png) |
+| C0 | 6 | C0_6 | [C0__6__scene.png](analysis_report/out/report_20260227_current/figures/C0__6__scene.png) |
+| C0 | 7 | C0_7 | [C0__7__scene.png](analysis_report/out/report_20260227_current/figures/C0__7__scene.png) |
+| C0 | 8 | C0_8 | [C0__8__scene.png](analysis_report/out/report_20260227_current/figures/C0__8__scene.png) |
+| C0 | 9 | C0_9 | [C0__9__scene.png](analysis_report/out/report_20260227_current/figures/C0__9__scene.png) |
