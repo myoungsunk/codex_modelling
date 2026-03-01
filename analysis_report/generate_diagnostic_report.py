@@ -64,6 +64,189 @@ def _median(rows: list[dict[str, Any]], key: str) -> float:
     return float(np.median(x))
 
 
+def _median_vals(vals: list[float] | np.ndarray) -> float:
+    x = np.asarray(vals, dtype=float)
+    x = x[np.isfinite(x)]
+    if len(x) == 0:
+        return float("nan")
+    return float(np.median(x))
+
+
+def _safe_span(vals: list[float] | np.ndarray) -> float:
+    x = np.asarray(vals, dtype=float)
+    x = x[np.isfinite(x)]
+    if len(x) == 0:
+        return float("nan")
+    return float(np.max(x) - np.min(x))
+
+
+def _judge_vs_delta(effect_db: float, delta_db: float) -> tuple[str, float]:
+    if not (np.isfinite(effect_db) and np.isfinite(delta_db) and abs(delta_db) > 0.0):
+        return "INCONCLUSIVE", float("nan")
+    ratio = abs(float(effect_db)) / abs(float(delta_db))
+    if ratio >= 2.0:
+        return "PASS", float(ratio)
+    if ratio >= 1.0:
+        return "WARN", float(ratio)
+    return "FAIL", float(ratio)
+
+
+def _provenance(row: dict[str, Any]) -> dict[str, Any]:
+    p = row.get("provenance_json", {})
+    if isinstance(p, dict):
+        return p
+    if isinstance(p, str):
+        s = p.strip()
+        if not s:
+            return {}
+        try:
+            obj = json.loads(s)
+            return obj if isinstance(obj, dict) else {}
+        except Exception:
+            return {}
+    return {}
+
+
+def _link_params(row: dict[str, Any]) -> dict[str, Any]:
+    prov = _provenance(row)
+    lp = prov.get("link_params", {})
+    return lp if isinstance(lp, dict) else {}
+
+
+def _c0_repeat_delta(link_rows: list[dict[str, Any]]) -> float:
+    by_key: dict[tuple[float, float, float], list[float]] = {}
+    for r in link_rows:
+        if str(r.get("scenario_id", "")).upper() != "C0":
+            continue
+        lp = _link_params(r)
+        d = _num(lp.get("distance_m", r.get("d_m", np.nan)))
+        yaw = _num(lp.get("yaw_deg", r.get("yaw_deg", np.nan)))
+        pitch = _num(lp.get("pitch_deg", r.get("pitch_deg", np.nan)))
+        x = _num(r.get("XPD_early_db", np.nan))
+        if not (np.isfinite(d) and np.isfinite(yaw) and np.isfinite(pitch) and np.isfinite(x)):
+            continue
+        k = (round(float(d), 6), round(float(yaw), 6), round(float(pitch), 6))
+        by_key.setdefault(k, []).append(float(x))
+    stds: list[float] = []
+    for vv in by_key.values():
+        arr = np.asarray(vv, dtype=float)
+        arr = arr[np.isfinite(arr)]
+        if len(arr) >= 2:
+            stds.append(float(np.std(arr, ddof=1)))
+    return _median_vals(stds)
+
+
+def _a5_pair_key(row: dict[str, Any]) -> tuple[Any, ...]:
+    lp = _link_params(row)
+    def _norm(v: Any, nd: int = 6) -> Any:
+        x = _num(v)
+        if not np.isfinite(x):
+            return None
+        return round(float(x), int(nd))
+    return (
+        _norm(lp.get("rho", np.nan), nd=4),
+        int(round(_num(lp.get("rep_id", -1)))) if np.isfinite(_num(lp.get("rep_id", np.nan))) else None,
+        int(round(_num(lp.get("rep_outer", -1)))) if np.isfinite(_num(lp.get("rep_outer", np.nan))) else None,
+        _norm(lp.get("offset", np.nan), nd=4),
+        _norm(lp.get("rx_x", np.nan), nd=4),
+        _norm(lp.get("rx_y", np.nan), nd=4),
+    )
+
+
+def _inc_bin(v: float) -> str:
+    if not np.isfinite(v):
+        return "NA"
+    if v < 30.0:
+        return "low"
+    if v < 60.0:
+        return "mid"
+    return "high"
+
+
+def _dominant_incidence_by_link(ray_rows: list[dict[str, Any]]) -> dict[str, float]:
+    best: dict[str, tuple[float, float]] = {}
+    for r in ray_rows:
+        lid = str(r.get("link_id", ""))
+        if not lid:
+            continue
+        p = _num(r.get("P_lin", np.nan))
+        inc = _num(r.get("incidence_deg", np.nan))
+        if not (np.isfinite(p) and np.isfinite(inc)):
+            continue
+        cur = best.get(lid)
+        if cur is None or p > cur[0]:
+            best[lid] = (float(p), float(inc))
+    return {k: float(v[1]) for k, v in best.items()}
+
+
+def _build_design_matrix(rows: list[dict[str, Any]], inc_by_link: dict[str, float]) -> tuple[np.ndarray, list[str], dict[str, np.ndarray]]:
+    num_keys = ["d_m", "EL_proxy_db"]
+    cat_keys = ["LOSflag", "material_class", "roughness_flag", "human_flag", "obstacle_flag", "dominant_parity_early", "incidence_bin"]
+
+    num_cols: list[np.ndarray] = []
+    names: list[str] = []
+    n = len(rows)
+
+    for k in num_keys:
+        col = np.asarray([_num(r.get(k, np.nan)) for r in rows], dtype=float)
+        med = float(np.nanmedian(col)) if np.any(np.isfinite(col)) else 0.0
+        col = np.where(np.isfinite(col), col, med)
+        num_cols.append(col)
+        names.append(k)
+
+    for k in cat_keys:
+        vals: list[str] = []
+        for r in rows:
+            if k == "incidence_bin":
+                inc = _num(inc_by_link.get(str(r.get("link_id", "")), np.nan))
+                vals.append(_inc_bin(inc))
+            else:
+                vals.append(str(r.get(k, "NA")))
+        lv = sorted(set(vals))
+        if len(lv) <= 1:
+            continue
+        for c in lv[1:]:
+            col = np.asarray([1.0 if v == c else 0.0 for v in vals], dtype=float)
+            num_cols.append(col)
+            names.append(f"{k}={c}")
+
+    if num_cols:
+        x = np.column_stack([np.ones(n, dtype=float)] + num_cols)
+        names = ["const"] + names
+    else:
+        x = np.ones((n, 1), dtype=float)
+        names = ["const"]
+    num_data = {k: np.asarray([_num(r.get(k, np.nan)) for r in rows], dtype=float) for k in num_keys}
+    return x, names, num_data
+
+
+def _vif_numeric(num_data: dict[str, np.ndarray], x_full: np.ndarray, names: list[str]) -> dict[str, float]:
+    out: dict[str, float] = {}
+    for k, y in num_data.items():
+        m = np.isfinite(y)
+        if int(np.sum(m)) < 4:
+            out[k] = float("nan")
+            continue
+        try:
+            idx = names.index(k)
+        except ValueError:
+            out[k] = float("nan")
+            continue
+        xm = x_full[m, :]
+        ym = y[m]
+        xo = np.delete(xm, idx, axis=1)
+        beta, *_ = np.linalg.lstsq(xo, ym, rcond=None)
+        yh = xo @ beta
+        ssr = float(np.sum((ym - yh) ** 2))
+        sst = float(np.sum((ym - float(np.mean(ym))) ** 2))
+        if sst <= 0:
+            out[k] = float("nan")
+            continue
+        r2 = max(0.0, min(1.0, 1.0 - ssr / sst))
+        out[k] = float(1.0 / max(1e-6, 1.0 - r2))
+    return out
+
+
 def _scenario_case_rows(link_rows: list[dict[str, Any]]) -> dict[tuple[str, str], list[dict[str, Any]]]:
     out: dict[tuple[str, str], list[dict[str, Any]]] = {}
     for r in link_rows:
@@ -370,6 +553,91 @@ def _wearly_te_sweep(
     }
 
 
+def _target_sign_stability_te_sweep(
+    *,
+    link_rows: list[dict[str, Any]],
+    runs: list[dict[str, Any]],
+    te_ns_list: list[float],
+    floor_db: float,
+) -> dict[str, Any]:
+    """Check A2/A3 odd/even sign stability over Te sweep.
+
+    A2 expected: XPD_early_ex < 0
+    A3 expected: XPD_early_ex > 0
+    """
+
+    run_by_sid = {str(r.get("scenario_id", "")): r for r in runs}
+    out: dict[str, Any] = {}
+    for sid, expected_sign in [("A2", -1), ("A3", +1)]:
+        rows = [r for r in link_rows if str(r.get("scenario_id", "")) == sid]
+        run = run_by_sid.get(sid)
+        if run is None or len(rows) == 0:
+            out[sid] = {"status": "WARN", "reason": "missing run or rows", "per_te": []}
+            continue
+        per_te: list[dict[str, Any]] = []
+        for te_ns in te_ns_list:
+            vals: list[float] = []
+            hit: list[bool] = []
+            for r in rows:
+                pdp = io_lib.load_pdp_npz(run, str(r.get("link_id", "")))
+                if pdp is None:
+                    continue
+                tau = np.asarray(pdp.get("delay_tau_s", []), dtype=float)
+                pco = np.asarray(pdp.get("P_co", []), dtype=float)
+                pcr = np.asarray(pdp.get("P_cross", []), dtype=float)
+                if len(tau) == 0 or len(pco) != len(tau) or len(pcr) != len(tau):
+                    continue
+                w = _window_dict(r)
+                tau0 = _num(w.get("tau0_s", np.nan))
+                if not np.isfinite(tau0):
+                    p_total = pco + pcr
+                    i0 = int(np.argmax(p_total)) if len(p_total) else -1
+                    if i0 < 0:
+                        continue
+                    tau0 = float(tau[i0])
+                te_s = float(te_ns) * 1e-9
+                early = (tau >= tau0) & (tau <= tau0 + te_s)
+                sco = float(np.sum(pco[early]))
+                scr = float(np.sum(pcr[early]))
+                xpd_e = _db_ratio(sco, scr)
+                xpd_ex = float(xpd_e - floor_db) if np.isfinite(floor_db) else float("nan")
+                if not np.isfinite(xpd_ex):
+                    continue
+                vals.append(float(xpd_ex))
+                hit.append(bool(xpd_ex < 0.0) if expected_sign < 0 else bool(xpd_ex > 0.0))
+            rate = float(np.mean(hit)) if hit else float("nan")
+            per_te.append(
+                {
+                    "Te_ns": float(te_ns),
+                    "n": int(len(vals)),
+                    "median_xpd_early_ex_db": float(np.median(np.asarray(vals, dtype=float))) if vals else float("nan"),
+                    "expected_sign_hit_rate": rate,
+                }
+            )
+        rates = np.asarray([_num(x.get("expected_sign_hit_rate", np.nan)) for x in per_te], dtype=float)
+        rates = rates[np.isfinite(rates)]
+        min_rate = float(np.min(rates)) if len(rates) else float("nan")
+        med_rate = float(np.median(rates)) if len(rates) else float("nan")
+        status = "PASS" if (np.isfinite(min_rate) and min_rate >= 0.8) else ("WARN" if (np.isfinite(med_rate) and med_rate >= 0.6) else "FAIL")
+        out[sid] = {
+            "expected_sign": "negative" if expected_sign < 0 else "positive",
+            "min_hit_rate": min_rate,
+            "median_hit_rate": med_rate,
+            "per_te": per_te,
+            "status": status,
+        }
+    a2s = str(out.get("A2", {}).get("status", "WARN"))
+    a3s = str(out.get("A3", {}).get("status", "WARN"))
+    if a2s == "PASS" and a3s == "PASS":
+        overall = "PASS"
+    elif a2s == "FAIL" or a3s == "FAIL":
+        overall = "FAIL"
+    else:
+        overall = "WARN"
+    out["overall_status"] = overall
+    return out
+
+
 def _make_scene_plots(
     config: dict[str, Any],
     out_fig_dir: Path,
@@ -588,6 +856,12 @@ def _diagnostic_checks(
         te_ns_list=te_ns_list,
         tmax_s=tmax_s,
     )
+    sign_stability = _target_sign_stability_te_sweep(
+        link_rows=link_rows,
+        runs=runs,
+        te_ns_list=te_ns_list,
+        floor_db=float(floor_ref.get("xpd_floor_db", np.nan)),
+    )
 
     checks["B_time_resolution"] = {
         "freq_source": str(freq_src),
@@ -616,88 +890,446 @@ def _diagnostic_checks(
         "W_floor_detail": floor_stats,
         "W_target_detail": target_stats,
         "W3_te_sweep": wearly_stats,
+        "A2A3_sign_stability": sign_stability,
     }
 
-    # C effect vs floor
+    # C effect vs floor (C2-M / C2-S endpoints)
     floor_delta = float(floor_ref.get("delta_floor_db", np.nan))
+    repeat_delta = float(_c0_repeat_delta(link_rows))
+    delta_ref = float(max(abs(floor_delta), abs(repeat_delta))) if np.isfinite(floor_delta) and np.isfinite(repeat_delta) else (
+        abs(float(floor_delta)) if np.isfinite(floor_delta) else (abs(float(repeat_delta)) if np.isfinite(repeat_delta) else float("nan"))
+    )
     a2 = scenario_rows.get("A2", [])
     a3 = scenario_rows.get("A3", [])
     dmed = metrics_lib.delta_median(a3, a2, "XPD_early_excess_db")
-    ratio = abs(float(dmed)) / abs(float(floor_delta)) if np.isfinite(dmed) and np.isfinite(floor_delta) and abs(floor_delta) > 0 else float("nan")
-    c1_status = "PASS" if np.isfinite(ratio) and ratio >= 2.0 else ("WARN" if np.isfinite(ratio) and ratio >= 1.0 else "FAIL")
+    c1_status, ratio = _judge_vs_delta(float(dmed), float(delta_ref))
 
     a4 = scenario_rows.get("A4", [])
     by_mat: dict[str, list[dict[str, Any]]] = {}
     for r in a4:
         by_mat.setdefault(str(r.get("material_class", "NA")), []).append(r)
-    mat_meds = [
-        _median(v, "XPD_late_excess_db")
-        for _, v in sorted(by_mat.items())
-        if np.isfinite(_median(v, "XPD_late_excess_db"))
-    ]
-    mat_shift = float(np.max(mat_meds) - np.min(mat_meds)) if mat_meds else float("nan")
+    a4_early_meds = {k: _median(v, "XPD_early_excess_db") for k, v in sorted(by_mat.items())}
+    a4_late_meds = {k: _median(v, "XPD_late_excess_db") for k, v in sorted(by_mat.items())}
+    a4_lpol_meds = {k: _median(v, "L_pol_db") for k, v in sorted(by_mat.items())}
+    a4_primary_span = _safe_span(list(a4_early_meds.values()))
+    a4_late_span = _safe_span(list(a4_late_meds.values()))
+    a4_lpol_span = _safe_span(list(a4_lpol_meds.values()))
+    c2m_primary_status, c2m_primary_ratio = _judge_vs_delta(float(a4_primary_span), float(delta_ref))
+    c2m_late_status, c2m_late_ratio = _judge_vs_delta(float(a4_late_span), float(delta_ref))
+    c2m_lpol_status, c2m_lpol_ratio = _judge_vs_delta(float(a4_lpol_span), float(delta_ref))
+    a4_target = target_stats.get("A4", {})
+    a4_target_c = float(_num(a4_target.get("C_target_median_db", np.nan)))
+    a4_target_exists = float(_num(a4_target.get("target_exists_rate", np.nan)))
+    a4_target_ok = bool(np.isfinite(a4_target_c) and a4_target_c < -10.0 and np.isfinite(a4_target_exists) and a4_target_exists >= 0.9)
+    if c2m_primary_status == "PASS" and a4_target_ok:
+        c2m_status = "PASS"
+    elif c2m_primary_status in {"PASS", "WARN"}:
+        c2m_status = "WARN"
+    elif c2m_primary_status == "INCONCLUSIVE":
+        c2m_status = "WARN"
+    else:
+        c2m_status = "FAIL"
 
     a5 = scenario_rows.get("A5", [])
     base = [r for r in a5 if int(_num(r.get("roughness_flag", 0))) == 0 and int(_num(r.get("human_flag", 0))) == 0]
     stress = [r for r in a5 if int(_num(r.get("roughness_flag", 0))) == 1 or int(_num(r.get("human_flag", 0))) == 1]
     d_stress = metrics_lib.delta_median(stress, base, "XPD_late_excess_db")
+    d_lpol = metrics_lib.delta_median(stress, base, "L_pol_db")
+    d_rho = metrics_lib.delta_median(stress, base, "rho_early_lin")
+    d_ds = metrics_lib.delta_median(stress, base, "delay_spread_rms_s")
     v_base = metrics_lib.tail_stats(base, "XPD_late_excess_db").get("std", np.nan)
     v_stress = metrics_lib.tail_stats(stress, "XPD_late_excess_db").get("std", np.nan)
     var_ratio = float(v_stress / v_base) if np.isfinite(v_stress) and np.isfinite(v_base) and v_base > 0 else float("nan")
-    c2_status = "PASS" if (
-        (np.isfinite(mat_shift) and np.isfinite(floor_delta) and abs(mat_shift) > abs(floor_delta))
-        or (np.isfinite(d_stress) and np.isfinite(floor_delta) and abs(d_stress) > abs(floor_delta))
-        or (np.isfinite(var_ratio) and var_ratio > 1.25)
-    ) else "WARN"
+
+    # Gate: target-path total power drop (A5 stress vs base). If too large, treat as blockage.
+    ray_by_link: dict[str, list[dict[str, Any]]] = {}
+    for rr in ray_rows:
+        if str(rr.get("scenario_id", "")).upper() != "A5":
+            continue
+        ray_by_link.setdefault(str(rr.get("link_id", "")), []).append(rr)
+
+    def _dom_target_power(link_row: dict[str, Any], target_n: int = 2) -> float:
+        lid = str(link_row.get("link_id", ""))
+        rays = ray_by_link.get(lid, [])
+        cand = []
+        for rr in rays:
+            nb = int(round(_num(rr.get("n_bounce", np.nan)))) if np.isfinite(_num(rr.get("n_bounce", np.nan))) else -1
+            if nb != int(target_n):
+                continue
+            p = _num(rr.get("P_lin", np.nan))
+            if np.isfinite(p) and p > 0:
+                cand.append(float(p))
+        if not cand:
+            return float("nan")
+        return float(np.max(np.asarray(cand, dtype=float)))
+
+    base_pow: dict[tuple[Any, ...], list[float]] = {}
+    stress_pow: dict[tuple[Any, ...], list[float]] = {}
+    for r in base:
+        p = _dom_target_power(r, target_n=2)
+        if np.isfinite(p):
+            base_pow.setdefault(_a5_pair_key(r), []).append(float(p))
+    for r in stress:
+        p = _dom_target_power(r, target_n=2)
+        if np.isfinite(p):
+            stress_pow.setdefault(_a5_pair_key(r), []).append(float(p))
+    dp_target_vals: list[float] = []
+    for k, vb in base_pow.items():
+        if k not in stress_pow:
+            continue
+        pb = _median_vals(vb)
+        ps = _median_vals(stress_pow[k])
+        if np.isfinite(pb) and np.isfinite(ps) and pb > 0 and ps > 0:
+            dp_target_vals.append(_db_ratio(ps, pb))
+    # Fallback: if key-level pairing is unavailable, pair by rho-level medians.
+    if len(dp_target_vals) == 0:
+        base_by_rho: dict[float, list[float]] = {}
+        stress_by_rho: dict[float, list[float]] = {}
+        for r in base:
+            rho = _num(_link_params(r).get("rho", np.nan))
+            p = _dom_target_power(r, target_n=2)
+            if np.isfinite(rho) and np.isfinite(p) and p > 0:
+                base_by_rho.setdefault(round(float(rho), 4), []).append(float(p))
+        for r in stress:
+            rho = _num(_link_params(r).get("rho", np.nan))
+            p = _dom_target_power(r, target_n=2)
+            if np.isfinite(rho) and np.isfinite(p) and p > 0:
+                stress_by_rho.setdefault(round(float(rho), 4), []).append(float(p))
+        for rho, vb in base_by_rho.items():
+            if rho not in stress_by_rho:
+                continue
+            pb = _median_vals(vb)
+            ps = _median_vals(stress_by_rho[rho])
+            if np.isfinite(pb) and np.isfinite(ps) and pb > 0 and ps > 0:
+                dp_target_vals.append(_db_ratio(ps, pb))
+    gate_dp_target_db = _median_vals(dp_target_vals)
+    gate_status = "PASS" if (np.isfinite(gate_dp_target_db) and gate_dp_target_db > -6.0) else ("WARN" if not np.isfinite(gate_dp_target_db) else "BLOCKAGE")
+
+    # C2-S primary: ΔL_pol < 0 and larger than uncertainty reference.
+    c2s_primary_status = "INCONCLUSIVE"
+    if np.isfinite(d_lpol):
+        if d_lpol < 0.0:
+            c2s_primary_status, _ = _judge_vs_delta(float(d_lpol), float(delta_ref))
+        else:
+            c2s_primary_status = "FAIL"
+    if gate_status == "BLOCKAGE":
+        c2s_status = "WARN"
+    elif c2s_primary_status == "PASS":
+        c2s_status = "PASS"
+    elif c2s_primary_status in {"WARN", "INCONCLUSIVE"}:
+        c2s_status = "WARN"
+    else:
+        c2s_status = "FAIL"
+
+    if c2m_status == "PASS" and c2s_status == "PASS":
+        c2_status = "PASS"
+    elif c2m_status == "FAIL" and c2s_status == "FAIL":
+        c2_status = "FAIL"
+    else:
+        c2_status = "WARN"
+
     checks["C_effect_vs_floor"] = {
         "floor_delta_db": floor_delta,
+        "repeat_delta_db": repeat_delta,
+        "delta_ref_db": float(delta_ref),
         "A3_minus_A2_delta_median_db": dmed,
         "ratio_to_floor": ratio,
         "C1_status": c1_status,
-        "A4_material_shift_late_excess_db": mat_shift,
+        # Backward-compatible legacy keys
+        "A4_material_shift_late_excess_db": float(a4_late_span),
         "A5_stress_delta_late_excess_db": d_stress,
         "A5_stress_var_ratio": var_ratio,
         "C2_status": c2_status,
+        # C2-M detailed
+        "C2M_primary_metric": "XPD_early_excess_db",
+        "C2M_primary_span_db": float(a4_primary_span),
+        "C2M_primary_ratio_to_delta": float(c2m_primary_ratio),
+        "C2M_primary_status": str(c2m_primary_status),
+        "C2M_secondary_late_span_db": float(a4_late_span),
+        "C2M_secondary_late_ratio_to_delta": float(c2m_late_ratio),
+        "C2M_secondary_late_status": str(c2m_late_status),
+        "C2M_secondary_lpol_span_db": float(a4_lpol_span),
+        "C2M_secondary_lpol_ratio_to_delta": float(c2m_lpol_ratio),
+        "C2M_secondary_lpol_status": str(c2m_lpol_status),
+        "C2M_status": str(c2m_status),
+        "A4_target_C_median_db": a4_target_c,
+        "A4_target_exists_rate": a4_target_exists,
+        "A4_target_gate_status": "PASS" if a4_target_ok else "WARN",
+        "A4_material_medians_early_ex": a4_early_meds,
+        "A4_material_medians_late_ex": a4_late_meds,
+        "A4_material_medians_lpol": a4_lpol_meds,
+        # C2-S detailed
+        "C2S_primary_metric": "L_pol_db",
+        "C2S_delta_lpol_db": float(d_lpol),
+        "C2S_primary_status": str(c2s_primary_status),
+        "C2S_status": str(c2s_status),
+        "C2S_delta_rho_early_lin": float(d_rho),
+        "C2S_delta_ds_s": float(d_ds),
+        "C2S_delta_late_ex_db": float(d_stress),
+        "C2S_late_ex_var_ratio": float(var_ratio),
+        "C2S_gate_delta_p_target_db": float(gate_dp_target_db),
+        "C2S_gate_status": str(gate_status),
+        "C2S_gate_pair_count": int(len(dp_target_vals)),
     }
 
-    # D identifiability
-    x_el = np.asarray([_num(r.get("EL_proxy_db", np.nan)) for r in link_rows], dtype=float)
-    x_el = x_el[np.isfinite(x_el)]
-    el_iqr = float(np.percentile(x_el, 75.0) - np.percentile(x_el, 25.0)) if len(x_el) else float("nan")
+    # D identifiability (D1 global/isolation + D2 multi-factor + D3 strata coverage)
+    inc_by_link = _dominant_incidence_by_link(ray_rows)
 
-    los = np.asarray([_num(r.get("LOSflag", np.nan)) for r in link_rows], dtype=float)
-    d_m = np.asarray([_num(r.get("d_m", np.nan)) for r in link_rows], dtype=float)
+    # D1-a: EL-identifying coverage (A3/A4/B*)
+    el_ident_sids = {"A3", "A4", "B1", "B2", "B3"}
+    rows_el_global = [r for r in link_rows if str(r.get("scenario_id", "")) in el_ident_sids]
+    x_el_global = np.asarray([_num(r.get("EL_proxy_db", np.nan)) for r in rows_el_global], dtype=float)
+    x_el_global = x_el_global[np.isfinite(x_el_global)]
+    el_iqr = float(np.percentile(x_el_global, 75.0) - np.percentile(x_el_global, 25.0)) if len(x_el_global) else float("nan")
+    el_bins_global = {"low": 0, "mid": 0, "high": 0}
+    if len(x_el_global) >= 3:
+        q1g, q2g = np.percentile(x_el_global, [33.3, 66.7])
+        for v in x_el_global:
+            if v <= q1g:
+                el_bins_global["low"] = int(el_bins_global["low"] + 1)
+            elif v <= q2g:
+                el_bins_global["mid"] = int(el_bins_global["mid"] + 1)
+            else:
+                el_bins_global["high"] = int(el_bins_global["high"] + 1)
+        min_el_bin = int(min(el_bins_global.values()))
+    else:
+        q1g, q2g = (float("nan"), float("nan"))
+        min_el_bin = 0
+    if np.isfinite(el_iqr) and el_iqr >= 3.0 and min_el_bin >= 5:
+        d1_global_status = "PASS"
+    elif np.isfinite(el_iqr) and el_iqr >= 2.0 and min_el_bin >= 2:
+        d1_global_status = "WARN"
+    elif len(x_el_global) == 0:
+        d1_global_status = "INCONCLUSIVE"
+    else:
+        d1_global_status = "FAIL"
+
+    # D1-b: local isolation checks (A2 parity-isolation, A5 stress-isolation)
+    a2_rows = scenario_rows.get("A2", [])
+    a2_el = np.asarray([_num(r.get("EL_proxy_db", np.nan)) for r in a2_rows], dtype=float)
+    a2_el = a2_el[np.isfinite(a2_el)]
+    a2_el_std = float(np.std(a2_el, ddof=1)) if len(a2_el) >= 2 else float("nan")
+    if len(a2_el) >= 2 and np.isfinite(a2_el_std):
+        if a2_el_std <= 0.25:
+            a2_iso_status = "PASS"
+        elif a2_el_std <= 1.0:
+            a2_iso_status = "WARN"
+        else:
+            a2_iso_status = "FAIL"
+    else:
+        a2_iso_status = "INCONCLUSIVE"
+
+    a5_rows_all = scenario_rows.get("A5", [])
+    a5_base = [r for r in a5_rows_all if int(_num(r.get("roughness_flag", 0))) == 0 and int(_num(r.get("human_flag", 0))) == 0]
+    a5_stress = [r for r in a5_rows_all if int(_num(r.get("roughness_flag", 0))) == 1 or int(_num(r.get("human_flag", 0))) == 1]
+    a5_base_el = np.asarray([_num(r.get("EL_proxy_db", np.nan)) for r in a5_base], dtype=float)
+    a5_stress_el = np.asarray([_num(r.get("EL_proxy_db", np.nan)) for r in a5_stress], dtype=float)
+    a5_base_el = a5_base_el[np.isfinite(a5_base_el)]
+    a5_stress_el = a5_stress_el[np.isfinite(a5_stress_el)]
+    d_el_a5 = float(np.median(a5_stress_el) - np.median(a5_base_el)) if (len(a5_base_el) and len(a5_stress_el)) else float("nan")
+    if np.isfinite(d_el_a5):
+        if abs(d_el_a5) <= 1.0:
+            a5_iso_status = "PASS"
+        elif abs(d_el_a5) <= 2.0:
+            a5_iso_status = "WARN"
+        else:
+            a5_iso_status = "FAIL"
+    else:
+        a5_iso_status = "INCONCLUSIVE"
+
+    if d1_global_status == "FAIL" or a2_iso_status == "FAIL" or a5_iso_status == "FAIL":
+        d1_status = "FAIL"
+    elif d1_global_status == "PASS" and a2_iso_status == "PASS" and a5_iso_status == "PASS":
+        d1_status = "PASS"
+    else:
+        d1_status = "WARN"
+
+    # D2: multi-factor separability (material×angle, stress×angle, collinearity)
+    def _new_bin_counter() -> dict[str, int]:
+        return {"low": 0, "mid": 0, "high": 0, "NA": 0}
+
+    def _coverage_status(cov: dict[str, dict[str, int]]) -> tuple[str, int, int]:
+        groups = sorted([k for k in cov.keys() if k and k != "NA"])
+        if not groups:
+            return "INCONCLUSIVE", 0, 0
+        good = 0
+        for g in groups:
+            d = cov.get(g, {})
+            n_bins = sum(int(d.get(b, 0) >= 2) for b in ["low", "mid", "high"])
+            if n_bins >= 2:
+                good += 1
+        if len(groups) >= 2 and good == len(groups):
+            return "PASS", good, len(groups)
+        if good >= 1:
+            return "WARN", good, len(groups)
+        return "FAIL", good, len(groups)
+
+    a4_cov: dict[str, dict[str, int]] = {}
+    for r in scenario_rows.get("A4", []):
+        mat = str(r.get("material_class", "NA"))
+        inc = _num(inc_by_link.get(str(r.get("link_id", "")), np.nan))
+        b = _inc_bin(inc)
+        if mat not in a4_cov:
+            a4_cov[mat] = _new_bin_counter()
+        a4_cov[mat][b] = int(a4_cov[mat].get(b, 0) + 1)
+    d2_mat_status, d2_mat_good, d2_mat_total = _coverage_status(a4_cov)
+
+    a5_cov: dict[str, dict[str, int]] = {"base": _new_bin_counter(), "stress": _new_bin_counter()}
+    for r in a5_base:
+        inc = _num(inc_by_link.get(str(r.get("link_id", "")), np.nan))
+        a5_cov["base"][_inc_bin(inc)] = int(a5_cov["base"][_inc_bin(inc)] + 1)
+    for r in a5_stress:
+        inc = _num(inc_by_link.get(str(r.get("link_id", "")), np.nan))
+        a5_cov["stress"][_inc_bin(inc)] = int(a5_cov["stress"][_inc_bin(inc)] + 1)
+    d2_stress_status, d2_stress_good, d2_stress_total = _coverage_status(a5_cov)
+
+    d2_rows = [r for r in link_rows if str(r.get("scenario_id", "")) in {"A3", "A4", "A5", "B1", "B2", "B3"}]
+    if len(d2_rows) >= 4:
+        xmat, xnames, xnum = _build_design_matrix(d2_rows, inc_by_link)
+        d2_rank = int(np.linalg.matrix_rank(xmat))
+        d2_cols = int(xmat.shape[1])
+        d2_cond = float(np.linalg.cond(xmat)) if xmat.size else float("nan")
+        vif = _vif_numeric(xnum, xmat, xnames)
+        vif_thr = float(dict(cfg.get("stats", {})).get("vif_threshold", 5.0))
+        vif_warn = {k: float(v) for k, v in vif.items() if np.isfinite(v) and v > vif_thr}
+        if d2_rank == d2_cols and np.isfinite(d2_cond) and d2_cond < 1.0e8 and len(vif_warn) == 0:
+            d2_design_status = "PASS"
+        elif d2_rank >= max(1, d2_cols - 1) and (not np.isfinite(d2_cond) or d2_cond < 1.0e12):
+            d2_design_status = "WARN"
+        else:
+            d2_design_status = "FAIL"
+    else:
+        d2_rank = 0
+        d2_cols = 0
+        d2_cond = float("nan")
+        vif = {}
+        vif_thr = float(dict(cfg.get("stats", {})).get("vif_threshold", 5.0))
+        vif_warn = {}
+        d2_design_status = "INCONCLUSIVE"
+
+    if "FAIL" in {d2_mat_status, d2_stress_status, d2_design_status}:
+        d2_status = "FAIL"
+    elif d2_mat_status == "PASS" and d2_stress_status == "PASS" and d2_design_status == "PASS":
+        d2_status = "PASS"
+    else:
+        d2_status = "WARN"
+
+    # D3: room/grid sampling strata coverage (LOS/NLOS × EL tertiles)
+    b_rows = [r for r in link_rows if str(r.get("scenario_id", "")) in {"B1", "B2", "B3"}]
+    b_el = np.asarray([_num(r.get("EL_proxy_db", np.nan)) for r in b_rows], dtype=float)
+    b_el = b_el[np.isfinite(b_el)]
+    strata_counts: dict[str, int] = {f"LOS{lf}_q{q}": 0 for lf in [0, 1] for q in [1, 2, 3]}
+    strata_counts["LOS0_qNA"] = 0
+    strata_counts["LOS1_qNA"] = 0
+    if len(b_el) >= 3:
+        q1, q2 = np.percentile(b_el, [33.3, 66.7])
+    else:
+        q1, q2 = (float("nan"), float("nan"))
+    for r in b_rows:
+        lf = int(round(_num(r.get("LOSflag", np.nan)))) if np.isfinite(_num(r.get("LOSflag", np.nan))) else -1
+        if lf not in {0, 1}:
+            continue
+        el = _num(r.get("EL_proxy_db", np.nan))
+        if not np.isfinite(el) or not np.isfinite(q1) or not np.isfinite(q2):
+            key = f"LOS{lf}_qNA"
+        elif el <= q1:
+            key = f"LOS{lf}_q1"
+        elif el <= q2:
+            key = f"LOS{lf}_q2"
+        else:
+            key = f"LOS{lf}_q3"
+        strata_counts[key] = int(strata_counts.get(key, 0) + 1)
+    base_6 = [f"LOS{lf}_q{q}" for lf in [0, 1] for q in [1, 2, 3]]
+    viable_bins = [k for k in base_6 if int(strata_counts.get(k, 0)) > 0]
+    min_strata_all = int(min(int(strata_counts.get(k, 0)) for k in base_6)) if base_6 else 0
+    min_strata_viable = int(min(int(strata_counts.get(k, 0)) for k in viable_bins)) if viable_bins else 0
+    qna_total = int(strata_counts.get("LOS0_qNA", 0) + strata_counts.get("LOS1_qNA", 0))
+    if len(viable_bins) == 0:
+        d3_status = "FAIL"
+    elif min_strata_viable >= 3 and qna_total == 0:
+        d3_status = "PASS"
+    elif min_strata_viable >= 2:
+        d3_status = "WARN"
+    else:
+        d3_status = "FAIL"
+
+    # Keep legacy correlation field for backward compatibility
+    los = np.asarray([_num(r.get("LOSflag", np.nan)) for r in rows_el_global], dtype=float)
+    d_m = np.asarray([_num(r.get("d_m", np.nan)) for r in rows_el_global], dtype=float)
     m = np.isfinite(los) & np.isfinite(d_m)
     corr_d_los = float(np.corrcoef(los[m], d_m[m])[0, 1]) if int(np.sum(m)) > 3 else float("nan")
 
-    # strata LOS/NLOS x EL tertile
-    strata_counts: dict[str, int] = {}
-    if len(x_el) >= 3:
-        q1, q2 = np.percentile(x_el, [33.3, 66.7])
+    if "FAIL" in {d1_status, d2_status, d3_status}:
+        d_status = "FAIL"
+    elif d1_status == "PASS" and d2_status == "PASS" and d3_status == "PASS":
+        d_status = "PASS"
     else:
-        q1, q2 = (float("nan"), float("nan"))
-    for r in link_rows:
-        el = _num(r.get("EL_proxy_db", np.nan))
-        lf = int(round(_num(r.get("LOSflag", np.nan)))) if np.isfinite(_num(r.get("LOSflag", np.nan))) else -1
-        if not np.isfinite(el) or lf not in {0, 1} or not np.isfinite(q1) or not np.isfinite(q2):
-            continue
-        if el <= q1:
-            eb = "q1"
-        elif el <= q2:
-            eb = "q2"
-        else:
-            eb = "q3"
-        key = f"LOS{lf}_{eb}"
-        strata_counts[key] = int(strata_counts.get(key, 0) + 1)
-    min_strata = min(strata_counts.values()) if strata_counts else 0
+        d_status = "WARN"
 
-    d_status = "PASS" if (np.isfinite(el_iqr) and el_iqr >= 3.0 and min_strata >= 2) else "WARN"
     checks["D_identifiability"] = {
+        # legacy keys
         "EL_iqr_db": float(el_iqr),
         "corr_d_vs_LOS": float(corr_d_los),
         "strata_counts": strata_counts,
-        "min_strata_n": int(min_strata),
+        "min_strata_n": int(min_strata_viable),
         "status": d_status,
+        # D1 detail
+        "D1": {
+            "status": d1_status,
+            "global": {
+                "status": d1_global_status,
+                "subset": sorted(el_ident_sids),
+                "EL_iqr_db": float(el_iqr),
+                "el_bins_low_mid_high": el_bins_global,
+                "min_bin_n": int(min_el_bin),
+                "n_rows": int(len(rows_el_global)),
+            },
+            "A2_isolation": {
+                "status": a2_iso_status,
+                "n_rows": int(len(a2_el)),
+                "EL_std_db": float(a2_el_std),
+                "target": "small EL variation is desired for parity isolation",
+            },
+            "A5_isolation": {
+                "status": a5_iso_status,
+                "n_base": int(len(a5_base_el)),
+                "n_stress": int(len(a5_stress_el)),
+                "delta_median_EL_stress_minus_base_db": float(d_el_a5),
+                "target": "small EL change is desired for stress isolation",
+            },
+        },
+        # D2 detail
+        "D2": {
+            "status": d2_status,
+            "material_x_angle_status": d2_mat_status,
+            "material_x_angle_groups_good": int(d2_mat_good),
+            "material_x_angle_groups_total": int(d2_mat_total),
+            "material_x_angle_coverage": a4_cov,
+            "stress_x_angle_status": d2_stress_status,
+            "stress_x_angle_groups_good": int(d2_stress_good),
+            "stress_x_angle_groups_total": int(d2_stress_total),
+            "stress_x_angle_coverage": a5_cov,
+            "design_status": d2_design_status,
+            "design_rank": int(d2_rank),
+            "design_cols": int(d2_cols),
+            "condition_number": float(d2_cond),
+            "vif_threshold": float(vif_thr),
+            "vif": vif,
+            "vif_warnings": vif_warn,
+        },
+        # D3 detail
+        "D3": {
+            "status": d3_status,
+            "n_rows": int(len(b_rows)),
+            "q1_db": float(q1) if np.isfinite(q1) else float("nan"),
+            "q2_db": float(q2) if np.isfinite(q2) else float("nan"),
+            "all_6_bins": base_6,
+            "viable_bins": viable_bins,
+            "min_strata_all_n": int(min_strata_all),
+            "min_strata_viable_n": int(min_strata_viable),
+            "qna_total": int(qna_total),
+            "strata_counts": strata_counts,
+        },
     }
 
     # E power-based only
@@ -997,33 +1629,76 @@ def _build_markdown(
             lines.append("")
             lines.append(report_md.md_table(srows, ["Te_ns", "S_xpd_early", "S_rho_early_db", "S_l_pol"]))
             lines.append("")
+    sstab = b.get("A2A3_sign_stability", {})
+    if isinstance(sstab, dict):
+        overall = str(sstab.get("overall_status", "WARN"))
+        lines.append(f"- A2/A3 odd-even sign stability over Te sweep: **{overall}**")
+        lines.append("")
+        rows_sign: list[dict[str, Any]] = []
+        for sid in ["A2", "A3"]:
+            d = sstab.get(sid, {})
+            if not isinstance(d, dict):
+                continue
+            rows_sign.append(
+                {
+                    "scenario": sid,
+                    "expected_sign": d.get("expected_sign", ""),
+                    "min_hit_rate": d.get("min_hit_rate", np.nan),
+                    "median_hit_rate": d.get("median_hit_rate", np.nan),
+                    "status": d.get("status", ""),
+                }
+            )
+        if rows_sign:
+            lines.append(report_md.md_table(rows_sign, ["scenario", "expected_sign", "min_hit_rate", "median_hit_rate", "status"]))
+            lines.append("")
 
     # C
     c = checks.get("C_effect_vs_floor", {})
     lines.append("### C) Effect Size vs Floor Uncertainty")
+    lines.append("")
+    lines.append("- C2-M primary: `XPD_early_excess`; secondary: `XPD_late_excess`, `L_pol`")
+    lines.append("- C2-S primary: `L_pol`; secondary: `rho_early`, `DS`, `XPD_late_excess`; gate: `ΔP_target,total > -6 dB`")
     lines.append("")
     lines.append(
         report_md.md_table(
             [
                 {
                     "floor_delta_db": c.get("floor_delta_db", np.nan),
+                    "repeat_delta_db": c.get("repeat_delta_db", np.nan),
+                    "delta_ref_db": c.get("delta_ref_db", np.nan),
                     "A3_minus_A2_delta_median_db": c.get("A3_minus_A2_delta_median_db", np.nan),
                     "ratio_to_floor": c.get("ratio_to_floor", np.nan),
                     "C1_status": c.get("C1_status", ""),
-                    "A4_material_shift_late_excess_db": c.get("A4_material_shift_late_excess_db", np.nan),
-                    "A5_stress_delta_late_excess_db": c.get("A5_stress_delta_late_excess_db", np.nan),
-                    "A5_stress_var_ratio": c.get("A5_stress_var_ratio", np.nan),
+                    "C2M_primary_span_db": c.get("C2M_primary_span_db", np.nan),
+                    "C2M_primary_status": c.get("C2M_primary_status", ""),
+                    "C2M_secondary_late_span_db": c.get("C2M_secondary_late_span_db", np.nan),
+                    "C2M_secondary_late_status": c.get("C2M_secondary_late_status", ""),
+                    "C2M_status": c.get("C2M_status", ""),
+                    "C2S_delta_lpol_db": c.get("C2S_delta_lpol_db", np.nan),
+                    "C2S_primary_status": c.get("C2S_primary_status", ""),
+                    "C2S_gate_delta_p_target_db": c.get("C2S_gate_delta_p_target_db", np.nan),
+                    "C2S_gate_status": c.get("C2S_gate_status", ""),
+                    "C2S_status": c.get("C2S_status", ""),
                     "C2_status": c.get("C2_status", ""),
                 }
             ],
             [
                 "floor_delta_db",
+                "repeat_delta_db",
+                "delta_ref_db",
                 "A3_minus_A2_delta_median_db",
                 "ratio_to_floor",
                 "C1_status",
-                "A4_material_shift_late_excess_db",
-                "A5_stress_delta_late_excess_db",
-                "A5_stress_var_ratio",
+                "C2M_primary_span_db",
+                "C2M_primary_status",
+                "C2M_secondary_late_span_db",
+                "C2M_secondary_late_status",
+                "C2M_status",
+                "C2S_delta_lpol_db",
+                "C2S_primary_status",
+                "C2S_gate_delta_p_target_db",
+                "C2S_gate_status",
+                "C2S_status",
                 "C2_status",
             ],
         )
@@ -1038,19 +1713,132 @@ def _build_markdown(
         report_md.md_table(
             [
                 {
+                    "status": d.get("status", ""),
                     "EL_iqr_db": d.get("EL_iqr_db", np.nan),
                     "corr_d_vs_LOS": d.get("corr_d_vs_LOS", np.nan),
                     "min_strata_n": d.get("min_strata_n", 0),
-                    "status": d.get("status", ""),
                 }
             ],
-            ["EL_iqr_db", "corr_d_vs_LOS", "min_strata_n", "status"],
+            ["status", "EL_iqr_db", "corr_d_vs_LOS", "min_strata_n"],
         )
     )
     lines.append("")
+
+    d1 = d.get("D1", {})
+    if isinstance(d1, dict):
+        g = d1.get("global", {})
+        a2i = d1.get("A2_isolation", {})
+        a5i = d1.get("A5_isolation", {})
+        lines.append("- D1 split: EL-identifying coverage(global) + parity/stress isolation(local)")
+        lines.append("")
+        lines.append(
+            report_md.md_table(
+                [
+                    {
+                        "component": "D1_global",
+                        "status": g.get("status", ""),
+                        "EL_iqr_db": g.get("EL_iqr_db", np.nan),
+                        "min_bin_n": g.get("min_bin_n", 0),
+                        "n_rows": g.get("n_rows", 0),
+                    },
+                    {
+                        "component": "A2_isolation",
+                        "status": a2i.get("status", ""),
+                        "EL_std_db": a2i.get("EL_std_db", np.nan),
+                        "n_rows": a2i.get("n_rows", 0),
+                        "target": a2i.get("target", ""),
+                    },
+                    {
+                        "component": "A5_isolation",
+                        "status": a5i.get("status", ""),
+                        "delta_median_EL_stress_minus_base_db": a5i.get("delta_median_EL_stress_minus_base_db", np.nan),
+                        "n_base": a5i.get("n_base", 0),
+                        "n_stress": a5i.get("n_stress", 0),
+                    },
+                ],
+                ["component", "status", "EL_iqr_db", "min_bin_n", "n_rows", "EL_std_db", "delta_median_EL_stress_minus_base_db", "n_base", "n_stress", "target"],
+            )
+        )
+        lines.append("")
+
+    d2 = d.get("D2", {})
+    if isinstance(d2, dict):
+        lines.append("- D2 split: material×angle coverage + stress×angle coverage + collinearity diagnostics")
+        lines.append("")
+        lines.append(
+            report_md.md_table(
+                [
+                    {
+                        "status": d2.get("status", ""),
+                        "material_x_angle_status": d2.get("material_x_angle_status", ""),
+                        "stress_x_angle_status": d2.get("stress_x_angle_status", ""),
+                        "design_status": d2.get("design_status", ""),
+                        "design_rank": d2.get("design_rank", 0),
+                        "design_cols": d2.get("design_cols", 0),
+                        "condition_number": d2.get("condition_number", np.nan),
+                    }
+                ],
+                ["status", "material_x_angle_status", "stress_x_angle_status", "design_status", "design_rank", "design_cols", "condition_number"],
+            )
+        )
+        lines.append("")
+        mat_cov = d2.get("material_x_angle_coverage", {})
+        if isinstance(mat_cov, dict) and mat_cov:
+            mrows = []
+            for mat, cc in sorted(mat_cov.items()):
+                if not isinstance(cc, dict):
+                    continue
+                mrows.append({"group": str(mat), "low": cc.get("low", 0), "mid": cc.get("mid", 0), "high": cc.get("high", 0), "NA": cc.get("NA", 0)})
+            if mrows:
+                lines.append(report_md.md_table(mrows, ["group", "low", "mid", "high", "NA"]))
+                lines.append("")
+        stress_cov = d2.get("stress_x_angle_coverage", {})
+        if isinstance(stress_cov, dict) and stress_cov:
+            srows2 = []
+            for grp in ["base", "stress"]:
+                cc = stress_cov.get(grp, {})
+                if not isinstance(cc, dict):
+                    continue
+                srows2.append({"group": grp, "low": cc.get("low", 0), "mid": cc.get("mid", 0), "high": cc.get("high", 0), "NA": cc.get("NA", 0)})
+            if srows2:
+                lines.append(report_md.md_table(srows2, ["group", "low", "mid", "high", "NA"]))
+                lines.append("")
+        vif_warn = d2.get("vif_warnings", {})
+        if isinstance(vif_warn, dict) and vif_warn:
+            vrows = [{"feature": k, "vif": v} for k, v in sorted(vif_warn.items())]
+            lines.append(report_md.md_table(vrows, ["feature", "vif"]))
+            lines.append("")
+
+    d3 = d.get("D3", {})
+    if isinstance(d3, dict):
+        lines.append("- D3 split: LOS/NLOS×EL-bin strata coverage (viable-subset aware)")
+        lines.append("")
+        lines.append(
+            report_md.md_table(
+                [
+                    {
+                        "status": d3.get("status", ""),
+                        "n_rows": d3.get("n_rows", 0),
+                        "min_strata_all_n": d3.get("min_strata_all_n", 0),
+                        "min_strata_viable_n": d3.get("min_strata_viable_n", 0),
+                        "qna_total": d3.get("qna_total", 0),
+                    }
+                ],
+                ["status", "n_rows", "min_strata_all_n", "min_strata_viable_n", "qna_total"],
+            )
+        )
+        lines.append("")
+        strata3 = d3.get("strata_counts", {})
+        if isinstance(strata3, dict):
+            srows3 = [{"strata": k, "n": v} for k, v in sorted(strata3.items())]
+            lines.append(report_md.md_table(srows3, ["strata", "n"]))
+            lines.append("")
+
     strata = d.get("strata_counts", {})
     if isinstance(strata, dict):
         srows = [{"strata": k, "n": v} for k, v in sorted(strata.items())]
+        lines.append("- Legacy D strata view")
+        lines.append("")
         lines.append(report_md.md_table(srows, ["strata", "n"]))
         lines.append("")
 
