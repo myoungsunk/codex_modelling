@@ -223,6 +223,94 @@ def _cv_compare(rows: list[dict[str, Any]], y_key: str, x_keys: list[str], k: in
     }
 
 
+def _cv_compare_two_stage(
+    rows: list[dict[str, Any]],
+    y_key: str,
+    k: int = 5,
+    seed: int = 0,
+) -> dict[str, float]:
+    # Stage 1: estimate EL coefficient from EL-identifying subset.
+    s1 = [r for r in rows if str(r.get("scenario_id", "")) in {"A3", "A4", "B1", "B2", "B3"}]
+    y1 = np.asarray([_num(r.get(y_key, np.nan)) for r in s1], dtype=float)
+    el1 = np.asarray([_num(r.get("EL_proxy_db", np.nan)) for r in s1], dtype=float)
+    m1 = np.isfinite(y1) & np.isfinite(el1)
+    y1 = y1[m1]
+    el1 = el1[m1]
+    if len(y1) < 8:
+        return {
+            "n_stage1": int(len(y1)),
+            "n_stage2": 0,
+            "b1_el": np.nan,
+            "rmse_const": np.nan,
+            "rmse_lin": np.nan,
+            "nll_const": np.nan,
+            "nll_lin": np.nan,
+        }
+    xa1 = np.column_stack([np.ones(len(el1), dtype=float), el1])
+    b1, *_ = np.linalg.lstsq(xa1, y1, rcond=None)
+    b1_el = float(b1[1])
+
+    # Stage 2: regress adjusted y on mechanism variables.
+    y2 = []
+    x2 = []
+    for r in rows:
+        yy = _num(r.get(y_key, np.nan))
+        el = _num(r.get("EL_proxy_db", np.nan))
+        los = _num(r.get("LOSflag", np.nan))
+        obs = _num(r.get("obstacle_flag", np.nan))
+        if not (np.isfinite(yy) and np.isfinite(el) and np.isfinite(los) and np.isfinite(obs)):
+            continue
+        odd = 1.0 if str(r.get("dominant_parity_early", "")).lower() == "odd" else 0.0
+        stress = 1.0 if (int(_num(r.get("roughness_flag", 0))) == 1 or int(_num(r.get("human_flag", 0))) == 1) else 0.0
+        y2.append(float(yy - b1_el * el))
+        x2.append([odd, stress, float(los), float(obs)])
+    y = np.asarray(y2, dtype=float)
+    x = np.asarray(x2, dtype=float)
+    if len(y) < max(8, x.shape[1] + 2):
+        return {
+            "n_stage1": int(len(y1)),
+            "n_stage2": int(len(y)),
+            "b1_el": float(b1_el),
+            "rmse_const": np.nan,
+            "rmse_lin": np.nan,
+            "nll_const": np.nan,
+            "nll_lin": np.nan,
+        }
+
+    folds = _kfold_indices(len(y), k=k, seed=seed)
+    errs_const = []
+    errs_lin = []
+    nll_const = []
+    nll_lin = []
+    for test_idx in folds:
+        tr = np.ones(len(y), dtype=bool)
+        tr[test_idx] = False
+        y_tr = y[tr]
+        y_te = y[test_idx]
+        x_tr = x[tr]
+        x_te = x[test_idx]
+        mu0 = float(np.mean(y_tr))
+        yhat0 = np.full_like(y_te, mu0)
+        errs_const.append(_rmse(y_te, yhat0))
+        nll_const.append(_gauss_nll(y_te, yhat0))
+        xa_tr = np.column_stack([np.ones(len(x_tr), dtype=float), x_tr])
+        xa_te = np.column_stack([np.ones(len(x_te), dtype=float), x_te])
+        beta, *_ = np.linalg.lstsq(xa_tr, y_tr, rcond=None)
+        yhat1 = xa_te @ beta
+        errs_lin.append(_rmse(y_te, yhat1))
+        nll_lin.append(_gauss_nll(y_te, yhat1))
+
+    return {
+        "n_stage1": int(len(y1)),
+        "n_stage2": int(len(y)),
+        "b1_el": float(b1_el),
+        "rmse_const": float(np.nanmean(np.asarray(errs_const, dtype=float))),
+        "rmse_lin": float(np.nanmean(np.asarray(errs_lin, dtype=float))),
+        "nll_const": float(np.nanmean(np.asarray(nll_const, dtype=float))),
+        "nll_lin": float(np.nanmean(np.asarray(nll_lin, dtype=float))),
+    }
+
+
 def _subsample_sign_stability(rows: list[dict[str, Any]], y_key: str, x_key: str, n_rep: int = 200, seed: int = 0) -> dict[str, float]:
     y = np.asarray([_num(r.get(y_key, np.nan)) for r in rows], dtype=float)
     x = np.asarray([_num(r.get(x_key, np.nan)) for r in rows], dtype=float)
@@ -558,28 +646,37 @@ def main() -> None:
     }
 
     # P1/P2
-    p1_cmp = _cv_compare(
+    p1_one_shot = _cv_compare(
         all_non_c0,
         y_key="XPD_early_excess_db",
         x_keys=["EL_proxy_db", "LOSflag", "roughness_flag", "human_flag", "obstacle_flag"],
         k=5,
         seed=42,
     )
+    p1_two_stage = _cv_compare_two_stage(
+        all_non_c0,
+        y_key="XPD_early_excess_db",
+        k=5,
+        seed=42,
+    )
     p1_ok = bool(
-        np.isfinite(p1_cmp.get("rmse_const", np.nan))
-        and np.isfinite(p1_cmp.get("rmse_lin", np.nan))
-        and float(p1_cmp.get("rmse_lin", np.nan)) < float(p1_cmp.get("rmse_const", np.nan))
+        np.isfinite(p1_two_stage.get("rmse_const", np.nan))
+        and np.isfinite(p1_two_stage.get("rmse_lin", np.nan))
+        and float(p1_two_stage.get("rmse_lin", np.nan)) < float(p1_two_stage.get("rmse_const", np.nan))
     )
     props["P1"] = {
-        "definition": "Conditional model improvement vs constant baseline",
-        "cv": p1_cmp,
-        "status": _status_support(p1_ok, cond_partial=bool(np.isfinite(p1_cmp.get("rmse_lin", np.nan)))),
+        "definition": "Two-stage model (EL first, then mechanism effects) vs constant baseline",
+        "cv_two_stage": p1_two_stage,
+        "cv_one_shot_reference": p1_one_shot,
+        "status": _status_support(p1_ok, cond_partial=bool(np.isfinite(p1_two_stage.get("rmse_lin", np.nan)))),
     }
 
-    p2_sign = _subsample_sign_stability(all_non_c0, y_key="XPD_early_excess_db", x_key="EL_proxy_db", n_rep=200, seed=123)
+    p2_subset = [r for r in all_non_c0 if str(r.get("scenario_id", "")) in {"A3", "A4", "B1", "B2", "B3"}]
+    p2_sign = _subsample_sign_stability(p2_subset, y_key="XPD_early_excess_db", x_key="EL_proxy_db", n_rep=200, seed=123)
     p2_ok = bool(np.isfinite(p2_sign.get("sign_keep_rate", np.nan)) and float(p2_sign.get("sign_keep_rate", 0.0)) >= 0.8)
     props["P2"] = {
-        "definition": "Sign stability of EL coefficient under subsampling",
+        "definition": "Stage-1 EL coefficient sign stability under subsampling",
+        "subset": ["A3", "A4", "B1", "B2", "B3"],
         "stability": p2_sign,
         "status": _status_support(p2_ok, cond_partial=bool(np.isfinite(p2_sign.get("sign_keep_rate", np.nan)))),
     }

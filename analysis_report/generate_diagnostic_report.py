@@ -91,6 +91,14 @@ def _judge_vs_delta(effect_db: float, delta_db: float) -> tuple[str, float]:
     return "FAIL", float(ratio)
 
 
+def _max_finite(values: list[float], default: float = float("nan")) -> float:
+    arr = np.asarray(values, dtype=float)
+    arr = arr[np.isfinite(arr)]
+    if len(arr) == 0:
+        return float(default)
+    return float(np.max(arr))
+
+
 def _provenance(row: dict[str, Any]) -> dict[str, Any]:
     p = row.get("provenance_json", {})
     if isinstance(p, dict):
@@ -245,6 +253,104 @@ def _vif_numeric(num_data: dict[str, np.ndarray], x_full: np.ndarray, names: lis
         r2 = max(0.0, min(1.0, 1.0 - ssr / sst))
         out[k] = float(1.0 / max(1e-6, 1.0 - r2))
     return out
+
+
+def _build_design_matrix_custom(
+    rows: list[dict[str, Any]],
+    *,
+    num_keys: list[str],
+    cat_keys: list[str],
+    inc_by_link: dict[str, float],
+) -> tuple[np.ndarray, list[str], dict[str, np.ndarray]]:
+    cols: list[np.ndarray] = []
+    names: list[str] = []
+    n = len(rows)
+
+    for k in num_keys:
+        col = np.asarray([_num(r.get(k, np.nan)) for r in rows], dtype=float)
+        med = float(np.nanmedian(col)) if np.any(np.isfinite(col)) else 0.0
+        col = np.where(np.isfinite(col), col, med)
+        cols.append(col)
+        names.append(k)
+
+    for k in cat_keys:
+        vals: list[str] = []
+        for r in rows:
+            if k == "incidence_bin":
+                inc = _num(inc_by_link.get(str(r.get("link_id", "")), np.nan))
+                vals.append(_inc_bin(inc))
+            elif k == "stress_flag":
+                s = int(_num(r.get("roughness_flag", 0))) == 1 or int(_num(r.get("human_flag", 0))) == 1
+                vals.append("1" if s else "0")
+            elif k == "odd_flag":
+                p = str(r.get("dominant_parity_early", "")).lower()
+                vals.append("1" if p == "odd" else "0")
+            else:
+                vals.append(str(r.get(k, "NA")))
+        lv = sorted(set(vals))
+        if len(lv) <= 1:
+            continue
+        for c in lv[1:]:
+            col = np.asarray([1.0 if v == c else 0.0 for v in vals], dtype=float)
+            cols.append(col)
+            names.append(f"{k}={c}")
+
+    if cols:
+        x = np.column_stack([np.ones(n, dtype=float)] + cols)
+        names = ["const"] + names
+    else:
+        x = np.ones((n, 1), dtype=float)
+        names = ["const"]
+    num_data = {k: np.asarray([_num(r.get(k, np.nan)) for r in rows], dtype=float) for k in num_keys}
+    return x, names, num_data
+
+
+def _design_diag(
+    rows: list[dict[str, Any]],
+    *,
+    num_keys: list[str],
+    cat_keys: list[str],
+    inc_by_link: dict[str, float],
+    vif_threshold: float,
+) -> dict[str, Any]:
+    if len(rows) < 4:
+        return {
+            "status": "INCONCLUSIVE",
+            "n_rows": int(len(rows)),
+            "design_rank": 0,
+            "design_cols": 0,
+            "condition_number": float("nan"),
+            "vif_threshold": float(vif_threshold),
+            "vif": {},
+            "vif_warnings": {},
+        }
+    x, names, num_data = _build_design_matrix_custom(
+        rows,
+        num_keys=list(num_keys),
+        cat_keys=list(cat_keys),
+        inc_by_link=inc_by_link,
+    )
+    rank = int(np.linalg.matrix_rank(x))
+    cols = int(x.shape[1])
+    cond = float(np.linalg.cond(x)) if x.size else float("nan")
+    vif = _vif_numeric(num_data, x, names)
+    vif_warn = {k: float(v) for k, v in vif.items() if np.isfinite(v) and v > float(vif_threshold)}
+    if rank == cols and np.isfinite(cond) and cond < 1.0e8 and len(vif_warn) == 0:
+        st = "PASS"
+    elif rank >= max(1, cols - 1) and (not np.isfinite(cond) or cond < 1.0e12):
+        st = "WARN"
+    else:
+        st = "FAIL"
+    return {
+        "status": st,
+        "n_rows": int(len(rows)),
+        "design_rank": rank,
+        "design_cols": cols,
+        "condition_number": cond,
+        "vif_threshold": float(vif_threshold),
+        "vif": vif,
+        "vif_warnings": vif_warn,
+    }
 
 
 def _scenario_case_rows(link_rows: list[dict[str, Any]]) -> dict[tuple[str, str], list[dict[str, Any]]]:
@@ -760,6 +866,9 @@ def _diagnostic_checks(
 ) -> dict[str, Any]:
     checks: dict[str, Any] = {}
     scenario_rows = metrics_lib.split_by_scenario(link_rows)
+    scenario_roles = dict(cfg.get("scenario_roles", {}))
+    a3_role = str(scenario_roles.get("A3", "mechanism")).strip().lower()
+    a5_role = str(scenario_roles.get("A5", "stress_response")).strip().lower()
 
     # A1 LOS blocked
     a1 = []
@@ -863,6 +972,35 @@ def _diagnostic_checks(
         floor_db=float(floor_ref.get("xpd_floor_db", np.nan)),
     )
 
+    a3_t = target_stats.get("A3", {})
+    a3_exists = _num(a3_t.get("target_exists_rate", np.nan))
+    a3_ct = _num(a3_t.get("C_target_median_db", np.nan))
+    a3_wearly = _num(a3_t.get("target_in_Wearly_rate", np.nan))
+    if np.isfinite(a3_exists) and a3_exists >= 0.9 and np.isfinite(a3_ct) and a3_ct < -10.0:
+        a3_mech_status = "PASS"
+    elif np.isfinite(a3_exists) and a3_exists >= 0.7 and np.isfinite(a3_ct) and a3_ct < -6.0:
+        a3_mech_status = "WARN"
+    else:
+        a3_mech_status = "FAIL"
+    if np.isfinite(a3_wearly) and a3_wearly >= 0.8:
+        a3_early_status = "PASS"
+    elif np.isfinite(a3_wearly) and a3_wearly >= 0.5:
+        a3_early_status = "WARN"
+    else:
+        a3_early_status = "FAIL"
+
+    a5_t = target_stats.get("A5", {})
+    a5_ct = _num(a5_t.get("C_target_median_db", np.nan))
+    if np.isfinite(a5_ct):
+        if a5_ct < -10.0:
+            a5_target_mode = "isolation"
+        elif a5_ct < -3.0:
+            a5_target_mode = "mixed"
+        else:
+            a5_target_mode = "contamination_response"
+    else:
+        a5_target_mode = "unknown"
+
     checks["B_time_resolution"] = {
         "freq_source": str(freq_src),
         "BW_Hz": float(bw),
@@ -891,6 +1029,11 @@ def _diagnostic_checks(
         "W_target_detail": target_stats,
         "W3_te_sweep": wearly_stats,
         "A2A3_sign_stability": sign_stability,
+        "A3_role": a3_role,
+        "A3_mechanism_status": a3_mech_status,
+        "A3_system_early_status": a3_early_status,
+        "A5_role": a5_role,
+        "A5_target_mode": a5_target_mode,
     }
 
     # C effect vs floor (C2-M / C2-S endpoints)
@@ -1127,20 +1270,38 @@ def _diagnostic_checks(
     a5_base_el = a5_base_el[np.isfinite(a5_base_el)]
     a5_stress_el = a5_stress_el[np.isfinite(a5_stress_el)]
     d_el_a5 = float(np.median(a5_stress_el) - np.median(a5_base_el)) if (len(a5_base_el) and len(a5_stress_el)) else float("nan")
-    if np.isfinite(d_el_a5):
-        if abs(d_el_a5) <= 1.0:
-            a5_iso_status = "PASS"
-        elif abs(d_el_a5) <= 2.0:
-            a5_iso_status = "WARN"
+    if a5_role in {"stress_isolation", "isolation"}:
+        if np.isfinite(d_el_a5):
+            if abs(d_el_a5) <= 1.0:
+                a5_role_status = "PASS"
+            elif abs(d_el_a5) <= 2.0:
+                a5_role_status = "WARN"
+            else:
+                a5_role_status = "FAIL"
         else:
-            a5_iso_status = "FAIL"
+            a5_role_status = "INCONCLUSIVE"
+        a5_role_target = "small EL change is desired for stress isolation"
     else:
-        a5_iso_status = "INCONCLUSIVE"
+        # stress_response mode: large EL invariance is not mandatory.
+        if np.isfinite(d_lpol):
+            if d_lpol < 0.0:
+                a5_role_status, _ = _judge_vs_delta(float(d_lpol), float(delta_ref))
+            else:
+                a5_role_status = "FAIL"
+        else:
+            a5_role_status = "INCONCLUSIVE"
+        if str(gate_status) == "BLOCKAGE" and a5_role_status == "PASS":
+            a5_role_status = "WARN"
+        a5_role_target = "response mode: L_pol decrease is primary, EL shift can be non-zero"
 
-    if d1_global_status == "FAIL" or a2_iso_status == "FAIL" or a5_iso_status == "FAIL":
+    if d1_global_status == "FAIL" or a2_iso_status == "FAIL":
         d1_status = "FAIL"
-    elif d1_global_status == "PASS" and a2_iso_status == "PASS" and a5_iso_status == "PASS":
-        d1_status = "PASS"
+    elif d1_global_status == "PASS" and a2_iso_status == "PASS":
+        if a5_role in {"stress_isolation", "isolation"}:
+            d1_status = "PASS" if a5_role_status == "PASS" else ("WARN" if a5_role_status in {"WARN", "INCONCLUSIVE"} else "FAIL")
+        else:
+            # response mode mismatch should not collapse global identifiability.
+            d1_status = "PASS" if a5_role_status in {"PASS", "WARN", "INCONCLUSIVE"} else "WARN"
     else:
         d1_status = "WARN"
 
@@ -1183,29 +1344,26 @@ def _diagnostic_checks(
         a5_cov["stress"][_inc_bin(inc)] = int(a5_cov["stress"][_inc_bin(inc)] + 1)
     d2_stress_status, d2_stress_good, d2_stress_total = _coverage_status(a5_cov)
 
-    d2_rows = [r for r in link_rows if str(r.get("scenario_id", "")) in {"A3", "A4", "A5", "B1", "B2", "B3"}]
-    if len(d2_rows) >= 4:
-        xmat, xnames, xnum = _build_design_matrix(d2_rows, inc_by_link)
-        d2_rank = int(np.linalg.matrix_rank(xmat))
-        d2_cols = int(xmat.shape[1])
-        d2_cond = float(np.linalg.cond(xmat)) if xmat.size else float("nan")
-        vif = _vif_numeric(xnum, xmat, xnames)
-        vif_thr = float(dict(cfg.get("stats", {})).get("vif_threshold", 5.0))
-        vif_warn = {k: float(v) for k, v in vif.items() if np.isfinite(v) and v > vif_thr}
-        if d2_rank == d2_cols and np.isfinite(d2_cond) and d2_cond < 1.0e8 and len(vif_warn) == 0:
-            d2_design_status = "PASS"
-        elif d2_rank >= max(1, d2_cols - 1) and (not np.isfinite(d2_cond) or d2_cond < 1.0e12):
-            d2_design_status = "WARN"
-        else:
-            d2_design_status = "FAIL"
-    else:
-        d2_rank = 0
-        d2_cols = 0
-        d2_cond = float("nan")
-        vif = {}
-        vif_thr = float(dict(cfg.get("stats", {})).get("vif_threshold", 5.0))
-        vif_warn = {}
-        d2_design_status = "INCONCLUSIVE"
+    vif_thr = float(dict(cfg.get("stats", {})).get("vif_threshold", 5.0))
+    d2_stage1_rows = [r for r in link_rows if str(r.get("scenario_id", "")) in {"A3", "A4", "B1", "B2", "B3"}]
+    d2_stage2_rows = [r for r in link_rows if str(r.get("scenario_id", "")) in {"A2", "A3", "A4", "A5", "B1", "B2", "B3"}]
+    d2_stage1 = _design_diag(
+        d2_stage1_rows,
+        num_keys=["EL_proxy_db", "d_m"],
+        cat_keys=["LOSflag", "obstacle_flag", "material_class"],
+        inc_by_link=inc_by_link,
+        vif_threshold=vif_thr,
+    )
+    d2_stage2 = _design_diag(
+        d2_stage2_rows,
+        num_keys=[],
+        cat_keys=["odd_flag", "stress_flag", "LOSflag", "obstacle_flag"],
+        inc_by_link=inc_by_link,
+        vif_threshold=vif_thr,
+    )
+    d2_design_status = "PASS" if (d2_stage1.get("status") == "PASS" and d2_stage2.get("status") == "PASS") else (
+        "FAIL" if ("FAIL" in {d2_stage1.get("status"), d2_stage2.get("status")}) else "WARN"
+    )
 
     if "FAIL" in {d2_mat_status, d2_stress_status, d2_design_status}:
         d2_status = "FAIL"
@@ -1291,11 +1449,12 @@ def _diagnostic_checks(
                 "target": "small EL variation is desired for parity isolation",
             },
             "A5_isolation": {
-                "status": a5_iso_status,
+                "status": a5_role_status,
+                "role": a5_role,
                 "n_base": int(len(a5_base_el)),
                 "n_stress": int(len(a5_stress_el)),
                 "delta_median_EL_stress_minus_base_db": float(d_el_a5),
-                "target": "small EL change is desired for stress isolation",
+                "target": a5_role_target,
             },
         },
         # D2 detail
@@ -1310,12 +1469,20 @@ def _diagnostic_checks(
             "stress_x_angle_groups_total": int(d2_stress_total),
             "stress_x_angle_coverage": a5_cov,
             "design_status": d2_design_status,
-            "design_rank": int(d2_rank),
-            "design_cols": int(d2_cols),
-            "condition_number": float(d2_cond),
+            "stage1": d2_stage1,
+            "stage2": d2_stage2,
+            "design_rank": int(round(_max_finite([_num(d2_stage1.get("design_rank", np.nan)), _num(d2_stage2.get("design_rank", np.nan))], default=0.0))),
+            "design_cols": int(round(_max_finite([_num(d2_stage1.get("design_cols", np.nan)), _num(d2_stage2.get("design_cols", np.nan))], default=0.0))),
+            "condition_number": float(_max_finite([_num(d2_stage1.get("condition_number", np.nan)), _num(d2_stage2.get("condition_number", np.nan))], default=float("nan"))),
             "vif_threshold": float(vif_thr),
-            "vif": vif,
-            "vif_warnings": vif_warn,
+            "vif": {
+                "stage1": d2_stage1.get("vif", {}),
+                "stage2": d2_stage2.get("vif", {}),
+            },
+            "vif_warnings": {
+                "stage1": d2_stage1.get("vif_warnings", {}),
+                "stage2": d2_stage2.get("vif_warnings", {}),
+            },
         },
         # D3 detail
         "D3": {
@@ -1532,6 +1699,9 @@ def _build_markdown(
                     "A3_target_in_Wearly_rate": b.get("A3_target_in_Wearly_rate", np.nan),
                     "A2_C_target_median_db": b.get("A2_C_target_median_db", np.nan),
                     "A3_C_target_median_db": b.get("A3_C_target_median_db", np.nan),
+                    "A3_mechanism_status": b.get("A3_mechanism_status", ""),
+                    "A3_system_early_status": b.get("A3_system_early_status", ""),
+                    "A5_target_mode": b.get("A5_target_mode", ""),
                     "min_delay_gap_median_s": b.get("B2_min_delay_gap_median_s", np.nan),
                     "B2_status": b.get("B2_status", ""),
                     "B3_status": b.get("B3_status", ""),
@@ -1552,6 +1722,9 @@ def _build_markdown(
                 "A3_target_in_Wearly_rate",
                 "A2_C_target_median_db",
                 "A3_C_target_median_db",
+                "A3_mechanism_status",
+                "A3_system_early_status",
+                "A5_target_mode",
                 "min_delay_gap_median_s",
                 "B2_status",
                 "B3_status",
@@ -1751,12 +1924,14 @@ def _build_markdown(
                     {
                         "component": "A5_isolation",
                         "status": a5i.get("status", ""),
+                        "role": a5i.get("role", ""),
                         "delta_median_EL_stress_minus_base_db": a5i.get("delta_median_EL_stress_minus_base_db", np.nan),
                         "n_base": a5i.get("n_base", 0),
                         "n_stress": a5i.get("n_stress", 0),
+                        "target": a5i.get("target", ""),
                     },
                 ],
-                ["component", "status", "EL_iqr_db", "min_bin_n", "n_rows", "EL_std_db", "delta_median_EL_stress_minus_base_db", "n_base", "n_stress", "target"],
+                ["component", "status", "role", "EL_iqr_db", "min_bin_n", "n_rows", "EL_std_db", "delta_median_EL_stress_minus_base_db", "n_base", "n_stress", "target"],
             )
         )
         lines.append("")
@@ -1782,6 +1957,33 @@ def _build_markdown(
             )
         )
         lines.append("")
+        st1 = d2.get("stage1", {})
+        st2 = d2.get("stage2", {})
+        if isinstance(st1, dict) or isinstance(st2, dict):
+            lines.append(
+                report_md.md_table(
+                    [
+                        {
+                            "stage": "stage1_EL_identifying",
+                            "status": st1.get("status", ""),
+                            "n_rows": st1.get("n_rows", 0),
+                            "design_rank": st1.get("design_rank", 0),
+                            "design_cols": st1.get("design_cols", 0),
+                            "condition_number": st1.get("condition_number", np.nan),
+                        },
+                        {
+                            "stage": "stage2_effects_after_EL",
+                            "status": st2.get("status", ""),
+                            "n_rows": st2.get("n_rows", 0),
+                            "design_rank": st2.get("design_rank", 0),
+                            "design_cols": st2.get("design_cols", 0),
+                            "condition_number": st2.get("condition_number", np.nan),
+                        },
+                    ],
+                    ["stage", "status", "n_rows", "design_rank", "design_cols", "condition_number"],
+                )
+            )
+            lines.append("")
         mat_cov = d2.get("material_x_angle_coverage", {})
         if isinstance(mat_cov, dict) and mat_cov:
             mrows = []
@@ -1805,9 +2007,23 @@ def _build_markdown(
                 lines.append("")
         vif_warn = d2.get("vif_warnings", {})
         if isinstance(vif_warn, dict) and vif_warn:
-            vrows = [{"feature": k, "vif": v} for k, v in sorted(vif_warn.items())]
-            lines.append(report_md.md_table(vrows, ["feature", "vif"]))
-            lines.append("")
+            if "stage1" in vif_warn or "stage2" in vif_warn:
+                vrows = []
+                s1 = vif_warn.get("stage1", {})
+                s2 = vif_warn.get("stage2", {})
+                if isinstance(s1, dict):
+                    for k, v in sorted(s1.items()):
+                        vrows.append({"stage": "stage1", "feature": k, "vif": v})
+                if isinstance(s2, dict):
+                    for k, v in sorted(s2.items()):
+                        vrows.append({"stage": "stage2", "feature": k, "vif": v})
+                if vrows:
+                    lines.append(report_md.md_table(vrows, ["stage", "feature", "vif"]))
+                    lines.append("")
+            else:
+                vrows = [{"feature": k, "vif": v} for k, v in sorted(vif_warn.items())]
+                lines.append(report_md.md_table(vrows, ["feature", "vif"]))
+                lines.append("")
 
     d3 = d.get("D3", {})
     if isinstance(d3, dict):
