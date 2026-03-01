@@ -514,14 +514,63 @@ def _plane_object_type(plane: Plane, scenario_id: str) -> str:
 
 
 def _serialize_scene_objects(scene: list[Plane], scenario_id: str) -> list[dict[str, Any]]:
+    sid = str(scenario_id).upper()
+    # For corner scenarios, infer the two reflector boundaries and suppress
+    # stress objects that are geometrically behind the reflector walls.
+    x_wall: float | None = None
+    y_wall: float | None = None
+    if sid in {"A3", "A5"}:
+        for pl in scene:
+            if _plane_object_type(pl, scenario_id) != "reflector":
+                continue
+            vv = _plane_vertices_xyz(pl)
+            if vv.ndim != 2 or vv.shape[1] < 2 or len(vv) < 2:
+                continue
+            xs = vv[:, 0]
+            ys = vv[:, 1]
+            if float(np.nanstd(xs)) < 1e-8:
+                x_wall = float(np.nanmedian(xs))
+            if float(np.nanstd(ys)) < 1e-8:
+                y_wall = float(np.nanmedian(ys))
+
     objects: list[dict[str, Any]] = []
     for idx, plane in enumerate(scene):
         verts = _plane_vertices_xyz(plane)
-        poly_xy = [[float(v[0]), float(v[1])] for v in verts]
+        obj_type = _plane_object_type(plane, scenario_id)
+        if obj_type == "absorber":
+            # In top-view plotting, represent vertical LOS blockers as a thin line-like strip
+            # around the in-plane u-axis extent. This avoids exaggerated projected area that
+            # can look like non-physical "refraction" in 2D.
+            p0 = np.asarray(plane.p0, dtype=float)
+            u, _ = plane.local_axes()
+            hu = float(plane.half_extent_u) if plane.half_extent_u is not None else 0.05
+            p_a = p0 + hu * u
+            p_b = p0 - hu * u
+            dxy = np.asarray([p_b[0] - p_a[0], p_b[1] - p_a[1]], dtype=float)
+            nrm = float(np.hypot(dxy[0], dxy[1]))
+            if nrm < 1e-9:
+                dxy = np.asarray([1.0, 0.0], dtype=float)
+                nrm = 1.0
+            perp = np.asarray([-dxy[1], dxy[0]], dtype=float) / nrm
+            t = 0.01
+            poly_xy = [
+                [float(p_a[0] + t * perp[0]), float(p_a[1] + t * perp[1])],
+                [float(p_b[0] + t * perp[0]), float(p_b[1] + t * perp[1])],
+                [float(p_b[0] - t * perp[0]), float(p_b[1] - t * perp[1])],
+                [float(p_a[0] - t * perp[0]), float(p_a[1] - t * perp[1])],
+            ]
+        else:
+            poly_xy = [[float(v[0]), float(v[1])] for v in verts]
+        if obj_type == "furniture" and sid in {"A3", "A5"} and x_wall is not None and y_wall is not None and poly_xy:
+            cx = float(np.mean([p[0] for p in poly_xy]))
+            cy = float(np.mean([p[1] for p in poly_xy]))
+            # Remove furniture/scatterers that sit behind the corner walls.
+            if (cx >= float(x_wall) - 1e-6) or (cy >= float(y_wall) - 1e-6):
+                continue
         objects.append(
             {
                 "name": f"plane_{int(getattr(plane, 'id', idx))}",
-                "type": _plane_object_type(plane, scenario_id),
+                "type": obj_type,
                 "material": _plane_material_name(plane),
                 "poly_xy": poly_xy,
                 "closed": bool(len(poly_xy) >= 3),
@@ -561,6 +610,7 @@ def _extract_rays_topk(path_records: list[dict[str, Any]], k: int) -> list[dict[
                 "n_bounce": int(n_bounce),
                 "P_lin": float(p_lin),
                 "tau_s": float(p.get("tau_s", np.nan)),
+                "surface_ids": list((p.get("meta", {}) or {}).get("surface_ids", [])),
                 "vertices_xyz": [[float(x), float(y), float(z)] for x, y, z in np.asarray(p.get("points", []), dtype=float)],
             }
         )
@@ -682,11 +732,19 @@ def _build_scene_snapshot(
             y_plane=float(params.get("y_plane", 2.0)),
         )
         if los_blocker:
-            scene.append(make_los_blocker_plane(tx.position, rx.position, plane_id=9301))
+            scene.append(
+                make_los_blocker_plane(
+                    tx.position,
+                    rx.position,
+                    plane_id=9301,
+                    half_extent_u=0.12,
+                    half_extent_v=0.30,
+                )
+            )
         return np.asarray(tx.position, dtype=float), np.asarray(rx.position, dtype=float), scene
 
     if s == "A5":
-        rx.position[:] = [float(params.get("rx_x", 3.5)), float(params.get("rx_y", 4.5)), 1.5]
+        rx.position[:] = [float(params.get("rx_x", 2.5)), float(params.get("rx_y", 0.5)), 1.5]
         scene = A5_depol_stress.build_scene(offset=float(params.get("offset", 3.5)))
         mode = str(a5_stress_mode).lower().strip()
         if mode in {"geometry", "hybrid"} and int(a5_scatterer_count) > 0:
@@ -696,9 +754,18 @@ def _build_scene_snapshot(
                     scene,
                     seed=int(params.get("seed", A5_depol_stress.BASE_SEED)),
                     count=int(a5_scatterer_count),
+                    offset=float(params.get("offset", 3.5)),
                 )
         if los_blocker:
-            scene.append(make_los_blocker_plane(tx.position, rx.position, plane_id=9401))
+            scene.append(
+                make_los_blocker_plane(
+                    tx.position,
+                    rx.position,
+                    plane_id=9401,
+                    half_extent_u=0.12,
+                    half_extent_v=0.30,
+                )
+            )
         return np.asarray(tx.position, dtype=float), np.asarray(rx.position, dtype=float), scene
 
     if s in {"B1", "B2", "B3"}:
