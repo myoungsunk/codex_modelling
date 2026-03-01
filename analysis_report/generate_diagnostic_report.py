@@ -555,6 +555,208 @@ def _target_window_stats(
     }
 
 
+def _dominant_target_tau_by_link(
+    ray_rows: list[dict[str, Any]],
+    *,
+    scenario_id: str,
+    target_n: int,
+) -> dict[str, float]:
+    out: dict[str, tuple[float, float]] = {}
+    for r in ray_rows:
+        if str(r.get("scenario_id", "")) != str(scenario_id):
+            continue
+        nb = int(round(_num(r.get("n_bounce", np.nan)))) if np.isfinite(_num(r.get("n_bounce", np.nan))) else -1
+        if nb != int(target_n):
+            continue
+        lid = str(r.get("link_id", ""))
+        if not lid:
+            continue
+        p = _num(r.get("P_lin", np.nan))
+        tau = _num(r.get("tau_s", np.nan))
+        if not (np.isfinite(p) and np.isfinite(tau) and p > 0):
+            continue
+        cur = out.get(lid)
+        if cur is None or p > cur[0]:
+            out[lid] = (float(p), float(tau))
+    return {k: float(v[1]) for k, v in out.items()}
+
+
+def _target_window_sign_metric(
+    *,
+    link_rows: list[dict[str, Any]],
+    ray_rows: list[dict[str, Any]],
+    runs: list[dict[str, Any]],
+    scenario_id: str,
+    target_n: int,
+    w_target_s: float,
+    floor_db: float,
+    expected_sign: int,
+) -> dict[str, Any]:
+    run = None
+    for rr in runs:
+        if str(rr.get("scenario_id", "")) == str(scenario_id):
+            run = rr
+            break
+    rows = [r for r in link_rows if str(r.get("scenario_id", "")) == str(scenario_id)]
+    if run is None or len(rows) == 0:
+        return {"scenario": str(scenario_id), "status": "WARN", "reason": "missing run or rows"}
+
+    tau_by_link = _dominant_target_tau_by_link(ray_rows, scenario_id=scenario_id, target_n=target_n)
+    vals: list[float] = []
+    hits: list[bool] = []
+    for r in rows:
+        lid = str(r.get("link_id", ""))
+        tau_tar = _num(tau_by_link.get(lid, np.nan))
+        if not np.isfinite(tau_tar):
+            continue
+        pdp = io_lib.load_pdp_npz(run, lid)
+        if pdp is None:
+            continue
+        tau = np.asarray(pdp.get("delay_tau_s", []), dtype=float)
+        pco = np.asarray(pdp.get("P_co", []), dtype=float)
+        pcr = np.asarray(pdp.get("P_cross", []), dtype=float)
+        if len(tau) == 0 or len(pco) != len(tau) or len(pcr) != len(tau):
+            continue
+        t0 = float(tau_tar - 0.5 * float(w_target_s))
+        t1 = float(tau_tar + 0.5 * float(w_target_s))
+        m = (tau >= t0) & (tau <= t1)
+        sco = float(np.sum(pco[m]))
+        scr = float(np.sum(pcr[m]))
+        xpd_target = _db_ratio(sco, scr)
+        xpd_target_ex = float(xpd_target - floor_db) if np.isfinite(floor_db) else float("nan")
+        if not np.isfinite(xpd_target_ex):
+            continue
+        vals.append(float(xpd_target_ex))
+        hits.append(bool(xpd_target_ex < 0.0) if int(expected_sign) < 0 else bool(xpd_target_ex > 0.0))
+
+    arr = np.asarray(vals, dtype=float)
+    hit = float(np.mean(hits)) if hits else float("nan")
+    med = float(np.nanmedian(arr)) if len(arr) else float("nan")
+    p10 = float(np.nanpercentile(arr, 10.0)) if len(arr) else float("nan")
+    p90 = float(np.nanpercentile(arr, 90.0)) if len(arr) else float("nan")
+    if np.isfinite(hit) and hit >= 0.8:
+        st = "PASS"
+    elif np.isfinite(hit) and hit >= 0.6:
+        st = "WARN"
+    elif np.isfinite(hit):
+        st = "FAIL"
+    else:
+        st = "INCONCLUSIVE"
+    return {
+        "scenario": str(scenario_id),
+        "target_n": int(target_n),
+        "W_target_s": float(w_target_s),
+        "expected_sign": "negative" if int(expected_sign) < 0 else "positive",
+        "n_links": int(len(rows)),
+        "n_eval": int(len(arr)),
+        "median_xpd_target_ex_db": med,
+        "p10_xpd_target_ex_db": p10,
+        "p90_xpd_target_ex_db": p90,
+        "expected_sign_hit_rate": hit,
+        "status": st,
+    }
+
+
+def _impute_missing_el_proxy(
+    link_rows: list[dict[str, Any]],
+    ray_rows: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    by_link_best: dict[str, tuple[float, float]] = {}
+    for r in ray_rows:
+        lid = str(r.get("link_id", ""))
+        if not lid:
+            continue
+        p = _num(r.get("P_lin", np.nan))
+        el = _num(r.get("EL_db", np.nan))
+        if not (np.isfinite(p) and np.isfinite(el) and p > 0):
+            continue
+        cur = by_link_best.get(lid)
+        if cur is None or p > cur[0]:
+            by_link_best[lid] = (float(p), float(el))
+
+    # scenario-level fallback median for rows with no usable rays
+    scenario_el_vals: dict[str, list[float]] = {}
+    for r in link_rows:
+        sid = str(r.get("scenario_id", ""))
+        el = _num(r.get("EL_proxy_db", np.nan))
+        if np.isfinite(el):
+            scenario_el_vals.setdefault(sid, []).append(float(el))
+    scenario_el_median: dict[str, float] = {}
+    for sid, vals in scenario_el_vals.items():
+        v = np.asarray(vals, dtype=float)
+        v = v[np.isfinite(v)]
+        if len(v):
+            scenario_el_median[sid] = float(np.median(v))
+
+    global_med = float(
+        np.median(
+            np.asarray(
+                [x for x in scenario_el_median.values() if np.isfinite(_num(x))],
+                dtype=float,
+            )
+        )
+    ) if scenario_el_median else float("nan")
+
+    out: list[dict[str, Any]] = []
+    imputed = 0
+    rows_changed: list[dict[str, Any]] = []
+    unresolved = 0
+    for r in link_rows:
+        rr = dict(r)
+        el = _num(rr.get("EL_proxy_db", np.nan))
+        if not np.isfinite(el):
+            lid = str(rr.get("link_id", ""))
+            sid = str(rr.get("scenario_id", ""))
+            if lid in by_link_best:
+                rr["EL_proxy_db"] = float(by_link_best[lid][1])
+                rr["EL_proxy_imputed"] = 1
+                imputed += 1
+                rows_changed.append(
+                    {
+                        "scenario_id": str(rr.get("scenario_id", "")),
+                        "case_id": str(rr.get("case_id", "")),
+                        "link_id": lid,
+                        "EL_proxy_db": float(rr["EL_proxy_db"]),
+                        "method": "dominant_ray_EL_db",
+                    }
+                )
+            elif sid in scenario_el_median:
+                rr["EL_proxy_db"] = float(scenario_el_median[sid])
+                rr["EL_proxy_imputed"] = 1
+                imputed += 1
+                rows_changed.append(
+                    {
+                        "scenario_id": str(rr.get("scenario_id", "")),
+                        "case_id": str(rr.get("case_id", "")),
+                        "link_id": lid,
+                        "EL_proxy_db": float(rr["EL_proxy_db"]),
+                        "method": "scenario_median_EL_proxy_db",
+                    }
+                )
+            elif np.isfinite(global_med):
+                rr["EL_proxy_db"] = float(global_med)
+                rr["EL_proxy_imputed"] = 1
+                imputed += 1
+                rows_changed.append(
+                    {
+                        "scenario_id": str(rr.get("scenario_id", "")),
+                        "case_id": str(rr.get("case_id", "")),
+                        "link_id": lid,
+                        "EL_proxy_db": float(rr["EL_proxy_db"]),
+                        "method": "global_median_EL_proxy_db",
+                    }
+                )
+            else:
+                unresolved += 1
+        out.append(rr)
+    info = {
+        "imputed_count": int(imputed),
+        "unresolved_count": int(unresolved),
+        "rows": rows_changed,
+    }
+    return out, info
+
+
 def _sep_score(a: np.ndarray, b: np.ndarray) -> float:
     xa = np.asarray(a, dtype=float)
     xb = np.asarray(b, dtype=float)
@@ -656,6 +858,137 @@ def _wearly_te_sweep(
         "best_S_xpd_early": float(best_score),
         "best_S_rho_early_db": float(_num(best.get("S_rho_early_db", np.nan))),
         "best_S_l_pol": float(_num(best.get("S_l_pol", np.nan))),
+    }
+
+
+def _strata_base_bins() -> list[str]:
+    return [f"LOS{lf}_q{q}" for lf in [0, 1] for q in [1, 2, 3]]
+
+
+def _new_strata_counter() -> dict[str, int]:
+    out = {k: 0 for k in _strata_base_bins()}
+    out["LOS0_qNA"] = 0
+    out["LOS1_qNA"] = 0
+    return out
+
+
+def _el_q1_q2(rows: list[dict[str, Any]]) -> tuple[float, float]:
+    b_el = np.asarray([_num(r.get("EL_proxy_db", np.nan)) for r in rows], dtype=float)
+    b_el = b_el[np.isfinite(b_el)]
+    if len(b_el) < 3:
+        return float("nan"), float("nan")
+    q1, q2 = np.percentile(b_el, [33.3, 66.7])
+    return float(q1), float(q2)
+
+
+def _strata_counts(rows: list[dict[str, Any]], *, q1: float, q2: float) -> dict[str, int]:
+    out = _new_strata_counter()
+    for r in rows:
+        lf = int(round(_num(r.get("LOSflag", np.nan)))) if np.isfinite(_num(r.get("LOSflag", np.nan))) else -1
+        if lf not in {0, 1}:
+            continue
+        el = _num(r.get("EL_proxy_db", np.nan))
+        if not np.isfinite(el) or not np.isfinite(q1) or not np.isfinite(q2):
+            key = f"LOS{lf}_qNA"
+        elif el <= q1:
+            key = f"LOS{lf}_q1"
+        elif el <= q2:
+            key = f"LOS{lf}_q2"
+        else:
+            key = f"LOS{lf}_q3"
+        out[key] = int(out.get(key, 0) + 1)
+    return out
+
+
+def _d3_hole_analysis(
+    strata_pool: dict[str, int],
+    strata_selected: dict[str, int] | None,
+) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for k in _strata_base_bins():
+        pool_n = int(strata_pool.get(k, 0))
+        sel_n = int(strata_selected.get(k, 0)) if isinstance(strata_selected, dict) else -1
+        if pool_n == 0:
+            hole = "structural_hole"
+            st = "FAIL"
+        elif isinstance(strata_selected, dict) and sel_n == 0:
+            hole = "sampling_hole"
+            st = "WARN"
+        else:
+            hole = "none"
+            st = "PASS"
+        out.append(
+            {
+                "strata": k,
+                "pool_n": int(pool_n),
+                "selected_n": int(sel_n) if sel_n >= 0 else "",
+                "hole_type": hole,
+                "status": st,
+            }
+        )
+    return out
+
+
+def _load_selected_subset(
+    cfg: dict[str, Any],
+    link_rows: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    sampling_cfg = dict(cfg.get("sampling", {})) if isinstance(cfg.get("sampling", {}), dict) else {}
+    raw_path = str(
+        sampling_cfg.get(
+            "selected_points_csv",
+            cfg.get("selected_points_csv", ""),
+        )
+    ).strip()
+    if not raw_path:
+        return [], {"status": "NA", "reason": "selected_points_csv not provided"}
+    p = Path(raw_path)
+    if not p.exists():
+        return [], {"status": "WARN", "reason": f"selected_points_csv not found: {p}"}
+
+    with p.open("r", encoding="utf-8", newline="") as f:
+        sel_rows = [dict(r) for r in csv.DictReader(f)]
+    if not sel_rows:
+        return [], {"status": "WARN", "reason": f"selected_points_csv empty: {p}"}
+
+    by_link: dict[str, dict[str, Any]] = {}
+    by_case: dict[tuple[str, str], dict[str, Any]] = {}
+    for r in link_rows:
+        lid = str(r.get("link_id", ""))
+        sid = str(r.get("scenario_id", ""))
+        cid = str(r.get("case_id", ""))
+        if lid:
+            by_link[lid] = r
+        by_case[(sid, cid)] = r
+
+    matched: list[dict[str, Any]] = []
+    unmatched = 0
+    for s in sel_rows:
+        lid = str(s.get("link_id", "")).strip()
+        sid = str(s.get("scenario_id", "")).strip()
+        cid = str(s.get("case_id", "")).strip()
+        if lid and lid in by_link:
+            matched.append(dict(by_link[lid]))
+            continue
+        if sid and cid and (sid, cid) in by_case:
+            matched.append(dict(by_case[(sid, cid)]))
+            continue
+        unmatched += 1
+
+    dedup: dict[tuple[str, str, str], dict[str, Any]] = {}
+    for r in matched:
+        k = (
+            str(r.get("scenario_id", "")),
+            str(r.get("case_id", "")),
+            str(r.get("link_id", "")),
+        )
+        dedup[k] = r
+    return list(dedup.values()), {
+        "status": "PASS" if dedup else "WARN",
+        "path": str(p),
+        "selected_raw_n": int(len(sel_rows)),
+        "matched_n": int(len(dedup)),
+        "unmatched_n": int(unmatched),
     }
 
 
@@ -857,12 +1190,67 @@ def _make_scene_plots(
     return index_rows, first_scene_by_scenario, warns, warn_cases
 
 
+def _build_a3_geometry_review_rows(
+    idx_rows: list[dict[str, Any]],
+    scene_map: dict[tuple[str, str], dict[str, Any]],
+    ray_rows: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    ray_by_case: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for rr in ray_rows:
+        sid = str(rr.get("scenario_id", ""))
+        cid = str(rr.get("case_id", ""))
+        ray_by_case.setdefault((sid, cid), []).append(rr)
+
+    out: list[dict[str, Any]] = []
+    for r in idx_rows:
+        sid = str(r.get("scenario_id", ""))
+        if sid != "A3":
+            continue
+        cid = str(r.get("case_id", ""))
+        sc = scene_map.get((sid, cid))
+        scene_ok = False
+        scene_issues = ""
+        rays_topk_n = 0
+        if isinstance(sc, dict):
+            ok, probs = scene_lib.validate_scene_debug(sc)
+            scene_ok = bool(ok)
+            scene_issues = ";".join(probs) if probs else ""
+            rays_topk_n = int(len(sc.get("rays_topk", []))) if isinstance(sc.get("rays_topk", []), list) else 0
+        case_rays = ray_by_case.get((sid, cid), [])
+        los_rays = int(sum(int(round(_num(x.get("los_flag_ray", np.nan)))) == 1 for x in case_rays if np.isfinite(_num(x.get("los_flag_ray", np.nan)))))
+        has_n2 = int(
+            any(
+                int(round(_num(x.get("n_bounce", np.nan)))) == 2
+                for x in case_rays
+                if np.isfinite(_num(x.get("n_bounce", np.nan)))
+            )
+        )
+        review = "PASS" if (scene_ok and los_rays == 0 and has_n2 == 1) else ("WARN" if has_n2 == 1 else "FAIL")
+        out.append(
+            {
+                "scenario_id": sid,
+                "case_id": cid,
+                "case_label": str(r.get("case_label", "")),
+                "scene_png_path": str(r.get("scene_png_path", "")),
+                "scene_debug_json": str(r.get("scene_debug_json", "")),
+                "scene_debug_valid": int(scene_ok),
+                "scene_debug_issues": scene_issues,
+                "rays_topk_n": int(rays_topk_n),
+                "los_rays": int(los_rays),
+                "has_target_bounce_n2": int(has_n2),
+                "review_status": review,
+            }
+        )
+    return sorted(out, key=lambda x: (str(x.get("case_id", "")), str(x.get("case_label", ""))))
+
+
 def _diagnostic_checks(
     link_rows: list[dict[str, Any]],
     ray_rows: list[dict[str, Any]],
     floor_ref: dict[str, Any],
     cfg: dict[str, Any],
     runs: list[dict[str, Any]],
+    selected_rows: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     checks: dict[str, Any] = {}
     scenario_rows = metrics_lib.split_by_scenario(link_rows)
@@ -971,6 +1359,27 @@ def _diagnostic_checks(
         te_ns_list=te_ns_list,
         floor_db=float(floor_ref.get("xpd_floor_db", np.nan)),
     )
+    floor_db_used = float(floor_ref.get("xpd_floor_db", np.nan))
+    a2_target_sign = _target_window_sign_metric(
+        link_rows=link_rows,
+        ray_rows=ray_rows,
+        runs=runs,
+        scenario_id="A2",
+        target_n=1,
+        w_target_s=float(w_target_s),
+        floor_db=floor_db_used,
+        expected_sign=-1,
+    )
+    a3_target_sign = _target_window_sign_metric(
+        link_rows=link_rows,
+        ray_rows=ray_rows,
+        runs=runs,
+        scenario_id="A3",
+        target_n=2,
+        w_target_s=float(w_target_s),
+        floor_db=floor_db_used,
+        expected_sign=+1,
+    )
 
     a3_t = target_stats.get("A3", {})
     a3_exists = _num(a3_t.get("target_exists_rate", np.nan))
@@ -1029,6 +1438,8 @@ def _diagnostic_checks(
         "W_target_detail": target_stats,
         "W3_te_sweep": wearly_stats,
         "A2A3_sign_stability": sign_stability,
+        "A2_target_window_sign": a2_target_sign,
+        "A3_target_window_sign": a3_target_sign,
         "A3_role": a3_role,
         "A3_mechanism_status": a3_mech_status,
         "A3_system_early_status": a3_early_status,
@@ -1374,30 +1785,13 @@ def _diagnostic_checks(
 
     # D3: room/grid sampling strata coverage (LOS/NLOS × EL tertiles)
     b_rows = [r for r in link_rows if str(r.get("scenario_id", "")) in {"B1", "B2", "B3"}]
-    b_el = np.asarray([_num(r.get("EL_proxy_db", np.nan)) for r in b_rows], dtype=float)
-    b_el = b_el[np.isfinite(b_el)]
-    strata_counts: dict[str, int] = {f"LOS{lf}_q{q}": 0 for lf in [0, 1] for q in [1, 2, 3]}
-    strata_counts["LOS0_qNA"] = 0
-    strata_counts["LOS1_qNA"] = 0
-    if len(b_el) >= 3:
-        q1, q2 = np.percentile(b_el, [33.3, 66.7])
-    else:
-        q1, q2 = (float("nan"), float("nan"))
-    for r in b_rows:
-        lf = int(round(_num(r.get("LOSflag", np.nan)))) if np.isfinite(_num(r.get("LOSflag", np.nan))) else -1
-        if lf not in {0, 1}:
-            continue
-        el = _num(r.get("EL_proxy_db", np.nan))
-        if not np.isfinite(el) or not np.isfinite(q1) or not np.isfinite(q2):
-            key = f"LOS{lf}_qNA"
-        elif el <= q1:
-            key = f"LOS{lf}_q1"
-        elif el <= q2:
-            key = f"LOS{lf}_q2"
-        else:
-            key = f"LOS{lf}_q3"
-        strata_counts[key] = int(strata_counts.get(key, 0) + 1)
-    base_6 = [f"LOS{lf}_q{q}" for lf in [0, 1] for q in [1, 2, 3]]
+    q1, q2 = _el_q1_q2(b_rows)
+    strata_counts = _strata_counts(b_rows, q1=float(q1), q2=float(q2))
+    selected_b_rows = [
+        r for r in (selected_rows or []) if str(r.get("scenario_id", "")) in {"B1", "B2", "B3"}
+    ]
+    strata_counts_selected = _strata_counts(selected_b_rows, q1=float(q1), q2=float(q2)) if selected_b_rows else None
+    base_6 = _strata_base_bins()
     viable_bins = [k for k in base_6 if int(strata_counts.get(k, 0)) > 0]
     min_strata_all = int(min(int(strata_counts.get(k, 0)) for k in base_6)) if base_6 else 0
     min_strata_viable = int(min(int(strata_counts.get(k, 0)) for k in viable_bins)) if viable_bins else 0
@@ -1410,6 +1804,40 @@ def _diagnostic_checks(
         d3_status = "WARN"
     else:
         d3_status = "FAIL"
+
+    hole_analysis = _d3_hole_analysis(strata_counts, strata_counts_selected)
+
+    # Priority-3: per-scenario room summary export
+    b_per_scenario: list[dict[str, Any]] = []
+    for sid in ["B1", "B2", "B3"]:
+        s_rows = [r for r in b_rows if str(r.get("scenario_id", "")) == sid]
+        sq1, sq2 = _el_q1_q2(s_rows)
+        scounts = _strata_counts(s_rows, q1=float(sq1), q2=float(sq2))
+        sviable = [k for k in _strata_base_bins() if int(scounts.get(k, 0)) > 0]
+        smin_all = int(min(int(scounts.get(k, 0)) for k in _strata_base_bins())) if _strata_base_bins() else 0
+        smin_viable = int(min(int(scounts.get(k, 0)) for k in sviable)) if sviable else 0
+        sqna = int(scounts.get("LOS0_qNA", 0) + scounts.get("LOS1_qNA", 0))
+        if len(sviable) == 0:
+            s_status = "FAIL"
+        elif smin_viable >= 3 and sqna == 0:
+            s_status = "PASS"
+        elif smin_viable >= 2:
+            s_status = "WARN"
+        else:
+            s_status = "FAIL"
+        b_per_scenario.append(
+            {
+                "scenario_id": sid,
+                "status": s_status,
+                "n_rows": int(len(s_rows)),
+                "q1_db": float(sq1) if np.isfinite(sq1) else float("nan"),
+                "q2_db": float(sq2) if np.isfinite(sq2) else float("nan"),
+                "min_strata_all_n": int(smin_all),
+                "min_strata_viable_n": int(smin_viable),
+                "qna_total": int(sqna),
+                "strata_counts": scounts,
+            }
+        )
 
     # Keep legacy correlation field for backward compatibility
     los = np.asarray([_num(r.get("LOSflag", np.nan)) for r in rows_el_global], dtype=float)
@@ -1496,6 +1924,10 @@ def _diagnostic_checks(
             "min_strata_viable_n": int(min_strata_viable),
             "qna_total": int(qna_total),
             "strata_counts": strata_counts,
+            "selected_rows_n": int(len(selected_b_rows)),
+            "strata_counts_selected": strata_counts_selected if isinstance(strata_counts_selected, dict) else {},
+            "hole_analysis": hole_analysis,
+            "per_scenario_summary": b_per_scenario,
         },
     }
 
@@ -1631,6 +2063,7 @@ def _build_markdown(
     global_plots: dict[str, str],
     warns: list[str],
     warn_cases: list[dict[str, Any]],
+    a3_review_rows: list[dict[str, Any]],
 ) -> str:
     lines: list[str] = []
     lines.append(f"# Diagnostic Report ({run_group})")
@@ -1675,6 +2108,34 @@ def _build_markdown(
     a3c = checks.get("A3_coord_sanity", {})
     lines.append(f"- A3 coordinate sanity: **{a3c.get('status', 'WARN')}** ({a3c.get('note', '')})")
     lines.append("")
+    if a3_review_rows:
+        lines.append("- A3 geometry manual review (ray-path visualization required before experiment)")
+        lines.append("")
+        lines.append(
+            report_md.md_table(
+                a3_review_rows,
+                [
+                    "scenario_id",
+                    "case_id",
+                    "review_status",
+                    "scene_debug_valid",
+                    "los_rays",
+                    "has_target_bounce_n2",
+                    "rays_topk_n",
+                    "scene_debug_issues",
+                ],
+            )
+        )
+        lines.append("")
+        for rr in a3_review_rows:
+            sp = str(rr.get("scene_png_path", ""))
+            if not sp:
+                continue
+            lines.append(f"#### A3 case {rr.get('case_id', '')}")
+            lines.append("")
+            lines.append(f"- review_status: **{rr.get('review_status', '')}**")
+            lines.append(f"![A3-case-{rr.get('case_id','')}]({report_md.relpath(sp, out_root)})")
+            lines.append("")
 
     # B
     b = checks.get("B_time_resolution", {})
@@ -1699,6 +2160,10 @@ def _build_markdown(
                     "A3_target_in_Wearly_rate": b.get("A3_target_in_Wearly_rate", np.nan),
                     "A2_C_target_median_db": b.get("A2_C_target_median_db", np.nan),
                     "A3_C_target_median_db": b.get("A3_C_target_median_db", np.nan),
+                    "A2_target_sign_hit_rate": _num(dict(b.get("A2_target_window_sign", {})).get("expected_sign_hit_rate", np.nan)),
+                    "A2_target_sign_status": dict(b.get("A2_target_window_sign", {})).get("status", ""),
+                    "A3_target_sign_hit_rate": _num(dict(b.get("A3_target_window_sign", {})).get("expected_sign_hit_rate", np.nan)),
+                    "A3_target_sign_status": dict(b.get("A3_target_window_sign", {})).get("status", ""),
                     "A3_mechanism_status": b.get("A3_mechanism_status", ""),
                     "A3_system_early_status": b.get("A3_system_early_status", ""),
                     "A5_target_mode": b.get("A5_target_mode", ""),
@@ -1722,6 +2187,10 @@ def _build_markdown(
                 "A3_target_in_Wearly_rate",
                 "A2_C_target_median_db",
                 "A3_C_target_median_db",
+                "A2_target_sign_hit_rate",
+                "A2_target_sign_status",
+                "A3_target_sign_hit_rate",
+                "A3_target_sign_status",
                 "A3_mechanism_status",
                 "A3_system_early_status",
                 "A5_target_mode",
@@ -1824,6 +2293,42 @@ def _build_markdown(
         if rows_sign:
             lines.append(report_md.md_table(rows_sign, ["scenario", "expected_sign", "min_hit_rate", "median_hit_rate", "status"]))
             lines.append("")
+    tw_rows: list[dict[str, Any]] = []
+    for k in ["A2_target_window_sign", "A3_target_window_sign"]:
+        d = b.get(k, {})
+        if not isinstance(d, dict):
+            continue
+        tw_rows.append(
+            {
+                "scenario": d.get("scenario", ""),
+                "target_n": d.get("target_n", np.nan),
+                "W_target_s": d.get("W_target_s", np.nan),
+                "expected_sign": d.get("expected_sign", ""),
+                "n_eval": d.get("n_eval", 0),
+                "expected_sign_hit_rate": d.get("expected_sign_hit_rate", np.nan),
+                "median_xpd_target_ex_db": d.get("median_xpd_target_ex_db", np.nan),
+                "status": d.get("status", ""),
+            }
+        )
+    if tw_rows:
+        lines.append("- Target-window sign metric (A2/A3)")
+        lines.append("")
+        lines.append(
+            report_md.md_table(
+                tw_rows,
+                [
+                    "scenario",
+                    "target_n",
+                    "W_target_s",
+                    "expected_sign",
+                    "n_eval",
+                    "expected_sign_hit_rate",
+                    "median_xpd_target_ex_db",
+                    "status",
+                ],
+            )
+        )
+        lines.append("")
 
     # C
     c = checks.get("C_effect_vs_floor", {})
@@ -2038,9 +2543,10 @@ def _build_markdown(
                         "min_strata_all_n": d3.get("min_strata_all_n", 0),
                         "min_strata_viable_n": d3.get("min_strata_viable_n", 0),
                         "qna_total": d3.get("qna_total", 0),
+                        "selected_rows_n": d3.get("selected_rows_n", 0),
                     }
                 ],
-                ["status", "n_rows", "min_strata_all_n", "min_strata_viable_n", "qna_total"],
+                ["status", "n_rows", "min_strata_all_n", "min_strata_viable_n", "qna_total", "selected_rows_n"],
             )
         )
         lines.append("")
@@ -2048,6 +2554,23 @@ def _build_markdown(
         if isinstance(strata3, dict):
             srows3 = [{"strata": k, "n": v} for k, v in sorted(strata3.items())]
             lines.append(report_md.md_table(srows3, ["strata", "n"]))
+            lines.append("")
+        hole_rows = d3.get("hole_analysis", [])
+        if isinstance(hole_rows, list) and hole_rows:
+            lines.append("- D3 hole diagnosis (structural vs sampling)")
+            lines.append("")
+            lines.append(report_md.md_table(hole_rows, ["strata", "pool_n", "selected_n", "hole_type", "status"]))
+            lines.append("")
+        per_sid_rows = d3.get("per_scenario_summary", [])
+        if isinstance(per_sid_rows, list) and per_sid_rows:
+            lines.append("- D3 per-scenario summary (B1/B2/B3)")
+            lines.append("")
+            lines.append(
+                report_md.md_table(
+                    per_sid_rows,
+                    ["scenario_id", "status", "n_rows", "q1_db", "q2_db", "min_strata_all_n", "min_strata_viable_n", "qna_total"],
+                )
+            )
             lines.append("")
 
     strata = d.get("strata_counts", {})
@@ -2169,6 +2692,8 @@ def main() -> None:
         floor_db=float(floor_ref.get("xpd_floor_db", np.nan)),
         delta_db=float(floor_ref.get("delta_floor_db", np.nan)),
     )
+    link_rows, el_impute_info = _impute_missing_el_proxy(link_rows, ray_rows)
+    selected_rows, selected_meta = _load_selected_subset(cfg, link_rows)
 
     # plots
     global_plots = _make_diagnostic_plots(fig_dir, link_rows, ray_rows)
@@ -2180,15 +2705,67 @@ def main() -> None:
         link_rows=link_rows,
         scene_map=scene_map,
     )
+    a3_review_rows = _build_a3_geometry_review_rows(idx_rows, scene_map=scene_map, ray_rows=ray_rows)
 
     # checks
-    checks = _diagnostic_checks(link_rows, ray_rows, floor_ref=floor_ref, cfg=cfg, runs=runs)
+    checks = _diagnostic_checks(
+        link_rows,
+        ray_rows,
+        floor_ref=floor_ref,
+        cfg=cfg,
+        runs=runs,
+        selected_rows=selected_rows,
+    )
 
     # save tables/json
     _write_rows_csv(tab_dir / "diagnostic_link_rows.csv", link_rows)
     _write_rows_csv(tab_dir / "diagnostic_ray_rows.csv", ray_rows)
+    _write_rows_csv(tab_dir / "el_proxy_imputation_rows.csv", list(el_impute_info.get("rows", [])))
+    _write_rows_csv(tab_dir / "A3_geometry_manual_review.csv", a3_review_rows)
     report_md.write_json(tab_dir / "diagnostic_checks.json", checks)
     report_md.write_json(tab_dir / "floor_reference_used.json", floor_ref)
+    report_md.write_json(tab_dir / "selected_subset_info.json", selected_meta)
+    report_md.write_json(tab_dir / "el_proxy_imputation_info.json", el_impute_info)
+    d3 = dict(dict(checks.get("D_identifiability", {})).get("D3", {}))
+    _write_rows_csv(tab_dir / "D3_hole_analysis.csv", list(d3.get("hole_analysis", [])))
+    _write_rows_csv(tab_dir / "B_per_scenario_summary.csv", list(d3.get("per_scenario_summary", [])))
+    _write_rows_csv(
+        tab_dir / "A3_target_window_sign.csv",
+        [
+            dict(dict(checks.get("B_time_resolution", {})).get("A2_target_window_sign", {})),
+            dict(dict(checks.get("B_time_resolution", {})).get("A3_target_window_sign", {})),
+        ],
+    )
+
+    a3_lines = ["# A3 Geometry Manual Review", ""]
+    if a3_review_rows:
+        a3_lines.append(
+            report_md.md_table(
+                a3_review_rows,
+                [
+                    "scenario_id",
+                    "case_id",
+                    "review_status",
+                    "scene_debug_valid",
+                    "los_rays",
+                    "has_target_bounce_n2",
+                    "rays_topk_n",
+                    "scene_debug_issues",
+                ],
+            )
+        )
+        a3_lines.append("")
+        for rr in a3_review_rows:
+            sp = str(rr.get("scene_png_path", ""))
+            if not sp:
+                continue
+            a3_lines.append(f"## Case {rr.get('case_id', '')}")
+            a3_lines.append("")
+            a3_lines.append(f"- review_status: **{rr.get('review_status', '')}**")
+            a3_lines.append(f"- scene_debug_json: `{rr.get('scene_debug_json', '')}`")
+            a3_lines.append(f"![A3-case-{rr.get('case_id','')}]({report_md.relpath(sp, out_root)})")
+            a3_lines.append("")
+    report_md.write_text(out_root / "A3_geometry_manual_review.md", "\n".join(a3_lines) + "\n")
 
     # complete index rows with run file refs
     run_by_scenario = {str(r.get("scenario_id", "")): r for r in runs}
@@ -2217,6 +2794,7 @@ def main() -> None:
         global_plots=global_plots,
         warns=scene_warns,
         warn_cases=warn_cases,
+        a3_review_rows=a3_review_rows,
     )
     out_md = out_root / "diagnostic_report.md"
     report_md.write_text(out_md, md)
