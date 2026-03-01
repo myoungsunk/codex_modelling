@@ -56,6 +56,7 @@ class Step1AcceptanceTests(unittest.TestCase):
             basis="circular",
             antenna_config=antenna_config,
             force_cp_swap_on_odd_reflection=True,
+            los_blocker=True,
         )
         a3_paths = A3_corner_2bounce.run_case(
             a3_params,
@@ -63,6 +64,7 @@ class Step1AcceptanceTests(unittest.TestCase):
             basis="circular",
             antenna_config=antenna_config,
             force_cp_swap_on_odd_reflection=True,
+            los_blocker=True,
         )
 
         odd = [p for p in a2_paths if p.bounce_count == 1]

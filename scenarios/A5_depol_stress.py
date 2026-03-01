@@ -73,8 +73,10 @@ def build_sweep_params() -> list[dict[str, Any]]:
             params.append(
                 {
                     "offset": 3.5,
-                    "rx_x": 3.5,
-                    "rx_y": 4.5,
+                    # Keep Rx on the same side of both corner planes to avoid
+                    # physically ambiguous through-wall geometry in stress tests.
+                    "rx_x": 2.5,
+                    "rx_y": 0.5,
                     "rho": rho,
                     "rep_id": rep_id,
                     "seed": BASE_SEED + rho_idx * 100 + rep_id,
@@ -97,8 +99,16 @@ def run_case(
     los_enabled_override: bool | None = None,
 ):
     tx, rx = default_antennas(basis=basis, **(antenna_config or {}))
-    rx.position[:] = [params["rx_x"], params["rx_y"], 1.5]
-    scene = build_scene(offset=params["offset"])
+    off = float(params["offset"])
+    rx_x = float(params["rx_x"])
+    rx_y = float(params["rx_y"])
+    if not (rx_x < off and rx_y < off):
+        raise ValueError(
+            "A5 invalid geometry: Rx must satisfy rx_x<offset and rx_y<offset "
+            f"(rx_x={rx_x}, rx_y={rx_y}, offset={off})"
+        )
+    rx.position[:] = [rx_x, rx_y, 1.5]
+    scene = build_scene(offset=off)
     mode = str(stress_mode).lower().strip()
     if mode in {"geometry", "hybrid"} and int(scatterer_count) > 0:
         _append_stress_scatterers(scene, seed=int(params.get("seed", BASE_SEED)), count=int(scatterer_count))
