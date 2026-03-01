@@ -10,6 +10,9 @@ floor_policy:
 windows:
   Te_ns: 10.0
   Tmax_ns: 200.0
+  floor_window_ns: 1.5        # W_floor (C0): LOS peak 주변 좁은 창
+  target_window_ns: 3.0       # W_target (A2-A5): target delay 주변 창
+  te_sweep_ns: [2.0, 3.0, 5.0] # W_early (room): 분리력 S(Te) 스윕
   tau0_method: "threshold"
   noise_tail_ns: 50.0
   threshold_margin_db: 6.0

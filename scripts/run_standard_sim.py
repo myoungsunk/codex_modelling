@@ -730,6 +730,8 @@ def _build_scene_snapshot(
         scene = A4_dielectric_plane.build_scene(
             str(params.get("material", "wood")),
             y_plane=float(params.get("y_plane", 2.0)),
+            y_late_offset=float(params.get("y_late_offset", 2.4)),
+            include_late_panel=bool(params.get("include_late_panel", True)),
         )
         if los_blocker:
             scene.append(
@@ -947,17 +949,28 @@ def _build_case_records(args: argparse.Namespace, f_hz: np.ndarray) -> list[dict
         mats = [m.strip() for m in str(args.material_list).split(",") if m.strip()] or list(DEFAULT_MATERIAL_SPECS.keys())
         yvals = _parse_float_list(args.a4_y_list, [1.5, 2.0, 2.5])
         dvals = _parse_float_list(args.dist_list, [6.0])
+        include_late_panel = _parse_bool(args.a4_include_late_panel, default=True)
+        late_offset_m = float(args.a4_late_offset_m)
         cid = 0
         for m in mats:
             for y in yvals:
                 for d in dvals:
                     for rep_id in range(n_rep):
-                        p = {"material": m, "y_plane": float(y), "distance_m": float(d), "rep_id": int(rep_id)}
+                        p = {
+                            "material": m,
+                            "y_plane": float(y),
+                            "distance_m": float(d),
+                            "rep_id": int(rep_id),
+                            "include_late_panel": bool(include_late_panel),
+                            "y_late_offset": late_offset_m,
+                        }
                         paths = A4_dielectric_plane.run_case(
                             p,
                             f_hz,
                             basis=basis,
                             los_blocker=bool(los_blocker),
+                            include_late_panel=bool(include_late_panel),
+                            y_late_offset=late_offset_m,
                         )
                         out.append(
                             {
@@ -1076,6 +1089,8 @@ def main() -> None:
     parser.add_argument("--n-rep", type=int, default=5)
     parser.add_argument("--a2-y-list", type=str, default="1.5,2.0,2.5")
     parser.add_argument("--a4-y-list", type=str, default="1.5,2.0,2.5")
+    parser.add_argument("--a4-include-late-panel", type=str, default="true")
+    parser.add_argument("--a4-late-offset-m", type=float, default=2.4)
     parser.add_argument("--los-block-mode", type=str, default="occluder", choices=["synthetic", "occluder"])
     parser.add_argument("--a5-stress-mode", type=str, default="hybrid", choices=["none", "synthetic", "geometry", "hybrid"])
     parser.add_argument("--a5-scatterer-count", type=int, default=3)

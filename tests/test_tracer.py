@@ -9,6 +9,7 @@ import numpy as np
 from rt_core.antenna import Antenna
 from rt_core.geometry import Material, Plane
 from rt_core.tracer import trace_paths
+from scenarios.common import make_los_blocker_plane
 
 
 class TracerTests(unittest.TestCase):
@@ -48,6 +49,21 @@ class TracerTests(unittest.TestCase):
         self.rx.position[:] = [3.0, 4.0, 1.0]
         paths = trace_paths([p1, p2], self.tx, self.rx, self.f, max_bounce=2, los_enabled=False)
         self.assertTrue(any(p.bounce_count == 2 for p in paths))
+
+    def test_absorber_proxy_is_occluder_not_reflector(self) -> None:
+        blocker = make_los_blocker_plane(self.tx.position, self.rx.position, plane_id=9101, half_extent_u=0.2, half_extent_v=0.3)
+        paths = trace_paths([blocker], self.tx, self.rx, self.f, max_bounce=1, los_enabled=False)
+        # With LOS disabled and no reflective planes, there should be no generated path.
+        self.assertEqual(len(paths), 0)
+
+    def test_los_blocker_blocks_los_but_not_reflector_candidate(self) -> None:
+        refl = Plane(id=1, p0=np.array([0.0, 2.0, 0.0]), normal=np.array([0.0, -1.0, 0.0]), material=Material.pec())
+        blocker = make_los_blocker_plane(self.tx.position, self.rx.position, plane_id=9101, half_extent_u=0.2, half_extent_v=0.3)
+        paths = trace_paths([refl, blocker], self.tx, self.rx, self.f, max_bounce=1, los_enabled=True)
+        self.assertFalse(any(p.bounce_count == 0 for p in paths))
+        self.assertTrue(any(p.bounce_count == 1 for p in paths))
+        # Blocker should never appear as a reflective surface in path metadata.
+        self.assertFalse(any(9101 in list(p.surface_ids) for p in paths))
 
 
 if __name__ == "__main__":

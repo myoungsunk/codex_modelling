@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import csv
 import json
 from pathlib import Path
@@ -69,6 +70,304 @@ def _scenario_case_rows(link_rows: list[dict[str, Any]]) -> dict[tuple[str, str]
         k = (str(r.get("scenario_id", "NA")), str(r.get("case_id", "")))
         out.setdefault(k, []).append(r)
     return out
+
+
+def _window_dict(row: dict[str, Any]) -> dict[str, Any]:
+    w = row.get("window", {})
+    if isinstance(w, dict):
+        return w
+    if isinstance(w, str):
+        s = w.strip()
+        if not s:
+            return {}
+        try:
+            obj = json.loads(s)
+            return obj if isinstance(obj, dict) else {}
+        except Exception:
+            try:
+                obj = ast.literal_eval(s)
+                return obj if isinstance(obj, dict) else {}
+            except Exception:
+                return {}
+    return {}
+
+
+def _db_ratio(num: float, den: float, eps: float = 1e-30) -> float:
+    n = max(float(num), float(eps))
+    d = max(float(den), float(eps))
+    return float(10.0 * np.log10(n / d))
+
+
+def _estimate_freq_grid(link_rows: list[dict[str, Any]], cfg: dict[str, Any]) -> tuple[float, float, str]:
+    # Prefer frequency axis embedded in link rows (actual run output),
+    # with C0 rows prioritized for calibration consistency.
+    cand: list[tuple[float, float, str]] = []
+    for r in link_rows:
+        arr = r.get("xpd_floor_freq_hz")
+        if not isinstance(arr, list):
+            continue
+        f = np.asarray(arr, dtype=float)
+        f = f[np.isfinite(f)]
+        if len(f) < 2:
+            continue
+        f = np.sort(np.unique(f))
+        df = float(np.median(np.diff(f)))
+        bw = float(f[-1] - f[0])
+        if not (bw > 0 and df > 0):
+            continue
+        sid = str(r.get("scenario_id", "NA"))
+        cand.append((bw, df, f"link_rows.xpd_floor_freq_hz[{sid}]"))
+    if cand:
+        c0 = [x for x in cand if x[2].endswith("[C0]")]
+        pick_pool = c0 if c0 else cand
+        # choose smallest df (=widest unambiguous delay range)
+        pick = sorted(pick_pool, key=lambda x: x[1])[0]
+        return float(pick[0]), float(pick[1]), str(pick[2])
+    ms = dict(cfg.get("measurement_sweep", {}))
+    bw = float(ms.get("BW_Hz", 1.0e9))
+    df = float(ms.get("df_Hz", 1.0e6))
+    return bw, df, "config.measurement_sweep"
+
+
+def _group_rays_by_case(ray_rows: list[dict[str, Any]], scenario_id: str) -> dict[str, list[dict[str, Any]]]:
+    out: dict[str, list[dict[str, Any]]] = {}
+    for r in ray_rows:
+        if str(r.get("scenario_id", "")) != str(scenario_id):
+            continue
+        out.setdefault(str(r.get("case_id", "")), []).append(r)
+    return out
+
+
+def _floor_window_contamination(
+    ray_rows: list[dict[str, Any]],
+    *,
+    w_floor_s: float,
+) -> dict[str, Any]:
+    by_case = _group_rays_by_case(ray_rows, "C0")
+    c_vals_db: list[float] = []
+    for _, cr in by_case.items():
+        los = [x for x in cr if int(round(_num(x.get("n_bounce", np.nan)))) == 0]
+        if not los:
+            continue
+        m_los = sorted(los, key=lambda x: _num(x.get("P_lin", np.nan)), reverse=True)[0]
+        tau_los = _num(m_los.get("tau_s", np.nan))
+        p_los = _num(m_los.get("P_lin", np.nan))
+        if not np.isfinite(tau_los) or not np.isfinite(p_los) or p_los <= 0:
+            continue
+        t0 = float(tau_los - 0.5 * float(w_floor_s))
+        t1 = float(tau_los + 0.5 * float(w_floor_s))
+        p_non = 0.0
+        for r in cr:
+            if r is m_los:
+                continue
+            tau = _num(r.get("tau_s", np.nan))
+            p = _num(r.get("P_lin", np.nan))
+            if not np.isfinite(tau) or not np.isfinite(p) or p <= 0:
+                continue
+            if int(round(_num(r.get("n_bounce", np.nan)))) == 0:
+                continue
+            if t0 <= tau <= t1:
+                p_non += float(p)
+        c_vals_db.append(_db_ratio(p_non, p_los))
+    arr = np.asarray(c_vals_db, dtype=float)
+    med = float(np.nanmedian(arr)) if len(arr) else float("nan")
+    p95 = float(np.nanpercentile(arr, 95.0)) if len(arr) else float("nan")
+    status = "PASS" if (np.isfinite(med) and med < -15.0) else ("WARN" if (np.isfinite(med) and med < -10.0) else "FAIL")
+    return {
+        "n_cases": int(len(arr)),
+        "W_floor_s": float(w_floor_s),
+        "C_floor_median_db": med,
+        "C_floor_p95_db": p95,
+        "rate_below_m10_db": float(np.mean(arr < -10.0)) if len(arr) else float("nan"),
+        "rate_below_m15_db": float(np.mean(arr < -15.0)) if len(arr) else float("nan"),
+        "status": status,
+    }
+
+
+def _target_window_stats(
+    ray_rows: list[dict[str, Any]],
+    *,
+    scenario_id: str,
+    target_n: int,
+    w_target_s: float,
+    te_s: float,
+    dt_res_s: float,
+) -> dict[str, Any]:
+    by_case = _group_rays_by_case(ray_rows, scenario_id)
+    c_vals_db: list[float] = []
+    early_ok: list[bool] = []
+    first_ok: list[bool] = []
+    gap_vals: list[float] = []
+    exists = 0
+    total = 0
+    tol = 0.25 * float(dt_res_s) if np.isfinite(dt_res_s) else 0.0
+    for _, cr in by_case.items():
+        total += 1
+        cand = [x for x in cr if int(round(_num(x.get("n_bounce", np.nan)))) == int(target_n)]
+        if not cand:
+            continue
+        exists += 1
+        m_tar = sorted(cand, key=lambda x: _num(x.get("P_lin", np.nan)), reverse=True)[0]
+        tau_tar = _num(m_tar.get("tau_s", np.nan))
+        p_tar = _num(m_tar.get("P_lin", np.nan))
+        if not np.isfinite(tau_tar) or not np.isfinite(p_tar) or p_tar <= 0:
+            continue
+        all_tau = np.asarray([_num(x.get("tau_s", np.nan)) for x in cr], dtype=float)
+        all_tau = all_tau[np.isfinite(all_tau)]
+        if len(all_tau) == 0:
+            continue
+        tau0 = float(np.min(all_tau))
+        early_ok.append(bool((tau_tar - tau0) <= float(te_s)))
+        first_ok.append(bool(abs(tau_tar - tau0) <= float(tol)))
+        t0 = float(tau_tar - 0.5 * float(w_target_s))
+        t1 = float(tau_tar + 0.5 * float(w_target_s))
+        p_other = 0.0
+        gaps: list[float] = []
+        for r in cr:
+            if r is m_tar:
+                continue
+            tau = _num(r.get("tau_s", np.nan))
+            p = _num(r.get("P_lin", np.nan))
+            if not np.isfinite(tau) or not np.isfinite(p) or p <= 0:
+                continue
+            gaps.append(abs(float(tau) - float(tau_tar)))
+            if t0 <= tau <= t1:
+                p_other += float(p)
+        c_vals_db.append(_db_ratio(p_other, p_tar))
+        if gaps:
+            gap_vals.append(float(np.min(gaps)))
+    arr_c = np.asarray(c_vals_db, dtype=float)
+    arr_gap = np.asarray(gap_vals, dtype=float)
+    med_c = float(np.nanmedian(arr_c)) if len(arr_c) else float("nan")
+    med_gap = float(np.nanmedian(arr_gap)) if len(arr_gap) else float("nan")
+    target_exists_rate = float(exists / total) if total > 0 else float("nan")
+    target_early_rate = float(np.mean(early_ok)) if early_ok else float("nan")
+    target_first_rate = float(np.mean(first_ok)) if first_ok else float("nan")
+    # Ideal: contamination < -10~-15 dB + target inside early.
+    status = "PASS" if (
+        np.isfinite(med_c)
+        and med_c < -10.0
+        and np.isfinite(target_early_rate)
+        and target_early_rate >= 0.8
+        and np.isfinite(target_exists_rate)
+        and target_exists_rate >= 0.9
+    ) else ("WARN" if (np.isfinite(med_c) and med_c < -6.0 and np.isfinite(target_exists_rate) and target_exists_rate >= 0.7) else "FAIL")
+    return {
+        "scenario": str(scenario_id),
+        "target_n": int(target_n),
+        "W_target_s": float(w_target_s),
+        "target_exists_rate": target_exists_rate,
+        "target_in_Wearly_rate": target_early_rate,
+        "target_is_first_rate": target_first_rate,
+        "C_target_median_db": med_c,
+        "C_target_p95_db": float(np.nanpercentile(arr_c, 95.0)) if len(arr_c) else float("nan"),
+        "target_gap_median_s": med_gap,
+        "status": status,
+    }
+
+
+def _sep_score(a: np.ndarray, b: np.ndarray) -> float:
+    xa = np.asarray(a, dtype=float)
+    xb = np.asarray(b, dtype=float)
+    xa = xa[np.isfinite(xa)]
+    xb = xb[np.isfinite(xb)]
+    if len(xa) < 2 or len(xb) < 2:
+        return float("nan")
+    mu = abs(float(np.mean(xa) - np.mean(xb)))
+    var = float(np.var(xa, ddof=1) + np.var(xb, ddof=1))
+    if not np.isfinite(mu) or not np.isfinite(var):
+        return float("nan")
+    return float(mu / np.sqrt(max(var, 1e-18)))
+
+
+def _wearly_te_sweep(
+    *,
+    link_rows: list[dict[str, Any]],
+    runs: list[dict[str, Any]],
+    te_ns_list: list[float],
+    tmax_s: float,
+) -> dict[str, Any]:
+    run_by_sid = {str(r.get("scenario_id", "")): r for r in runs}
+    b_rows = [r for r in link_rows if str(r.get("scenario_id", "")) in {"B1", "B2", "B3"}]
+    if not b_rows:
+        return {"status": "WARN", "reason": "No B-scenario links"}
+    vals: dict[float, dict[str, dict[int, list[float]]]] = {}
+    for te_ns in te_ns_list:
+        vals[float(te_ns)] = {
+            "xpd_early": {0: [], 1: []},
+            "rho_early_db": {0: [], 1: []},
+            "l_pol": {0: [], 1: []},
+        }
+    used_links = 0
+    for r in b_rows:
+        sid = str(r.get("scenario_id", ""))
+        run = run_by_sid.get(sid)
+        if run is None:
+            continue
+        pdp = io_lib.load_pdp_npz(run, str(r.get("link_id", "")))
+        if pdp is None:
+            continue
+        tau = np.asarray(pdp.get("delay_tau_s", []), dtype=float)
+        pco = np.asarray(pdp.get("P_co", []), dtype=float)
+        pcr = np.asarray(pdp.get("P_cross", []), dtype=float)
+        if len(tau) == 0 or len(pco) != len(tau) or len(pcr) != len(tau):
+            continue
+        lf = int(round(_num(r.get("LOSflag", np.nan)))) if np.isfinite(_num(r.get("LOSflag", np.nan))) else -1
+        if lf not in {0, 1}:
+            continue
+        w = _window_dict(r)
+        tau0 = _num(w.get("tau0_s", np.nan))
+        if not np.isfinite(tau0):
+            p_total = pco + pcr
+            imax = int(np.argmax(p_total)) if len(p_total) else -1
+            if imax < 0:
+                continue
+            tau0 = float(tau[imax])
+        used_links += 1
+        for te_ns in te_ns_list:
+            te_s = float(te_ns) * 1e-9
+            early = (tau >= tau0) & (tau <= tau0 + te_s)
+            late = (tau > tau0 + te_s) & (tau <= tau0 + float(tmax_s))
+            sco = float(np.sum(pco[early]))
+            scr = float(np.sum(pcr[early]))
+            lco = float(np.sum(pco[late]))
+            lcr = float(np.sum(pcr[late]))
+            xpd_e = _db_ratio(sco, scr)
+            rho_e_db = _db_ratio(scr, sco)
+            xpd_l = _db_ratio(lco, lcr)
+            l_pol = float(xpd_e - xpd_l)
+            vals[float(te_ns)]["xpd_early"][lf].append(float(xpd_e))
+            vals[float(te_ns)]["rho_early_db"][lf].append(float(rho_e_db))
+            vals[float(te_ns)]["l_pol"][lf].append(float(l_pol))
+    if used_links == 0:
+        return {"status": "WARN", "reason": "No PDP links loaded for B scenarios"}
+
+    score_rows: list[dict[str, Any]] = []
+    for te_ns in te_ns_list:
+        d = vals[float(te_ns)]
+        sx = _sep_score(np.asarray(d["xpd_early"][1], dtype=float), np.asarray(d["xpd_early"][0], dtype=float))
+        sr = _sep_score(np.asarray(d["rho_early_db"][1], dtype=float), np.asarray(d["rho_early_db"][0], dtype=float))
+        sl = _sep_score(np.asarray(d["l_pol"][1], dtype=float), np.asarray(d["l_pol"][0], dtype=float))
+        score_rows.append(
+            {
+                "Te_ns": float(te_ns),
+                "S_xpd_early": sx,
+                "S_rho_early_db": sr,
+                "S_l_pol": sl,
+            }
+        )
+    best = max(score_rows, key=lambda x: _num(x.get("S_xpd_early", np.nan)))
+    best_score = _num(best.get("S_xpd_early", np.nan))
+    status = "PASS" if (np.isfinite(best_score) and best_score >= 1.0) else ("WARN" if (np.isfinite(best_score) and best_score >= 0.5) else "FAIL")
+    return {
+        "status": status,
+        "n_links_used": int(used_links),
+        "scores": score_rows,
+        "best_te_ns": float(best.get("Te_ns", np.nan)),
+        "best_S_xpd_early": float(best_score),
+        "best_S_rho_early_db": float(_num(best.get("S_rho_early_db", np.nan))),
+        "best_S_l_pol": float(_num(best.get("S_l_pol", np.nan))),
+    }
 
 
 def _make_scene_plots(
@@ -189,6 +488,7 @@ def _diagnostic_checks(
     ray_rows: list[dict[str, Any]],
     floor_ref: dict[str, Any],
     cfg: dict[str, Any],
+    runs: list[dict[str, Any]],
 ) -> dict[str, Any]:
     checks: dict[str, Any] = {}
     scenario_rows = metrics_lib.split_by_scenario(link_rows)
@@ -232,36 +532,31 @@ def _diagnostic_checks(
         "note": "Coordinate penetration sanity needs scenario geometry file review; not inferable from standard outputs only.",
     }
 
-    # B time-resolution checks
-    ms = dict(cfg.get("measurement_sweep", {}))
+    # B: time-resolution checks with purpose-specific windows
     ws = dict(cfg.get("windows", {}))
-    bw = float(ms.get("BW_Hz", 1.0e9))
-    df = float(ms.get("df_Hz", 1.0e6))
     te_s = float(ws.get("Te_ns", 10.0)) * 1e-9
     tmax_s = float(ws.get("Tmax_ns", 200.0)) * 1e-9
+    w_floor_s = float(ws.get("floor_window_ns", max(1.0, 0.5 * float(ws.get("Te_ns", 10.0))))) * 1e-9
+    w_target_s = float(ws.get("target_window_ns", max(2.0, 0.8 * float(ws.get("Te_ns", 10.0))))) * 1e-9
+    bw, df, freq_src = _estimate_freq_grid(link_rows, cfg)
     dt_res = 1.0 / bw if bw > 0 else float("nan")
     tau_max = 1.0 / df if df > 0 else float("nan")
 
-    def _target_tau(sid: str, n_bounce: int) -> list[float]:
-        rr = [r for r in ray_rows if str(r.get("scenario_id", "")) == sid]
-        by_case: dict[str, list[dict[str, Any]]] = {}
-        for r in rr:
-            by_case.setdefault(str(r.get("case_id", "")), []).append(r)
-        out: list[float] = []
-        for _, cr in by_case.items():
-            cand = [x for x in cr if int(round(_num(x.get("n_bounce", np.nan)))) == int(n_bounce)]
-            if not cand:
-                continue
-            c0 = sorted(cand, key=lambda x: _num(x.get("P_lin", np.nan)), reverse=True)[0]
-            out.append(_num(c0.get("tau_s", np.nan)))
-        return out
+    floor_stats = _floor_window_contamination(ray_rows, w_floor_s=w_floor_s)
+    target_map = {"A2": 1, "A3": 2, "A4": 1, "A5": 2}
+    target_stats = {
+        sid: _target_window_stats(
+            ray_rows,
+            scenario_id=sid,
+            target_n=tn,
+            w_target_s=w_target_s,
+            te_s=te_s,
+            dt_res_s=dt_res,
+        )
+        for sid, tn in target_map.items()
+    }
 
-    tau_a2 = np.asarray(_target_tau("A2", 1), dtype=float)
-    tau_a3 = np.asarray(_target_tau("A3", 2), dtype=float)
-    b1_rate_a2 = float(np.mean(tau_a2 < te_s)) if len(tau_a2) else float("nan")
-    b1_rate_a3 = float(np.mean(tau_a3 < te_s)) if len(tau_a3) else float("nan")
-
-    # B2: minimal delay spacing across rays
+    # B2: minimal delay spacing across rays (deduplicated tau per case)
     mins = []
     for sid in ["A2", "A3", "A4", "A5", "B1", "B2", "B3"]:
         rr = [r for r in ray_rows if str(r.get("scenario_id", "")) == sid]
@@ -270,23 +565,57 @@ def _diagnostic_checks(
             by_case.setdefault(str(r.get("case_id", "")), []).append(_num(r.get("tau_s", np.nan)))
         for _, tv in by_case.items():
             x = np.asarray(tv, dtype=float)
-            x = np.sort(x[np.isfinite(x)])
+            x = np.sort(np.unique(x[np.isfinite(x)]))
             if len(x) < 2:
                 continue
             mins.append(float(np.min(np.diff(x))))
     mins = np.asarray(mins, dtype=float)
     b2_ok = bool(np.isfinite(dt_res) and len(mins) > 0 and np.nanmedian(mins) > dt_res)
+    b3_ok = bool(np.isfinite(tau_max) and (tmax_s < tau_max))
+
+    te_ns_list_cfg = ws.get("te_sweep_ns", [2.0, 3.0, 5.0])
+    te_ns_list: list[float] = []
+    if isinstance(te_ns_list_cfg, list):
+        for x in te_ns_list_cfg:
+            v = _num(x)
+            if np.isfinite(v) and v > 0:
+                te_ns_list.append(float(v))
+    if not te_ns_list:
+        te_ns_list = [2.0, 3.0, 5.0]
+    wearly_stats = _wearly_te_sweep(
+        link_rows=link_rows,
+        runs=runs,
+        te_ns_list=te_ns_list,
+        tmax_s=tmax_s,
+    )
 
     checks["B_time_resolution"] = {
+        "freq_source": str(freq_src),
+        "BW_Hz": float(bw),
+        "df_Hz": float(df),
         "dt_res_s": float(dt_res),
         "tau_max_s": float(tau_max),
         "Te_s": float(te_s),
         "Tmax_s": float(tmax_s),
-        "B1_target_in_early_rate_A2": float(b1_rate_a2),
-        "B1_target_in_early_rate_A3": float(b1_rate_a3),
+        "W_floor_s": float(w_floor_s),
+        "W_target_s": float(w_target_s),
+        "W_floor_status": str(floor_stats.get("status", "WARN")),
+        "W_floor_C_median_db": float(floor_stats.get("C_floor_median_db", np.nan)),
+        "A2_target_in_Wearly_rate": float(target_stats["A2"].get("target_in_Wearly_rate", np.nan)),
+        "A3_target_in_Wearly_rate": float(target_stats["A3"].get("target_in_Wearly_rate", np.nan)),
+        "A2_C_target_median_db": float(target_stats["A2"].get("C_target_median_db", np.nan)),
+        "A3_C_target_median_db": float(target_stats["A3"].get("C_target_median_db", np.nan)),
         "B2_min_delay_gap_median_s": float(np.nanmedian(mins)) if len(mins) else float("nan"),
         "B2_status": "PASS" if b2_ok else "WARN",
-        "B3_status": "PASS" if (np.isfinite(tau_max) and tmax_s < tau_max) else "FAIL",
+        "B3_status": "PASS" if b3_ok else "FAIL",
+        "W3_status": str(wearly_stats.get("status", "WARN")),
+        "W3_best_te_ns": float(_num(wearly_stats.get("best_te_ns", np.nan))),
+        "W3_best_S_xpd_early": float(_num(wearly_stats.get("best_S_xpd_early", np.nan))),
+        "W3_best_S_rho_early_db": float(_num(wearly_stats.get("best_S_rho_early_db", np.nan))),
+        "W3_best_S_l_pol": float(_num(wearly_stats.get("best_S_l_pol", np.nan))),
+        "W_floor_detail": floor_stats,
+        "W_target_detail": target_stats,
+        "W3_te_sweep": wearly_stats,
     }
 
     # C effect vs floor
@@ -552,35 +881,122 @@ def _build_markdown(
     b = checks.get("B_time_resolution", {})
     lines.append("### B) Time Resolution / Delay Separability")
     lines.append("")
+    lines.append("- `W_floor`(C0): `C_floor = Sum(P_nonLOS in W_floor) / P_LOS`")
+    lines.append("- `W_target`(A2-A5): `C_target = Sum(P_non-target in W_target) / P_target`")
+    lines.append("- `W_early`(B1-B3): `S(Te)=|mu_LOS-mu_NLOS|/sqrt(sig_LOS^2+sig_NLOS^2)`")
+    lines.append("")
     lines.append(
         report_md.md_table(
             [
                 {
+                    "freq_source": b.get("freq_source", ""),
                     "dt_res_s": b.get("dt_res_s", np.nan),
                     "tau_max_s": b.get("tau_max_s", np.nan),
                     "Te_s": b.get("Te_s", np.nan),
                     "Tmax_s": b.get("Tmax_s", np.nan),
-                    "A2_target_in_early_rate": b.get("B1_target_in_early_rate_A2", np.nan),
-                    "A3_target_in_early_rate": b.get("B1_target_in_early_rate_A3", np.nan),
+                    "W_floor_C_median_db": b.get("W_floor_C_median_db", np.nan),
+                    "W_floor_status": b.get("W_floor_status", ""),
+                    "A2_target_in_Wearly_rate": b.get("A2_target_in_Wearly_rate", np.nan),
+                    "A3_target_in_Wearly_rate": b.get("A3_target_in_Wearly_rate", np.nan),
+                    "A2_C_target_median_db": b.get("A2_C_target_median_db", np.nan),
+                    "A3_C_target_median_db": b.get("A3_C_target_median_db", np.nan),
                     "min_delay_gap_median_s": b.get("B2_min_delay_gap_median_s", np.nan),
                     "B2_status": b.get("B2_status", ""),
                     "B3_status": b.get("B3_status", ""),
+                    "W3_best_te_ns": b.get("W3_best_te_ns", np.nan),
+                    "W3_best_S_xpd_early": b.get("W3_best_S_xpd_early", np.nan),
+                    "W3_status": b.get("W3_status", ""),
                 }
             ],
             [
+                "freq_source",
                 "dt_res_s",
                 "tau_max_s",
                 "Te_s",
                 "Tmax_s",
-                "A2_target_in_early_rate",
-                "A3_target_in_early_rate",
+                "W_floor_C_median_db",
+                "W_floor_status",
+                "A2_target_in_Wearly_rate",
+                "A3_target_in_Wearly_rate",
+                "A2_C_target_median_db",
+                "A3_C_target_median_db",
                 "min_delay_gap_median_s",
                 "B2_status",
                 "B3_status",
+                "W3_best_te_ns",
+                "W3_best_S_xpd_early",
+                "W3_status",
             ],
         )
     )
     lines.append("")
+    wfloor = b.get("W_floor_detail", {})
+    if isinstance(wfloor, dict):
+        lines.append("- W_floor(C0) contamination summary")
+        lines.append("")
+        lines.append(
+            report_md.md_table(
+                [
+                    {
+                        "W_floor_s": wfloor.get("W_floor_s", np.nan),
+                        "C_floor_median_db": wfloor.get("C_floor_median_db", np.nan),
+                        "C_floor_p95_db": wfloor.get("C_floor_p95_db", np.nan),
+                        "rate_below_m10_db": wfloor.get("rate_below_m10_db", np.nan),
+                        "rate_below_m15_db": wfloor.get("rate_below_m15_db", np.nan),
+                        "status": wfloor.get("status", ""),
+                        "n_cases": wfloor.get("n_cases", 0),
+                    }
+                ],
+                ["W_floor_s", "C_floor_median_db", "C_floor_p95_db", "rate_below_m10_db", "rate_below_m15_db", "status", "n_cases"],
+            )
+        )
+        lines.append("")
+    wtarget = b.get("W_target_detail", {})
+    if isinstance(wtarget, dict):
+        trows = []
+        for sid in ["A2", "A3", "A4", "A5"]:
+            wsid = wtarget.get(sid, {})
+            if not isinstance(wsid, dict):
+                continue
+            trows.append(
+                {
+                    "scenario": sid,
+                    "target_n": wsid.get("target_n", np.nan),
+                    "target_exists_rate": wsid.get("target_exists_rate", np.nan),
+                    "target_is_first_rate": wsid.get("target_is_first_rate", np.nan),
+                    "target_in_Wearly_rate": wsid.get("target_in_Wearly_rate", np.nan),
+                    "C_target_median_db": wsid.get("C_target_median_db", np.nan),
+                    "target_gap_median_s": wsid.get("target_gap_median_s", np.nan),
+                    "status": wsid.get("status", ""),
+                }
+            )
+        if trows:
+            lines.append("- W_target(controlled scenarios) summary")
+            lines.append("")
+            lines.append(
+                report_md.md_table(
+                    trows,
+                    [
+                        "scenario",
+                        "target_n",
+                        "target_exists_rate",
+                        "target_is_first_rate",
+                        "target_in_Wearly_rate",
+                        "C_target_median_db",
+                        "target_gap_median_s",
+                        "status",
+                    ],
+                )
+            )
+            lines.append("")
+    w3 = b.get("W3_te_sweep", {})
+    if isinstance(w3, dict):
+        srows = w3.get("scores", [])
+        if isinstance(srows, list) and srows:
+            lines.append("- W_early(room/grid) Te sweep separation")
+            lines.append("")
+            lines.append(report_md.md_table(srows, ["Te_ns", "S_xpd_early", "S_rho_early_db", "S_l_pol"]))
+            lines.append("")
 
     # C
     c = checks.get("C_effect_vs_floor", {})
@@ -653,6 +1069,8 @@ def _build_markdown(
     lines.append("")
     for s in sorted(scenario_scene.keys()):
         lines.append(f"### {s}")
+        lines.append("")
+        lines.append(f"- 의미: {report_md.scenario_meaning(s)}")
         lines.append("")
         scene_png = scenario_scene[s]
         scene_rel = report_md.relpath(scene_png, out_root)
@@ -760,7 +1178,7 @@ def main() -> None:
     )
 
     # checks
-    checks = _diagnostic_checks(link_rows, ray_rows, floor_ref=floor_ref, cfg=cfg)
+    checks = _diagnostic_checks(link_rows, ray_rows, floor_ref=floor_ref, cfg=cfg, runs=runs)
 
     # save tables/json
     _write_rows_csv(tab_dir / "diagnostic_link_rows.csv", link_rows)

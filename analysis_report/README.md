@@ -37,3 +37,7 @@ python analysis_report/generate_warning_report.py --config analysis_report/confi
 ## Notes
 - 기본 구현은 **power 기반 지표(Z/U)**만 사용합니다.
 - `scene_debug.json`이 없으면 해당 케이스 scene plot은 WARN으로 보고서에 기록됩니다.
+- 진단 B는 목적별 3-window를 분리해 계산합니다.
+  - `W_floor` (C0): LOS peak 주변 contamination `C_floor`
+  - `W_target` (A2-A5): target path 주변 contamination `C_target`
+  - `W_early` (B1-B3): `Te` sweep(기본 `2/3/5 ns`) 분리력 `S(Te)`

@@ -7,6 +7,23 @@ from pathlib import Path
 from typing import Any
 
 
+_SCENARIO_MEANING: dict[str, str] = {
+    "C0": "Free-space LOS calibration baseline for floor/alignment uncertainty.",
+    "A2": "LOS-blocked single-bounce(odd) control to probe early cross-leakage increase.",
+    "A3": "LOS-blocked double-bounce(even) control to test co-dominant recovery trend.",
+    "A4": "LOS-blocked material/angle sweep to isolate material-conditional leakage statistics.",
+    "A5": "LOS-blocked depolarization-stress scenario (roughness/human/scatter) for tail-risk.",
+    "B1": "Room grid baseline (mostly LOS) for spatial Z/U trend mapping.",
+    "B2": "Room grid with partition obstacle to induce partial NLOS/blocked regions.",
+    "B3": "Room grid with corner obstacles for stronger NLOS and multipath complexity.",
+}
+
+
+def scenario_meaning(scenario_id: Any) -> str:
+    sid = str(scenario_id).upper().strip()
+    return _SCENARIO_MEANING.get(sid, "Scenario-specific control/sweep for proxy Z/U validation.")
+
+
 def relpath(target: str | Path, base_dir: str | Path) -> str:
     t = Path(target).resolve()
     b = Path(base_dir).resolve()

@@ -131,7 +131,7 @@ def _collect_diag_alerts(checks: dict[str, Any]) -> list[dict[str, Any]]:
 
     b = checks.get("B_time_resolution", {})
     if isinstance(b, dict):
-        for k in ["B2_status", "B3_status"]:
+        for k in ["W_floor_status", "B2_status", "B3_status", "W3_status"]:
             st = str(b.get(k, ""))
             if st and st not in {"PASS"}:
                 alerts.append({"item": f"B_time_resolution::{k}", "status": st, "detail": b})
@@ -237,7 +237,7 @@ def main() -> None:
         delta_db=float(floor_ref.get("delta_floor_db", np.nan)),
     )
 
-    checks = _diagnostic_checks(link_rows, ray_rows, floor_ref=floor_ref, cfg=cfg)
+    checks = _diagnostic_checks(link_rows, ray_rows, floor_ref=floor_ref, cfg=cfg, runs=runs)
     diag_alerts = _collect_diag_alerts(checks)
 
     ws = dict(cfg.get("windows", {}))
@@ -441,6 +441,7 @@ def main() -> None:
         cid = str(r.get("case_id", ""))
         lines.append(f"### [{r.get('severity', 'WARN')}] {sid}/{cid} ({r.get('link_id', '')})")
         lines.append("")
+        lines.append(f"- scenario 의미: {report_md.scenario_meaning(sid)}")
         lines.append(f"- case_label: {r.get('case_label', '')}")
         lines.append(f"- scene_source: {r.get('scene_source', '')}")
         lines.append("- reasons:")

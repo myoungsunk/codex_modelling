@@ -25,6 +25,28 @@ make rich_release
 make parity_map
 ```
 
+## MATLAB Port (Phase 1)
+
+MATLAB core rewrite is available under `matlab/`:
+
+```matlab
+addpath('/Users/kimmyoungsun/Documents/codex/matlab');
+ok = run_all_tests();
+
+dataset = run_scenario_sweep('scenario', 'C0', 'basis', 'linear', ...
+  'out_mat', '/Users/kimmyoungsun/Documents/codex/outputs/matlab_c0.mat', ...
+  'out_json_summary', '/Users/kimmyoungsun/Documents/codex/outputs/matlab_c0_summary.json');
+
+report = run_xpd_analysis('dataset', dataset, ...
+  'num_subbands', 4, ...
+  'out_json', '/Users/kimmyoungsun/Documents/codex/outputs/matlab_c0_xpd.json');
+
+summary = validate_matlab2025('output_dir', ...
+  '/Users/kimmyoungsun/Documents/codex/outputs/matlab_validation_2025');
+```
+
+Current MATLAB coverage includes `rt_core`, scenario generation/execution (`A1/C0/A2/A2R/A3/A3R/A4/A5/A6/B0`), and core `analysis` functions (`ctf_cir` + key `xpd_stats`).
+
 Optional dispersive material mode (defaults keep legacy behavior):
 ```bash
 python -m scenarios.runner \

@@ -655,6 +655,8 @@ def main() -> None:
     for sid in scenarios:
         lines.append(f"### {sid}")
         lines.append("")
+        lines.append(f"- 의미: {report_md.scenario_meaning(sid)}")
+        lines.append("")
         img = scene_global.get(sid, "")
         if not img:
             cand = sorted([k for k in scene_case.keys() if k[0] == sid], key=lambda x: x[1])

@@ -95,8 +95,11 @@ def apply_floor_excess(link_rows: list[dict[str, Any]], floor_db: float, delta_d
         rr = dict(r)
         x_e = float(rr.get("XPD_early_db", np.nan))
         x_l = float(rr.get("XPD_late_db", np.nan))
-        rr.setdefault("XPD_early_excess_db", float(x_e - floor_db) if np.isfinite(x_e) and np.isfinite(floor_db) else np.nan)
-        rr.setdefault("XPD_late_excess_db", float(x_l - floor_db) if np.isfinite(x_l) and np.isfinite(floor_db) else np.nan)
+        # Always recompute excess against the report-selected floor reference.
+        # Do not keep pre-existing per-run excess values, which may have been
+        # computed with a different floor policy.
+        rr["XPD_early_excess_db"] = float(x_e - floor_db) if np.isfinite(x_e) and np.isfinite(floor_db) else np.nan
+        rr["XPD_late_excess_db"] = float(x_l - floor_db) if np.isfinite(x_l) and np.isfinite(floor_db) else np.nan
         rr["floor_db"] = float(floor_db)
         rr["delta_floor_db"] = float(delta_db)
         rr["outlier_excess_neg"] = bool(np.isfinite(rr["XPD_early_excess_db"]) and np.isfinite(delta_db) and rr["XPD_early_excess_db"] < -abs(delta_db))
