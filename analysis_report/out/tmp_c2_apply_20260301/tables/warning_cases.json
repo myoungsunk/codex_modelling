@@ -1,0 +1,372 @@
+[
+  {
+    "severity": "WARN",
+    "scenario_id": "A2",
+    "case_id": "0",
+    "case_label": "A2_0",
+    "link_id": "A2_0",
+    "scene_source": "scene_debug_json",
+    "scene_png": "analysis_report/out/tmp_c2_apply_20260301/figures/A2__0__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "target tau 16.678ns >= Te 3.000ns"
+    ],
+    "flags": {
+      "scene_fallback": false,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -32.934837556282154,
+    "XPD_late_excess_db": -24.93483769676745,
+    "L_pol_db": -7.9999998595147055,
+    "EL_proxy_db": 2.7199659283313338,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 1.9015384099281446e-07,
+        "tau_ns": 16.6782047599076,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A2",
+    "case_id": "1",
+    "case_label": "A2_1",
+    "link_id": "A2_1",
+    "scene_source": "scene_debug_json",
+    "scene_png": "analysis_report/out/tmp_c2_apply_20260301/figures/A2__1__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "target tau 16.678ns >= Te 3.000ns"
+    ],
+    "flags": {
+      "scene_fallback": false,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -32.934837556282154,
+    "XPD_late_excess_db": -24.93483769676745,
+    "L_pol_db": -7.9999998595147055,
+    "EL_proxy_db": 2.7199659283313338,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 1.9015384099281446e-07,
+        "tau_ns": 16.6782047599076,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A2",
+    "case_id": "10",
+    "case_label": "A2_10",
+    "link_id": "A2_10",
+    "scene_source": "scene_debug_json",
+    "scene_png": "analysis_report/out/tmp_c2_apply_20260301/figures/A2__10__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "target tau 22.376ns >= Te 3.000ns"
+    ],
+    "flags": {
+      "scene_fallback": false,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -32.934837443893926,
+    "XPD_late_excess_db": -24.93483769676745,
+    "L_pol_db": -7.999999747126473,
+    "EL_proxy_db": 2.7199659283313338,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 1.0564102277378595e-07,
+        "tau_ns": 22.376159751488377,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A2",
+    "case_id": "11",
+    "case_label": "A2_11",
+    "link_id": "A2_11",
+    "scene_source": "scene_debug_json",
+    "scene_png": "analysis_report/out/tmp_c2_apply_20260301/figures/A2__11__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "target tau 22.376ns >= Te 3.000ns"
+    ],
+    "flags": {
+      "scene_fallback": false,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -32.934837443893926,
+    "XPD_late_excess_db": -24.93483769676745,
+    "L_pol_db": -7.999999747126473,
+    "EL_proxy_db": 2.7199659283313338,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 1.0564102277378595e-07,
+        "tau_ns": 22.376159751488377,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A2",
+    "case_id": "12",
+    "case_label": "A2_12",
+    "link_id": "A2_12",
+    "scene_source": "scene_debug_json",
+    "scene_png": "analysis_report/out/tmp_c2_apply_20260301/figures/A2__12__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "target tau 24.054ns >= Te 3.000ns"
+    ],
+    "flags": {
+      "scene_fallback": false,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -32.934837404558046,
+    "XPD_late_excess_db": -24.93483769676745,
+    "L_pol_db": -7.999999707790595,
+    "EL_proxy_db": 2.719965928331348,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 9.142011586193009e-08,
+        "tau_ns": 24.053648977813772,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A2",
+    "case_id": "13",
+    "case_label": "A2_13",
+    "link_id": "A2_13",
+    "scene_source": "scene_debug_json",
+    "scene_png": "analysis_report/out/tmp_c2_apply_20260301/figures/A2__13__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "target tau 24.054ns >= Te 3.000ns"
+    ],
+    "flags": {
+      "scene_fallback": false,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -32.934837404558046,
+    "XPD_late_excess_db": -24.93483769676745,
+    "L_pol_db": -7.999999707790595,
+    "EL_proxy_db": 2.719965928331348,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 9.142011586193009e-08,
+        "tau_ns": 24.053648977813772,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A2",
+    "case_id": "14",
+    "case_label": "A2_14",
+    "link_id": "A2_14",
+    "scene_source": "scene_debug_json",
+    "scene_png": "analysis_report/out/tmp_c2_apply_20260301/figures/A2__14__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "target tau 24.054ns >= Te 3.000ns"
+    ],
+    "flags": {
+      "scene_fallback": false,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -32.934837404558046,
+    "XPD_late_excess_db": -24.93483769676745,
+    "L_pol_db": -7.999999707790595,
+    "EL_proxy_db": 2.719965928331348,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 9.142011586193009e-08,
+        "tau_ns": 24.053648977813772,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A2",
+    "case_id": "15",
+    "case_label": "A2_15",
+    "link_id": "A2_15",
+    "scene_source": "scene_debug_json",
+    "scene_png": "analysis_report/out/tmp_c2_apply_20260301/figures/A2__15__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "target tau 26.052ns >= Te 3.000ns"
+    ],
+    "flags": {
+      "scene_fallback": false,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -32.93483735398334,
+    "XPD_late_excess_db": -24.93483769676745,
+    "L_pol_db": -7.999999657215893,
+    "EL_proxy_db": 2.719965928331348,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 7.793190204623549e-08,
+        "tau_ns": 26.052188664154635,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A2",
+    "case_id": "16",
+    "case_label": "A2_16",
+    "link_id": "A2_16",
+    "scene_source": "scene_debug_json",
+    "scene_png": "analysis_report/out/tmp_c2_apply_20260301/figures/A2__16__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "target tau 26.052ns >= Te 3.000ns"
+    ],
+    "flags": {
+      "scene_fallback": false,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -32.93483735398334,
+    "XPD_late_excess_db": -24.93483769676745,
+    "L_pol_db": -7.999999657215893,
+    "EL_proxy_db": 2.719965928331348,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 7.793190204623549e-08,
+        "tau_ns": 26.052188664154635,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A2",
+    "case_id": "17",
+    "case_label": "A2_17",
+    "link_id": "A2_17",
+    "scene_source": "scene_debug_json",
+    "scene_png": "analysis_report/out/tmp_c2_apply_20260301/figures/A2__17__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "target tau 26.052ns >= Te 3.000ns"
+    ],
+    "flags": {
+      "scene_fallback": false,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -32.93483735398334,
+    "XPD_late_excess_db": -24.93483769676745,
+    "L_pol_db": -7.999999657215893,
+    "EL_proxy_db": 2.719965928331348,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 7.793190204623549e-08,
+        "tau_ns": 26.052188664154635,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  }
+]

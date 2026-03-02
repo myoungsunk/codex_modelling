@@ -1,0 +1,12 @@
+data_status,definition,proposition,status
+OK,C0 floor distance/yaw sensitivity,M1,SUPPORTED
+OK,Fraction inside/outside floor uncertainty band,M2,SUPPORTED
+OK,A2 odd-bounce increases cross dominance vs C0,G1,SUPPORTED
+OK,A3 even-bounce recovery vs A2,G2,SUPPORTED
+OK,Early/Late leakage separation via XPD_early_ex/XPD_late_ex/L_pol,L1,SUPPORTED
+OK,A5 stress impact on center/tails,L2,SUPPORTED
+OK,Correlation between leakage excess and -EL_proxy,L3,PARTIAL
+OK,Room-space LOS/NLOS and heatmap consistency,R1,SUPPORTED
+OK,DS/early-fraction relation with leakage,R2,SUPPORTED
+OK,"Two-stage model (EL first, then mechanism effects) vs constant baseline",P1,SUPPORTED
+OK,Stage-1 EL coefficient sign stability under subsampling,P2,SUPPORTED
