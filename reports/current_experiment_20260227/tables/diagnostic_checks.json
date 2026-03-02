@@ -1,0 +1,95 @@
+{
+  "A1_los_blocked": [
+    {
+      "scenario": "A2",
+      "los_rays": 0,
+      "status": "PASS"
+    },
+    {
+      "scenario": "A3",
+      "los_rays": 0,
+      "status": "PASS"
+    },
+    {
+      "scenario": "A4",
+      "los_rays": 0,
+      "status": "PASS"
+    },
+    {
+      "scenario": "A5",
+      "los_rays": 0,
+      "status": "PASS"
+    }
+  ],
+  "A2_target_bounce": [
+    {
+      "scenario": "A2",
+      "target_n": 1,
+      "hit": 27,
+      "total": 27,
+      "rate": 1.0,
+      "status": "PASS"
+    },
+    {
+      "scenario": "A3",
+      "target_n": 2,
+      "hit": 12,
+      "total": 14,
+      "rate": 0.8571428571428571,
+      "status": "PASS"
+    }
+  ],
+  "A3_coord_sanity": {
+    "status": "WARN",
+    "note": "Coordinate penetration sanity needs scenario geometry file review; not inferable from standard outputs only."
+  },
+  "B_time_resolution": {
+    "dt_res_s": 1e-09,
+    "tau_max_s": 1e-06,
+    "Te_s": 1e-08,
+    "Tmax_s": 2.0000000000000002e-07,
+    "B1_target_in_early_rate_A2": 0.0,
+    "B1_target_in_early_rate_A3": 0.0,
+    "B2_min_delay_gap_median_s": 0.0,
+    "B2_status": "WARN",
+    "B3_status": "PASS"
+  },
+  "C_effect_vs_floor": {
+    "floor_delta_db": 0.6107424337365455,
+    "A3_minus_A2_delta_median_db": 6.335361848931871,
+    "ratio_to_floor": 10.373213811543904,
+    "C1_status": "PASS",
+    "A4_material_shift_late_excess_db": 0.0,
+    "A5_stress_delta_late_excess_db": 0.0,
+    "A5_stress_var_ratio": 58913129275750.33,
+    "C2_status": "PASS"
+  },
+  "D_identifiability": {
+    "EL_iqr_db": 2.2431072202267295,
+    "corr_d_vs_LOS": -0.5493884215888136,
+    "strata_counts": {
+      "LOS0_q2": 106,
+      "LOS0_q1": 94,
+      "LOS0_q3": 96,
+      "LOS1_q1": 59,
+      "LOS1_q3": 37,
+      "LOS1_q2": 66
+    },
+    "min_strata_n": 37,
+    "status": "WARN"
+  },
+  "E_power_based": {
+    "status": "PASS",
+    "used_metrics": [
+      "XPD_early_db",
+      "XPD_late_db",
+      "rho_early_lin",
+      "L_pol_db",
+      "delay_spread_rms_s",
+      "early_energy_fraction",
+      "EL_proxy_db",
+      "LOSflag"
+    ],
+    "note": "No complex-phase fields are used by this report pipeline."
+  }
+}

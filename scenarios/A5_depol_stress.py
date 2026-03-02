@@ -41,20 +41,37 @@ def build_scene(offset: float = 3.0) -> list[Plane]:
     ]
 
 
-def _append_stress_scatterers(scene: list[Plane], seed: int, count: int) -> None:
+def _append_stress_scatterers(scene: list[Plane], seed: int, count: int, offset: float) -> None:
     if int(count) <= 0:
         return
     rng = np.random.default_rng(int(seed))
-    for i in range(int(count)):
-        px = 2.8 + 1.8 * float(rng.random())
-        py = 1.2 + 2.8 * float(rng.random())
+    # Keep stress scatterers on the same visible side of corner planes (x<offset, y<offset).
+    # This avoids non-physical "behind-wall scatterer" artifacts in A5 scene diagnostics.
+    margin = 0.30
+    x_min = 0.7
+    y_min = 0.3
+    x_max = max(x_min + 0.2, float(offset) - margin)
+    y_max = max(y_min + 0.2, float(offset) - margin)
+    if not (x_max > x_min and y_max > y_min):
+        return
+
+    added = 0
+    max_trials = max(8 * int(count), 24)
+    trials = 0
+    while added < int(count) and trials < max_trials:
+        trials += 1
+        px = x_min + (x_max - x_min) * float(rng.random())
+        py = y_min + (y_max - y_min) * float(rng.random())
         pz = 0.8 + 1.4 * float(rng.random())
+        # Keep scatterers away from the wall boundary to avoid appearing embedded in wall lines.
+        if (px >= float(offset) - margin) or (py >= float(offset) - margin):
+            continue
         yaw = (float(rng.random()) - 0.5) * np.pi
         n = np.array([np.cos(yaw), np.sin(yaw), 0.2 * (float(rng.random()) - 0.5)], dtype=float)
         n = n / float(np.linalg.norm(n))
         scene.append(
             Plane(
-                id=9500 + int(i),
+                id=9500 + int(added),
                 p0=np.array([px, py, pz], dtype=float),
                 normal=n,
                 material=Material.pec(),
@@ -64,6 +81,7 @@ def _append_stress_scatterers(scene: list[Plane], seed: int, count: int) -> None
                 half_extent_v=0.25,
             )
         )
+        added += 1
 
 
 def build_sweep_params() -> list[dict[str, Any]]:
@@ -73,8 +91,10 @@ def build_sweep_params() -> list[dict[str, Any]]:
             params.append(
                 {
                     "offset": 3.5,
-                    "rx_x": 3.5,
-                    "rx_y": 4.5,
+                    # Keep Rx on the same side of both corner planes to avoid
+                    # physically ambiguous through-wall geometry in stress tests.
+                    "rx_x": 2.5,
+                    "rx_y": 0.5,
                     "rho": rho,
                     "rep_id": rep_id,
                     "seed": BASE_SEED + rho_idx * 100 + rep_id,
@@ -97,13 +117,35 @@ def run_case(
     los_enabled_override: bool | None = None,
 ):
     tx, rx = default_antennas(basis=basis, **(antenna_config or {}))
-    rx.position[:] = [params["rx_x"], params["rx_y"], 1.5]
-    scene = build_scene(offset=params["offset"])
+    off = float(params["offset"])
+    rx_x = float(params["rx_x"])
+    rx_y = float(params["rx_y"])
+    if not (rx_x < off and rx_y < off):
+        raise ValueError(
+            "A5 invalid geometry: Rx must satisfy rx_x<offset and rx_y<offset "
+            f"(rx_x={rx_x}, rx_y={rx_y}, offset={off})"
+        )
+    rx.position[:] = [rx_x, rx_y, 1.5]
+    scene = build_scene(offset=off)
     mode = str(stress_mode).lower().strip()
     if mode in {"geometry", "hybrid"} and int(scatterer_count) > 0:
-        _append_stress_scatterers(scene, seed=int(params.get("seed", BASE_SEED)), count=int(scatterer_count))
+        _append_stress_scatterers(
+            scene,
+            seed=int(params.get("seed", BASE_SEED)),
+            count=int(scatterer_count),
+            offset=off,
+        )
     if bool(los_blocker):
-        scene.append(make_los_blocker_plane(tx.position, rx.position, plane_id=9401))
+        # Block only LOS; do not over-block candidate reflected paths.
+        scene.append(
+            make_los_blocker_plane(
+                tx.position,
+                rx.position,
+                plane_id=9401,
+                half_extent_u=0.12,
+                half_extent_v=0.30,
+            )
+        )
 
     dep = None
     if mode in {"synthetic", "hybrid"}:

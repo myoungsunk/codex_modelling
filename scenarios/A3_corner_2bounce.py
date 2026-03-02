@@ -38,9 +38,11 @@ def build_scene(offset: float = 3.0) -> list[Plane]:
 
 def build_sweep_params() -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
+    # Keep Rx on the same side of both corner planes (x<offset, y<offset) to avoid
+    # physically ambiguous "through-wall" interpretation while preserving strong 2-bounce paths.
     for off in [3.0, 3.5, 4.0]:
-        for rx_x, rx_y in [(3.0, 4.0), (3.5, 4.5), (4.0, 5.0), (4.5, 4.0)]:
-            out.append({"offset": off, "rx_x": float(rx_x), "rx_y": float(rx_y)})
+        for rx_x, rx_y in [(0.5, 1.5), (1.5, 0.5), (0.5, 2.5), (2.5, 0.5)]:
+            out.append({"offset": float(off), "rx_x": float(rx_x), "rx_y": float(rx_y)})
     return out
 
 
@@ -56,9 +58,17 @@ def run_case(
     los_enabled_override: bool | None = None,
 ):
     tx, rx = default_antennas(basis=basis, **(antenna_config or {}))
+    off = float(params["offset"])
+    rx_x = float(params["rx_x"])
+    rx_y = float(params["rx_y"])
+    if not (rx_x < off and rx_y < off):
+        raise ValueError(
+            "A3 invalid geometry: Rx must satisfy rx_x<offset and rx_y<offset "
+            f"(rx_x={rx_x}, rx_y={rx_y}, offset={off})"
+        )
     tx.position[:] = [0.0, 0.0, 1.5]
-    rx.position[:] = [params["rx_x"], params["rx_y"], 1.5]
-    scene = build_scene(offset=params["offset"])
+    rx.position[:] = [rx_x, rx_y, 1.5]
+    scene = build_scene(offset=off)
     if bool(los_blocker):
         scene.append(make_los_blocker_plane(tx.position, rx.position, plane_id=9201))
     if los_enabled_override is None:

@@ -298,10 +298,26 @@ def _select_case(dataset: dict[str, Any], scenario_id: str | None = None, case_i
     return best2[1], best2[2], best2[3]
 
 
-def _xpd_over_frequency(H_f: NDArray[np.complex128]) -> NDArray[np.float64]:
-    co = np.abs(H_f[:, 0, 0]) ** 2 + np.abs(H_f[:, 1, 1]) ** 2
-    cr = np.abs(H_f[:, 0, 1]) ** 2 + np.abs(H_f[:, 1, 0]) ** 2
+def _xpd_over_frequency(H_f: NDArray[np.complex128], mode: str = "matrix") -> NDArray[np.float64]:
+    m = str(mode).lower().strip()
+    if m == "dualcp":
+        co = np.abs(H_f[:, 0, 0]) ** 2
+        cr = np.abs(H_f[:, 1, 0]) ** 2
+    else:
+        co = np.abs(H_f[:, 0, 0]) ** 2 + np.abs(H_f[:, 1, 1]) ** 2
+        cr = np.abs(H_f[:, 0, 1]) ** 2 + np.abs(H_f[:, 1, 0]) ** 2
     return 10.0 * np.log10((co + EPS) / (np.maximum(cr, 1e-12) + EPS))
+
+
+def _infer_xpd_mode(meas_meta: dict[str, Any], H_meas_rt: NDArray[np.complex128]) -> str:
+    fmt = str(meas_meta.get("format", "")).lower().strip()
+    if fmt in {"dualcp_two_csv", "dualcp_three_csv"}:
+        return "dualcp"
+    h01 = np.max(np.abs(np.asarray(H_meas_rt[:, 0, 1], dtype=np.complex128))) if len(H_meas_rt) else 0.0
+    h11 = np.max(np.abs(np.asarray(H_meas_rt[:, 1, 1], dtype=np.complex128))) if len(H_meas_rt) else 0.0
+    if h01 <= 1e-12 and h11 <= 1e-12:
+        return "dualcp"
+    return "matrix"
 
 
 def _ecdf(x: NDArray[np.float64]) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
@@ -377,8 +393,9 @@ def compare_measured_to_dataset(
     mag_me = 20.0 * np.log10(np.abs(H_meas_rt) + 1e-12)
     rmse_mag_db_rt = float(np.sqrt(np.mean((mag_me - mag_rt) ** 2)))
 
-    xpd_me = _xpd_over_frequency(H_meas_rt)
-    xpd_rt = _xpd_over_frequency(H_rt)
+    xpd_mode = _infer_xpd_mode(meas_meta, H_meas_rt)
+    xpd_me = _xpd_over_frequency(H_meas_rt, mode=xpd_mode)
+    xpd_rt = _xpd_over_frequency(H_rt, mode=xpd_mode)
     ks_rt = stats.ks_2samp(xpd_me, xpd_rt, alternative="two-sided", method="auto")
 
     ks_sy_p = np.nan
@@ -387,7 +404,7 @@ def compare_measured_to_dataset(
     if H_sy is not None:
         mag_sy = 20.0 * np.log10(np.abs(H_sy) + 1e-12)
         rmse_mag_db_sy = float(np.sqrt(np.mean((mag_me - mag_sy) ** 2)))
-        xpd_sy = _xpd_over_frequency(H_sy)
+        xpd_sy = _xpd_over_frequency(H_sy, mode=xpd_mode)
         ks_sy = stats.ks_2samp(xpd_me, xpd_sy, alternative="two-sided", method="auto")
         ks_sy_p = float(ks_sy.pvalue)
 
@@ -445,6 +462,7 @@ def compare_measured_to_dataset(
         "eval_convention": out_conv,
         "rmse_mag_db_meas_vs_rt": rmse_mag_db_rt,
         "rmse_mag_db_meas_vs_synth": float(rmse_mag_db_sy) if np.isfinite(rmse_mag_db_sy) else np.nan,
+        "xpd_mode": xpd_mode,
         "xpd_mu_measured_db": float(np.mean(xpd_me)),
         "xpd_mu_rt_db": float(np.mean(xpd_rt)),
         "xpd_mu_synth_db": float(np.mean(xpd_sy)) if len(xpd_sy) else np.nan,

@@ -52,9 +52,10 @@ def _to_params(params: dict[str, Any] | DualCPMetricParams | None) -> DualCPMetr
 
 
 def _dualcp_tap_powers(h_tau: np.ndarray, power_floor: float) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    _ = power_floor
     p = np.abs(np.asarray(h_tau, dtype=np.complex128)) ** 2
     p_co = p[:, 0, 0].astype(float)
-    p_cross = np.maximum(p[:, 1, 0].astype(float), float(power_floor))
+    p_cross = p[:, 1, 0].astype(float)
     p_total = (p_co + p_cross).astype(float)
     return p_co, p_cross, p_total
 

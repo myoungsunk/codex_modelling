@@ -1,0 +1,101 @@
+{
+  "c0_delta_floor_db": 1.2214848660738156,
+  "C2_A4": [
+    {
+      "label": "A4_tuned3",
+      "csv": "/Users/kimmyoungsun/Documents/codex/outputs/step1_diag/A4_tuned3/link_metrics.csv",
+      "n_links": 72,
+      "material_shift_range_db": 8.189290571385877,
+      "material_stats": {
+        "glass": {
+          "n": 24,
+          "median_XPD_early_db": -9.378960553911483,
+          "median_XPD_late_db": -8.145146729919597,
+          "median_L_pol_db": -1.3194624882938246
+        },
+        "gypsum": {
+          "n": 24,
+          "median_XPD_early_db": -5.115264947632366,
+          "median_XPD_late_db": -4.14703972865855,
+          "median_L_pol_db": -1.47015156102449
+        },
+        "wood": {
+          "n": 24,
+          "median_XPD_early_db": -1.1896699825256054,
+          "median_XPD_late_db": 0.0,
+          "median_L_pol_db": -1.0301840625651537
+        }
+      },
+      "coverage_material_x_incidence": {
+        "glass": {
+          "low": 2,
+          "mid": 10,
+          "high": 12,
+          "NA": 0
+        },
+        "gypsum": {
+          "low": 2,
+          "mid": 10,
+          "high": 12,
+          "NA": 0
+        },
+        "wood": {
+          "low": 2,
+          "mid": 10,
+          "high": 12,
+          "NA": 0
+        }
+      },
+      "exceeds_delta_floor": true
+    }
+  ],
+  "C2_A5_effect": {
+    "XPD_early_db": {
+      "delta_median": -5.8962649490633785,
+      "var_ratio": 3.506373105940637,
+      "q10_shift": -7.1693281841592285,
+      "ks_p": 1.6911233892144742e-17
+    },
+    "XPD_late_db": {
+      "delta_median": 0.0,
+      "var_ratio": NaN,
+      "q10_shift": -0.0478423437932698,
+      "ks_p": 0.9578462903438838
+    },
+    "L_pol_db": {
+      "delta_median": -5.852639695953271,
+      "var_ratio": 5.141924790886765,
+      "q10_shift": -7.1693281841592285,
+      "ks_p": 1.6911233892144742e-17
+    }
+  },
+  "D2": {
+    "n_rows": 132,
+    "design_rank": 11,
+    "design_cols": 13,
+    "condition_number": 2.5405077257822573e+17,
+    "vif": {
+      "d_m": 6.5180744468003065,
+      "EL_proxy_db": 13.290922038506494
+    },
+    "vif_threshold": 5.0,
+    "vif_warnings": {
+      "d_m": 6.5180744468003065,
+      "EL_proxy_db": 13.290922038506494
+    },
+    "stress_x_incidence_coverage": {
+      "base": {
+        "low": 0,
+        "mid": 0,
+        "high": 0,
+        "NA": 30
+      },
+      "stress": {
+        "low": 0,
+        "mid": 0,
+        "high": 0,
+        "NA": 30
+      }
+    }
+  }
+}

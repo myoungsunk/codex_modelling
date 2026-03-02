@@ -75,6 +75,25 @@ def _enumerate_sequences(num_planes: int, bounce: int) -> list[tuple[int, ...]]:
     return list(product(range(num_planes), repeat=bounce))
 
 
+def _is_occluder_only_plane(plane: Plane) -> bool:
+    """Return True when a plane should block rays but never generate reflections.
+
+    LOS blockers are exported with absorber-like material names and dedicated IDs.
+    Keep them in occlusion checks, but remove from bounce-sequence enumeration.
+    """
+
+    try:
+        mat_name = str(getattr(plane.material, "name", "") or "").strip().lower()
+    except Exception:
+        mat_name = ""
+    pid = int(getattr(plane, "id", -1))
+    if "absorber_proxy" in mat_name or "occluder" in mat_name:
+        return True
+    if pid in {9101, 9201, 9301, 9401}:
+        return True
+    return False
+
+
 def _construct_reflection_points_source_images(
     tx: NDArray[np.float64],
     rx: NDArray[np.float64],
@@ -253,12 +272,16 @@ def trace_paths(
     results: list[PathResult] = []
     seen: set[tuple] = set()
     plate_eps = 1e-6
+    # Use all planes for occlusion checks, but only reflective planes for bounce generation.
+    reflective_planes = [pl for pl in planes if not _is_occluder_only_plane(pl)]
 
     for b in range(max_bounce + 1):
         if b == 0 and not los_enabled:
             continue
-        for idx_seq in _enumerate_sequences(len(planes), b):
-            seq = [planes[i] for i in idx_seq]
+        if b > 0 and len(reflective_planes) == 0:
+            continue
+        for idx_seq in _enumerate_sequences(len(reflective_planes), b):
+            seq = [reflective_planes[i] for i in idx_seq]
             points = _construct_reflection_points(tx.position, rx.position, seq)
             if points is None or not _path_valid(points):
                 continue
