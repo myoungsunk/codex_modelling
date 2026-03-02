@@ -24,6 +24,9 @@ python analysis_report/generate_intermediate_report.py --config analysis_report/
 - 경고 보고서(진단 WARN/FAIL 케이스별 리뷰):
 ```bash
 python analysis_report/generate_warning_report.py --config analysis_report/config.yaml
+
+# 4) 최종 판정 보고서(템플릿 기반, 문서용)
+python analysis_report/generate_final_decision_report.py --config analysis_report/config.yaml
 ```
 
 ## Outputs
@@ -41,3 +44,10 @@ python analysis_report/generate_warning_report.py --config analysis_report/confi
   - `W_floor` (C0): LOS peak 주변 contamination `C_floor`
   - `W_target` (A2-A5): target path 주변 contamination `C_target`
   - `W_early` (B1-B3): `Te` sweep(기본 `2/3/5 ns`) 분리력 `S(Te)`
+- 진단 C는 endpoint를 분리합니다.
+  - `C2-M`(material): primary=`XPD_early_excess`, secondary=`XPD_late_excess`/`L_pol`
+  - `C2-S`(stress): primary=`L_pol`, secondary=`rho_early`/`DS`/`XPD_late_excess`, gate=`ΔP_target,total`
+- 최종 보고서 산출물:
+  - `analysis_report/out/<run_group>/final_diagnostic_decision.md`
+  - `analysis_report/out/<run_group>/scenario_space_plots.md`
+  - `analysis_report/out/<run_group>/figures/<scenario>__ALL__scene_montage.png`
