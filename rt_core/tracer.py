@@ -263,10 +263,22 @@ def _path_occluded(points: list[NDArray[np.float64]], planes: Sequence[Plane], s
     return False
 
 
-def _path_key(points: list[NDArray[np.float64]], seq: Sequence[Plane], tau_s: float) -> tuple:
+def _path_key(
+    points: list[NDArray[np.float64]],
+    seq: Sequence[Plane],
+    tau_s: float,
+    point_tol_m: float = 1e-7,
+    tau_tol_s: float = 1e-13,
+) -> tuple:
     sid = tuple(pl.id for pl in seq)
-    pflat = tuple(tuple(np.round(p, 6).tolist()) for p in points[1:-1])
-    return (sid, pflat, round(float(tau_s), 12))
+    ptol = float(max(abs(float(point_tol_m)), 1e-12))
+    ttol = float(max(abs(float(tau_tol_s)), 1e-18))
+    pflat = tuple(
+        tuple(int(np.rint(float(x) / ptol)) for x in np.asarray(p, dtype=float))
+        for p in points[1:-1]
+    )
+    tau_q = int(np.rint(float(tau_s) / ttol))
+    return (sid, pflat, tau_q)
 
 
 def trace_paths(
@@ -291,6 +303,8 @@ def trace_paths(
     max_paths_per_case: int | None = None,
     max_sequence_candidates_per_bounce: int | None = None,
     forbid_immediate_surface_repeat: bool = False,
+    dedup_point_tol_m: float = 1e-7,
+    dedup_tau_tol_s: float = 1e-13,
 ) -> list[PathResult]:
     """Trace paths and return per-path delay and 2x2 transfer matrix over frequency."""
 
@@ -341,7 +355,13 @@ def trace_paths(
             if total_len <= 0.0:
                 continue
             tau = total_len / c0
-            key = _path_key(points, seq, tau)
+            key = _path_key(
+                points,
+                seq,
+                tau,
+                point_tol_m=float(dedup_point_tol_m),
+                tau_tol_s=float(dedup_tau_tol_s),
+            )
             if key in seen:
                 continue
             seen.add(key)

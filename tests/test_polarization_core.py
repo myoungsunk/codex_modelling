@@ -11,11 +11,17 @@ from rt_core.polarization import depol_matrix, fresnel_reflection, jones_reflect
 
 
 class PolarizationCoreTests(unittest.TestCase):
-    def test_fresnel_pec_is_minus_one(self) -> None:
+    def test_fresnel_pec_default_legacy_sign(self) -> None:
         f = np.linspace(6e9, 8e9, 9)
         gs, gp = fresnel_reflection(Material.pec(), theta_i=np.deg2rad(33.0), f_hz=f)
         self.assertTrue(np.allclose(gs, -1.0 + 0.0j))
         self.assertTrue(np.allclose(gp, -1.0 + 0.0j))
+
+    def test_fresnel_pec_tm_sign_override_plus_one(self) -> None:
+        f = np.linspace(6e9, 8e9, 9)
+        gs, gp = fresnel_reflection(Material.pec(pec_tm_sign=1.0), theta_i=np.deg2rad(33.0), f_hz=f)
+        self.assertTrue(np.allclose(gs, -1.0 + 0.0j))
+        self.assertTrue(np.allclose(gp, 1.0 + 0.0j))
 
     def test_jones_reflection_default_is_diagonal(self) -> None:
         f = np.linspace(6e9, 8e9, 9)

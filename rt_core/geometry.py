@@ -41,10 +41,23 @@ class Material:
     # None -> disabled (pure diagonal Fresnel).
     xpol_coupling_db: float | None = None
     xpol_coupling_phase_deg: float = 0.0
+    # PEC TM sign convention in local p basis.
+    # Legacy/default tracer convention uses -1.0 for continuity.
+    # Use +1.0 to match textbook TE/TM table under alternate p-vector conventions.
+    pec_tm_sign: float = -1.0
 
     @staticmethod
-    def pec(xpol_coupling_db: float | None = None, xpol_coupling_phase_deg: float = 0.0) -> "Material":
-        return Material(kind="PEC", xpol_coupling_db=xpol_coupling_db, xpol_coupling_phase_deg=float(xpol_coupling_phase_deg))
+    def pec(
+        xpol_coupling_db: float | None = None,
+        xpol_coupling_phase_deg: float = 0.0,
+        pec_tm_sign: float = -1.0,
+    ) -> "Material":
+        return Material(
+            kind="PEC",
+            xpol_coupling_db=xpol_coupling_db,
+            xpol_coupling_phase_deg=float(xpol_coupling_phase_deg),
+            pec_tm_sign=float(pec_tm_sign),
+        )
 
     @staticmethod
     def dielectric(

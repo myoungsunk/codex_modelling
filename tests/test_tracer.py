@@ -8,7 +8,7 @@ import numpy as np
 
 from rt_core.antenna import Antenna
 from rt_core.geometry import Material, Plane
-from rt_core.tracer import _enumerate_sequences, trace_paths
+from rt_core.tracer import _enumerate_sequences, _path_key, trace_paths
 from scenarios.common import make_los_blocker_plane
 
 
@@ -131,6 +131,18 @@ class TracerTests(unittest.TestCase):
         seq = list(_enumerate_sequences(2, 3, forbid_immediate_repeat=True))
         self.assertEqual(len(seq), 2)
         self.assertTrue(all(s[i] != s[i - 1] for s in seq for i in range(1, len(s))))
+
+    def test_path_key_tolerance_controls_merge(self) -> None:
+        pl = Plane(id=9, p0=np.array([0.0, 0.0, 0.0]), normal=np.array([0.0, 0.0, 1.0]), material=Material.pec())
+        seq = [pl]
+        p1 = [np.array([0.0, 0.0, 0.0]), np.array([1.0000002, 2.0, 3.0]), np.array([4.0, 5.0, 6.0])]
+        p2 = [np.array([0.0, 0.0, 0.0]), np.array([1.00000049, 2.0, 3.0]), np.array([4.0, 5.0, 6.0])]
+        k_coarse_1 = _path_key(p1, seq, 1.0e-8, point_tol_m=1e-6, tau_tol_s=1e-12)
+        k_coarse_2 = _path_key(p2, seq, 1.0e-8, point_tol_m=1e-6, tau_tol_s=1e-12)
+        self.assertEqual(k_coarse_1, k_coarse_2)
+        k_fine_1 = _path_key(p1, seq, 1.0e-8, point_tol_m=1e-8, tau_tol_s=1e-14)
+        k_fine_2 = _path_key(p2, seq, 1.0e-8, point_tol_m=1e-8, tau_tol_s=1e-14)
+        self.assertNotEqual(k_fine_1, k_fine_2)
 
 
 if __name__ == "__main__":

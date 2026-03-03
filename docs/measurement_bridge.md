@@ -96,6 +96,9 @@ This ordering avoids conflating geometry or loss errors with polarization-model 
   - `xpol_coupling_phase_deg`
 - This adds effective cross-polar reflection terms in `jones_reflection`, but is not a full
   rough-surface/multilayer anisotropic solver (e.g., BRDF/Kirchhoff/cluster scattering).
+- PEC `Gamma_p` sign is convention-sensitive in local `(s,p)` basis.
+  - tracer default keeps legacy continuity: `Gamma_s=-1`, `Gamma_p=-1`
+  - optional override exists via material field `pec_tm_sign=+1.0`
 
 ## Antenna Coupling Frequency Dependence
 

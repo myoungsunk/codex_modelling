@@ -119,8 +119,10 @@ def fresnel_reflection(material: Material, theta_i: float, f_hz: NDArray[np.floa
 
     freq = np.asarray(f_hz, dtype=float)
     if material.kind.upper() == "PEC":
-        ones = -np.ones(freq.shape, dtype=np.complex128)
-        return ones, ones
+        gamma_s = -np.ones(freq.shape, dtype=np.complex128)
+        tm_sign = float(getattr(material, "pec_tm_sign", -1.0))
+        gamma_p = (np.ones(freq.shape, dtype=np.complex128) if tm_sign >= 0.0 else -np.ones(freq.shape, dtype=np.complex128))
+        return gamma_s, gamma_p
 
     sin2 = float(np.sin(theta_i) ** 2)
     cos_i = float(np.cos(theta_i))

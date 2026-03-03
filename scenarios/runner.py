@@ -1536,6 +1536,8 @@ def main() -> None:
     parser.add_argument("--max-paths-per-case", type=int, default=None)
     parser.add_argument("--max-sequence-candidates-per-bounce", type=int, default=None)
     parser.add_argument("--forbid-immediate-surface-repeat", action="store_true")
+    parser.add_argument("--dedup-point-tol-m", type=float, default=1e-7)
+    parser.add_argument("--dedup-tau-tol-s", type=float, default=1e-13)
     parser.add_argument("--force-cp-swap-on-odd-reflection", action="store_true")
     parser.add_argument("--model-compare", dest="model_compare", action="store_true")
     parser.add_argument("--no-model-compare", dest="model_compare", action="store_false")
@@ -1703,6 +1705,8 @@ def main() -> None:
             else None
         ),
         "forbid_immediate_surface_repeat": bool(args.forbid_immediate_surface_repeat),
+        "dedup_point_tol_m": float(max(abs(float(args.dedup_point_tol_m)), 1e-12)),
+        "dedup_tau_tol_s": float(max(abs(float(args.dedup_tau_tol_s)), 1e-18)),
     }
 
     bases = _parse_bases(args.basis, args.bases)
