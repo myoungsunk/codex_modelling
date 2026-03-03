@@ -67,6 +67,14 @@ When RT and measurement disagree, diagnose in this order:
 
 This ordering avoids conflating geometry or loss errors with polarization-model errors.
 
+## Band-Limited CIR Reminder
+
+- `H(f) -> h(t)` in this repo is computed on the available sampled RF band.
+- For UWB sweeps such as 6-10 GHz:
+  - practical delay-bin spacing is `dt = 1/(nfft*df)`,
+  - multipath separability is fundamentally limited by `~1/BW` (`BW=f_max-f_min`).
+- This is a known measurement/synthesis limitation (not a bug). Keep it explicit in reports.
+
 ## Diffuse Scattering Scope (Important)
 
 - Current `diffuse` branch in `rt_core.tracer` is an empirical proxy:

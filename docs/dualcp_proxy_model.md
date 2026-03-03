@@ -59,6 +59,13 @@ Core outputs:
 - `xpd_early_excess_db`, `xpd_late_excess_db` (if floor JSON is provided)
 - `claim_caution_early/late` (true when excess is within floor uncertainty)
 
+CTF/CIR interpretation limits (important):
+
+- `ctf_to_cir` uses the sampled RF band grid directly (e.g. 6-10 GHz), so CIR is band-limited.
+- Delay-bin spacing: `dt = 1/(nfft*df)`.
+- Fundamental path separability is bandwidth-limited (`~1/BW`, `BW=f_max-f_min`), not improved by zero padding alone.
+- For strict reporting, include `analysis.ctf_cir.cir_bandlimit_info(...)` in metadata.
+
 ## Step 3: Conditional Proxy Fit
 
 Fit `Z|U` using binned statistics + numeric regression fallback:
