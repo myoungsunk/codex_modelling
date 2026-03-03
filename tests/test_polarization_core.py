@@ -46,6 +46,18 @@ class PolarizationCoreTests(unittest.TestCase):
         # Effective normal must oppose incident direction.
         self.assertLessEqual(float(np.dot(k_in / np.linalg.norm(k_in), n_eff)), 0.0)
 
+    def test_local_sp_bases_normal_incidence_alignment(self) -> None:
+        # Exact normal incidence should not create arbitrary s_in/s_out flips.
+        k_in = np.array([0.0, 0.0, -1.0], dtype=float)
+        k_out = np.array([0.0, 0.0, 1.0], dtype=float)
+        n = np.array([0.0, 0.0, 1.0], dtype=float)
+        s_in, p_in, s_out, p_out, _theta_i, _n_eff = local_sp_bases(k_in, k_out, n)
+        self.assertGreater(float(np.dot(s_in, s_out)), 0.999999)
+        self.assertAlmostEqual(float(np.linalg.norm(s_in)), 1.0, places=12)
+        self.assertAlmostEqual(float(np.linalg.norm(s_out)), 1.0, places=12)
+        self.assertAlmostEqual(float(np.dot(s_in, p_in)), 0.0, places=12)
+        self.assertAlmostEqual(float(np.dot(s_out, p_out)), 0.0, places=12)
+
 
 if __name__ == "__main__":
     unittest.main()

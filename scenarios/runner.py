@@ -1510,6 +1510,7 @@ def main() -> None:
     parser.add_argument("--diffuse-lobe-alpha", type=float, default=8.0)
     parser.add_argument("--diffuse-rays-per-hit", type=int, default=0)
     parser.add_argument("--diffuse-seed", type=int, default=0)
+    parser.add_argument("--wave-basis-mode", type=str, default="transport", choices=["transport", "global_up"])
     parser.add_argument("--allow-proxy-diffuse-release", action="store_true")
     parser.add_argument("--min-path-power-db", type=float, default=None)
     parser.add_argument("--max-paths-per-case", type=int, default=None)
@@ -1644,6 +1645,7 @@ def main() -> None:
         "diffuse_enabled": bool(str(args.diffuse).lower() == "on"),
         "diffuse_model": str(args.diffuse_model),
         "diffuse_physics_model": "proxy_jones_jitter_v1",
+        "wave_basis_mode": str(args.wave_basis_mode),
         "diffuse_factor": float(max(0.0, min(1.0, args.diffuse_factor))),
         "diffuse_lobe_alpha": float(max(args.diffuse_lobe_alpha, 1e-6)),
         "diffuse_rays_per_hit": int(max(0, args.diffuse_rays_per_hit)),

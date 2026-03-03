@@ -98,6 +98,30 @@ class TracerTests(unittest.TestCase):
         pow_off = float(np.mean(np.abs(p_off[0].A_f) ** 2))
         self.assertLess(pow_off, pow_on)
 
+    def test_wave_basis_mode_switch_keeps_power_consistent(self) -> None:
+        p1 = Plane(id=1, p0=np.array([0.0, 3.0, 0.0]), normal=np.array([0.0, -1.0, 0.0]), material=Material.pec())
+        p2 = Plane(id=2, p0=np.array([3.0, 0.0, 0.0]), normal=np.array([-1.0, 0.0, 0.0]), material=Material.pec())
+        rx = Antenna(
+            position=np.array([3.0, 4.0, 1.0]),
+            boresight=np.array([-1.0, 0.0, 0.0]),
+            h_axis=np.array([0.0, 1.0, 0.0]),
+            v_axis=np.array([0.0, 0.0, 1.0]),
+            basis="linear",
+        )
+        a = trace_paths([p1, p2], self.tx, rx, self.f, max_bounce=2, los_enabled=False, wave_basis_mode="transport")
+        b = trace_paths([p1, p2], self.tx, rx, self.f, max_bounce=2, los_enabled=False, wave_basis_mode="global_up")
+        self.assertTrue(len(a) > 0 and len(b) > 0)
+        pa = max(a, key=lambda p: float(np.mean(np.abs(p.A_f) ** 2)))
+        pb = max(b, key=lambda p: float(np.mean(np.abs(p.A_f) ** 2)))
+        pwr_a = float(np.mean(np.abs(pa.A_f) ** 2))
+        pwr_b = float(np.mean(np.abs(pb.A_f) ** 2))
+        rel = abs(pwr_a - pwr_b) / max(pwr_a, pwr_b, 1e-18)
+        self.assertLess(rel, 1e-6)
+
+    def test_invalid_wave_basis_mode_raises(self) -> None:
+        with self.assertRaises(ValueError):
+            trace_paths([], self.tx, self.rx, self.f, max_bounce=0, wave_basis_mode="bad_mode")
+
 
 if __name__ == "__main__":
     unittest.main()

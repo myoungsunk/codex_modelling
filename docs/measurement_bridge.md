@@ -92,3 +92,12 @@ This ordering avoids conflating geometry or loss errors with polarization-model 
 - If you compare against measured datasets with strong off-boresight attenuation,
   keep isotropic defaults only for sanity checks; use directional settings for
   physically tighter absolute power matching.
+
+## Wave-Basis Gauge Choice
+
+- Tracer supports two wave-basis update modes:
+  - `transport` (default): segment-to-segment basis is smoothly transported.
+  - `global_up`: recompute each segment basis from fixed `global_up`.
+- Both are gauge choices; observable power metrics should remain close, but
+  `transport` reduces basis-jump sensitivity in multi-bounce geometries.
+- CLI (`scenarios.runner`): `--wave-basis-mode transport|global_up`

@@ -23,7 +23,7 @@ from numpy.typing import NDArray
 
 from rt_core.antenna import Antenna
 from rt_core.geometry import Plane, line_plane_intersection, normalize, path_length, ray_plane_intersection, reflect_point
-from rt_core.polarization import DepolConfig, apply_depol, basis_change, depol_matrix, jones_reflection, local_sp_bases
+from rt_core.polarization import DepolConfig, apply_depol, basis_change, depol_matrix, jones_reflection, local_sp_bases, transverse_basis
 
 
 @dataclass
@@ -195,6 +195,22 @@ def _default_rho(_: dict) -> float:
     return 0.0
 
 
+def _transport_wave_basis(k_out: NDArray[np.float64], prev_basis: NDArray[np.complex128], fallback_up: NDArray[np.float64]) -> NDArray[np.complex128]:
+    """Parallel-transport-like wave basis update to reduce gauge jumps."""
+    k = normalize(np.asarray(k_out, dtype=float))
+    u_prev = np.real(np.asarray(prev_basis[:, 0], dtype=np.complex128)).astype(float)
+    v_prev = np.real(np.asarray(prev_basis[:, 1], dtype=np.complex128)).astype(float)
+    u = u_prev - float(np.dot(u_prev, k)) * k
+    if np.linalg.norm(u) < 1e-9:
+        u = v_prev - float(np.dot(v_prev, k)) * k
+    if np.linalg.norm(u) < 1e-9:
+        u, v = transverse_basis(k, np.asarray(fallback_up, dtype=float))
+        return np.column_stack([u, v]).astype(np.complex128)
+    u = normalize(u)
+    v = normalize(np.cross(k, u))
+    return np.column_stack([u, v]).astype(np.complex128)
+
+
 def _segment_blocked(
     a: NDArray[np.float64],
     b: NDArray[np.float64],
@@ -254,6 +270,7 @@ def trace_paths(
     diffuse_lobe_alpha: float = 8.0,
     diffuse_rays_per_hit: int = 0,
     diffuse_seed: int = 0,
+    wave_basis_mode: str = "transport",
     min_path_power_db: float | None = None,
     max_paths_per_case: int | None = None,
 ) -> list[PathResult]:
@@ -263,6 +280,9 @@ def trace_paths(
         raise ValueError("max_bounce must be >= 0")
 
     dep = depol or DepolConfig(enabled=False)
+    wb_mode = str(wave_basis_mode).strip().lower()
+    if wb_mode not in {"transport", "global_up"}:
+        raise ValueError("wave_basis_mode must be one of: transport, global_up")
     rng = np.random.default_rng(dep.seed)
     drng = np.random.default_rng(int(diffuse_seed))
     rho_fn: Callable[[dict], float] = dep.rho_func or _default_rho
@@ -340,7 +360,10 @@ def trace_paths(
                 sp_out = np.column_stack([s_out, p_out]).astype(np.complex128)
 
                 t_in = basis_change(wave_basis, sp_in)
-                next_basis = tx.wave_basis(k_out)
+                if wb_mode == "global_up":
+                    next_basis = tx.wave_basis(k_out)
+                else:
+                    next_basis = _transport_wave_basis(k_out, wave_basis, tx.global_up)
                 t_out = basis_change(next_basis, sp_out)
                 r_f = jones_reflection(pl.material, theta_i, freq)
 

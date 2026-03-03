@@ -54,12 +54,14 @@ def basis_change(src_basis: NDArray[np.complex128], dst_basis: NDArray[np.comple
     return (dst_basis.conj().T @ src_basis).astype(np.complex128)
 
 
-def _safe_s(k_in: Vec3, n_eff: Vec3) -> Vec3:
-    s = np.cross(k_in, n_eff)
-    if np.linalg.norm(s) < 1e-9:
-        alt = np.array([0.0, 0.0, 1.0]) if abs(k_in[2]) < 0.8 else np.array([0.0, 1.0, 0.0])
-        s = np.cross(k_in, alt)
-    return normalize(s)
+def _fallback_tangent_from_normal(n_eff: Vec3) -> Vec3:
+    """Return deterministic tangent vector orthogonal to effective normal."""
+    n = normalize(np.asarray(n_eff, dtype=float))
+    alt = np.array([0.0, 0.0, 1.0], dtype=float) if abs(n[2]) < 0.8 else np.array([0.0, 1.0, 0.0], dtype=float)
+    t = np.cross(n, alt)
+    if np.linalg.norm(t) < 1e-9:
+        t = np.cross(n, np.array([1.0, 0.0, 0.0], dtype=float))
+    return normalize(t)
 
 
 def local_sp_bases(k_in: Vec3, k_out: Vec3, normal: Vec3) -> tuple[Vec3, Vec3, Vec3, Vec3, float, Vec3]:
@@ -82,8 +84,31 @@ def local_sp_bases(k_in: Vec3, k_out: Vec3, normal: Vec3) -> tuple[Vec3, Vec3, V
     cos_i = -float(np.dot(kin, n))
     cos_i = float(np.clip(cos_i, 0.0, 1.0))
     theta_i = float(np.arccos(cos_i))
-    s_in = _safe_s(kin, n)
-    s_out = _safe_s(kout, n)
+    s_in_raw = np.cross(kin, n)
+    s_out_raw = np.cross(kout, n)
+    n_in = float(np.linalg.norm(s_in_raw))
+    n_out = float(np.linalg.norm(s_out_raw))
+    eps = 1e-9
+
+    # Near normal incidence, k x n can vanish for incident/reflected directions.
+    # Use a shared deterministic tangent to avoid arbitrary basis jumps between s_in/s_out.
+    if n_in < eps and n_out < eps:
+        s_ref = _fallback_tangent_from_normal(n)
+        s_in = s_ref.copy()
+        s_out = s_ref.copy()
+    elif n_in < eps:
+        s_out = normalize(s_out_raw)
+        s_in = s_out.copy()
+    elif n_out < eps:
+        s_in = normalize(s_in_raw)
+        s_out = s_in.copy()
+    else:
+        s_in = normalize(s_in_raw)
+        s_out = normalize(s_out_raw)
+        # Keep in/out transverse axes aligned when both are well-defined.
+        if float(np.dot(s_in, s_out)) < 0.0:
+            s_out = -s_out
+
     p_in = normalize(np.cross(kin, s_in))
     p_out = normalize(np.cross(kout, s_out))
     return s_in, p_in, s_out, p_out, theta_i, n
