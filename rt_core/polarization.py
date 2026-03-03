@@ -179,13 +179,31 @@ def fresnel_reflection(material: Material, theta_i: float, f_hz: NDArray[np.floa
 
 
 def jones_reflection(material: Material, theta_i: float, f_hz: NDArray[np.float64]) -> NDArray[np.complex128]:
-    """Return R(f) with shape (Nf,2,2) in local (s,p) basis."""
+    """Return R(f) with shape (Nf,2,2) in local (s,p) basis.
+
+    Default model is diagonal Fresnel reflection (smooth, isotropic interface).
+    Optional effective off-diagonal coupling can be enabled via material fields:
+    - material.xpol_coupling_db
+    - material.xpol_coupling_phase_deg
+    This is an empirical extension hook (not full rough-surface BRDF physics).
+    """
 
     gs, gp = fresnel_reflection(material, theta_i, f_hz)
     n = len(f_hz)
     out = np.zeros((n, 2, 2), dtype=np.complex128)
     out[:, 0, 0] = gs
     out[:, 1, 1] = gp
+    xdb = getattr(material, "xpol_coupling_db", None)
+    if xdb is not None and np.isfinite(float(xdb)):
+        # Amplitude coupling relative to diagonal magnitude scale.
+        amp = float(10.0 ** (-float(xdb) / 20.0))
+        phi = float(np.deg2rad(float(getattr(material, "xpol_coupling_phase_deg", 0.0))))
+        phase = np.exp(1j * phi)
+        # Bound cross term by geometric mean diagonal magnitude.
+        diag_scale = np.sqrt(np.maximum(np.abs(gs * gp), 0.0))
+        c = (amp * diag_scale * phase).astype(np.complex128)
+        out[:, 0, 1] = c
+        out[:, 1, 0] = np.conj(c)
     return out
 
 

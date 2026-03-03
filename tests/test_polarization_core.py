@@ -7,7 +7,7 @@ import unittest
 import numpy as np
 
 from rt_core.geometry import Material
-from rt_core.polarization import depol_matrix, fresnel_reflection, local_sp_bases
+from rt_core.polarization import depol_matrix, fresnel_reflection, jones_reflection, local_sp_bases
 
 
 class PolarizationCoreTests(unittest.TestCase):
@@ -16,6 +16,26 @@ class PolarizationCoreTests(unittest.TestCase):
         gs, gp = fresnel_reflection(Material.pec(), theta_i=np.deg2rad(33.0), f_hz=f)
         self.assertTrue(np.allclose(gs, -1.0 + 0.0j))
         self.assertTrue(np.allclose(gp, -1.0 + 0.0j))
+
+    def test_jones_reflection_default_is_diagonal(self) -> None:
+        f = np.linspace(6e9, 8e9, 9)
+        mat = Material.dielectric(eps_r=4.2, tan_delta=0.02, name="test")
+        r = jones_reflection(mat, theta_i=np.deg2rad(30.0), f_hz=f)
+        self.assertTrue(np.allclose(r[:, 0, 1], 0.0 + 0.0j))
+        self.assertTrue(np.allclose(r[:, 1, 0], 0.0 + 0.0j))
+
+    def test_jones_reflection_offdiag_hook_enabled(self) -> None:
+        f = np.linspace(6e9, 8e9, 9)
+        mat = Material.dielectric(
+            eps_r=4.2,
+            tan_delta=0.02,
+            name="test",
+            xpol_coupling_db=20.0,
+            xpol_coupling_phase_deg=45.0,
+        )
+        r = jones_reflection(mat, theta_i=np.deg2rad(30.0), f_hz=f)
+        self.assertGreater(float(np.max(np.abs(r[:, 0, 1]))), 0.0)
+        self.assertGreater(float(np.max(np.abs(r[:, 1, 0]))), 0.0)
 
     def test_dielectric_fresnel_is_passive(self) -> None:
         mat = Material.dielectric(eps_r=4.2, tan_delta=0.02, name="test")

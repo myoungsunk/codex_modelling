@@ -88,21 +88,38 @@ def _debye_to_const(spec: dict[str, Any], fallback_tan: float = 0.0) -> tuple[fl
 def material_from_spec(name: str, spec: dict[str, Any], material_dispersion: str = "off") -> Material:
     mode = str(material_dispersion).lower()
     model = str(spec.get("model", "const")).lower()
+    xpol_db_raw = spec.get("xpol_coupling_db", None)
+    xpol_db = (None if xpol_db_raw is None else float(xpol_db_raw))
+    xpol_ph = float(spec.get("xpol_coupling_phase_deg", 0.0))
 
     if model == "pec":
-        return Material.pec()
+        return Material.pec(xpol_coupling_db=xpol_db, xpol_coupling_phase_deg=xpol_ph)
 
     if mode == "off":
         if model == "table":
             eps_r, tan_delta = _table_to_const(spec, fallback_tan=float(spec.get("tan_delta_const", 0.0)))
-            return Material.dielectric(eps_r=eps_r, tan_delta=tan_delta, name=name)
+            return Material.dielectric(
+                eps_r=eps_r,
+                tan_delta=tan_delta,
+                name=name,
+                xpol_coupling_db=xpol_db,
+                xpol_coupling_phase_deg=xpol_ph,
+            )
         if model == "debye":
             eps_r, tan_delta = _debye_to_const(spec)
-            return Material.dielectric(eps_r=eps_r, tan_delta=tan_delta, name=name)
+            return Material.dielectric(
+                eps_r=eps_r,
+                tan_delta=tan_delta,
+                name=name,
+                xpol_coupling_db=xpol_db,
+                xpol_coupling_phase_deg=xpol_ph,
+            )
         return Material.dielectric(
             eps_r=float(max(float(spec.get("eps_r", 2.0)), 1.0)),
             tan_delta=float(max(float(spec.get("tan_delta", 0.0)), 0.0)),
             name=name,
+            xpol_coupling_db=xpol_db,
+            xpol_coupling_phase_deg=xpol_ph,
         )
 
     # dispersion ON/DEBYE mode: keep spec model if available.
@@ -112,6 +129,8 @@ def material_from_spec(name: str, spec: dict[str, Any], material_dispersion: str
             eps_r=[float(x) for x in spec.get("eps_r", [])],
             tan_delta=[float(x) for x in spec.get("tan_delta", [])] if "tan_delta" in spec else None,
             name=name,
+            xpol_coupling_db=xpol_db,
+            xpol_coupling_phase_deg=xpol_ph,
         )
     if model == "debye":
         return Material.dielectric_debye(
@@ -120,11 +139,15 @@ def material_from_spec(name: str, spec: dict[str, Any], material_dispersion: str
             tau_s=[float(x) for x in spec.get("tau_s", [])],
             tan_delta=float(spec.get("tan_delta", 0.0)),
             name=name,
+            xpol_coupling_db=xpol_db,
+            xpol_coupling_phase_deg=xpol_ph,
         )
     return Material.dielectric(
         eps_r=float(max(float(spec.get("eps_r", 2.0)), 1.0)),
         tan_delta=float(max(float(spec.get("tan_delta", 0.0)), 0.0)),
         name=name,
+        xpol_coupling_db=xpol_db,
+        xpol_coupling_phase_deg=xpol_ph,
     )
 
 
@@ -139,4 +162,3 @@ def resolve_material_library(
     for name, spec in specs.items():
         out[str(name)] = material_from_spec(str(name), spec, material_dispersion=material_dispersion)
     return out
-

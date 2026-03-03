@@ -37,10 +37,14 @@ class Material:
     debye_eps_inf: float | None = None
     debye_delta_eps: tuple[float, ...] | None = None
     debye_tau_s: tuple[float, ...] | None = None
+    # Optional effective cross-polar reflection coupling (empirical hook).
+    # None -> disabled (pure diagonal Fresnel).
+    xpol_coupling_db: float | None = None
+    xpol_coupling_phase_deg: float = 0.0
 
     @staticmethod
-    def pec() -> "Material":
-        return Material(kind="PEC")
+    def pec(xpol_coupling_db: float | None = None, xpol_coupling_phase_deg: float = 0.0) -> "Material":
+        return Material(kind="PEC", xpol_coupling_db=xpol_coupling_db, xpol_coupling_phase_deg=float(xpol_coupling_phase_deg))
 
     @staticmethod
     def dielectric(
@@ -48,8 +52,18 @@ class Material:
         tan_delta: float = 0.0,
         complex_eps_r: complex | None = None,
         name: str = "",
+        xpol_coupling_db: float | None = None,
+        xpol_coupling_phase_deg: float = 0.0,
     ) -> "Material":
-        return Material(kind="dielectric", name=name, eps_r=eps_r, tan_delta=tan_delta, complex_eps_r=complex_eps_r)
+        return Material(
+            kind="dielectric",
+            name=name,
+            eps_r=eps_r,
+            tan_delta=tan_delta,
+            complex_eps_r=complex_eps_r,
+            xpol_coupling_db=xpol_coupling_db,
+            xpol_coupling_phase_deg=float(xpol_coupling_phase_deg),
+        )
 
     @staticmethod
     def dielectric_table(
@@ -57,6 +71,8 @@ class Material:
         eps_r: Iterable[float],
         tan_delta: Iterable[float] | None = None,
         name: str = "",
+        xpol_coupling_db: float | None = None,
+        xpol_coupling_phase_deg: float = 0.0,
     ) -> "Material":
         f = tuple(float(x) for x in f_hz)
         e = tuple(float(x) for x in eps_r)
@@ -77,6 +93,8 @@ class Material:
             table_f_hz=f,
             table_eps_r=e,
             table_tan_delta=t,
+            xpol_coupling_db=xpol_coupling_db,
+            xpol_coupling_phase_deg=float(xpol_coupling_phase_deg),
         )
 
     @staticmethod
@@ -86,6 +104,8 @@ class Material:
         tau_s: Iterable[float],
         tan_delta: float = 0.0,
         name: str = "",
+        xpol_coupling_db: float | None = None,
+        xpol_coupling_phase_deg: float = 0.0,
     ) -> "Material":
         de = tuple(float(x) for x in delta_eps)
         ts = tuple(float(x) for x in tau_s)
@@ -100,6 +120,8 @@ class Material:
             debye_eps_inf=float(eps_inf),
             debye_delta_eps=de,
             debye_tau_s=ts,
+            xpol_coupling_db=xpol_coupling_db,
+            xpol_coupling_phase_deg=float(xpol_coupling_phase_deg),
         )
 
 

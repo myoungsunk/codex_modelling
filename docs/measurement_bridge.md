@@ -78,6 +78,17 @@ This ordering avoids conflating geometry or loss errors with polarization-model 
 - In `--release-mode`, diffuse is blocked by default unless explicitly acknowledged:
   - add `--allow-proxy-diffuse-release` to proceed intentionally.
 
+## Reflection Jones Scope (Diagonal vs Effective Cross Coupling)
+
+- Baseline reflection Jones matrix is diagonal in local `(s,p)`:
+  - `R = diag(Gamma_s, Gamma_p)`
+  - This corresponds to smooth, isotropic, homogeneous interface assumption.
+- For expanded studies, an empirical off-diagonal hook is available at material level:
+  - `xpol_coupling_db`
+  - `xpol_coupling_phase_deg`
+- This adds effective cross-polar reflection terms in `jones_reflection`, but is not a full
+  rough-surface/multilayer anisotropic solver (e.g., BRDF/Kirchhoff/cluster scattering).
+
 ## FSPL and Antenna Pattern Assumptions
 
 - `scalar_gain_f` in tracer uses amplitude-domain Friis scaling: `lambda/(4*pi*R)`.
