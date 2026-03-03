@@ -354,6 +354,11 @@ def _antennas_from_points(
         cross_pol_leakage_db=float(antenna_config.get("tx_cross_pol_leakage_db", 35.0)),
         axial_ratio_db=float(antenna_config.get("tx_axial_ratio_db", 0.0)),
         enable_coupling=bool(antenna_config.get("enable_coupling", True)),
+        coupling_ref_freq_hz=float(antenna_config.get("tx_coupling_ref_freq_hz", 8.0e9)),
+        cross_pol_leakage_db_slope_per_ghz=float(antenna_config.get("tx_cross_pol_leakage_db_slope_per_ghz", 0.0)),
+        axial_ratio_db_slope_per_ghz=float(antenna_config.get("tx_axial_ratio_db_slope_per_ghz", 0.0)),
+        cross_coupling_phase_deg=float(antenna_config.get("tx_cross_coupling_phase_deg", 0.0)),
+        cross_coupling_phase_slope_deg_per_ghz=float(antenna_config.get("tx_cross_coupling_phase_slope_deg_per_ghz", 0.0)),
         tx_peak_gain_dbi=float(antenna_config.get("tx_peak_gain_dbi", 0.0)),
         tx_pattern_cos_exp=float(antenna_config.get("tx_pattern_cos_exp", 0.0)),
     )
@@ -367,6 +372,11 @@ def _antennas_from_points(
         cross_pol_leakage_db=float(antenna_config.get("rx_cross_pol_leakage_db", 35.0)),
         axial_ratio_db=float(antenna_config.get("rx_axial_ratio_db", 0.0)),
         enable_coupling=bool(antenna_config.get("enable_coupling", True)),
+        coupling_ref_freq_hz=float(antenna_config.get("rx_coupling_ref_freq_hz", 8.0e9)),
+        cross_pol_leakage_db_slope_per_ghz=float(antenna_config.get("rx_cross_pol_leakage_db_slope_per_ghz", 0.0)),
+        axial_ratio_db_slope_per_ghz=float(antenna_config.get("rx_axial_ratio_db_slope_per_ghz", 0.0)),
+        cross_coupling_phase_deg=float(antenna_config.get("rx_cross_coupling_phase_deg", 0.0)),
+        cross_coupling_phase_slope_deg_per_ghz=float(antenna_config.get("rx_cross_coupling_phase_slope_deg_per_ghz", 0.0)),
         rx_peak_gain_dbi=float(antenna_config.get("rx_peak_gain_dbi", 0.0)),
         rx_pattern_cos_exp=float(antenna_config.get("rx_pattern_cos_exp", 0.0)),
     )
@@ -1495,6 +1505,16 @@ def main() -> None:
     parser.add_argument("--rx-cross-pol-leakage-db", type=float, default=35.0)
     parser.add_argument("--tx-axial-ratio-db", type=float, default=0.0)
     parser.add_argument("--rx-axial-ratio-db", type=float, default=0.0)
+    parser.add_argument("--tx-coupling-ref-freq-hz", type=float, default=8.0e9)
+    parser.add_argument("--rx-coupling-ref-freq-hz", type=float, default=8.0e9)
+    parser.add_argument("--tx-cross-pol-leakage-db-slope-per-ghz", type=float, default=0.0)
+    parser.add_argument("--rx-cross-pol-leakage-db-slope-per-ghz", type=float, default=0.0)
+    parser.add_argument("--tx-axial-ratio-db-slope-per-ghz", type=float, default=0.0)
+    parser.add_argument("--rx-axial-ratio-db-slope-per-ghz", type=float, default=0.0)
+    parser.add_argument("--tx-cross-coupling-phase-deg", type=float, default=0.0)
+    parser.add_argument("--rx-cross-coupling-phase-deg", type=float, default=0.0)
+    parser.add_argument("--tx-cross-coupling-phase-slope-deg-per-ghz", type=float, default=0.0)
+    parser.add_argument("--rx-cross-coupling-phase-slope-deg-per-ghz", type=float, default=0.0)
     parser.add_argument("--tx-peak-gain-dbi", type=float, default=0.0)
     parser.add_argument("--rx-peak-gain-dbi", type=float, default=0.0)
     parser.add_argument("--tx-pattern-cos-exp", type=float, default=0.0)
@@ -1620,6 +1640,16 @@ def main() -> None:
         "rx_cross_pol_leakage_db": args.rx_cross_pol_leakage_db,
         "tx_axial_ratio_db": args.tx_axial_ratio_db,
         "rx_axial_ratio_db": args.rx_axial_ratio_db,
+        "tx_coupling_ref_freq_hz": args.tx_coupling_ref_freq_hz,
+        "rx_coupling_ref_freq_hz": args.rx_coupling_ref_freq_hz,
+        "tx_cross_pol_leakage_db_slope_per_ghz": args.tx_cross_pol_leakage_db_slope_per_ghz,
+        "rx_cross_pol_leakage_db_slope_per_ghz": args.rx_cross_pol_leakage_db_slope_per_ghz,
+        "tx_axial_ratio_db_slope_per_ghz": args.tx_axial_ratio_db_slope_per_ghz,
+        "rx_axial_ratio_db_slope_per_ghz": args.rx_axial_ratio_db_slope_per_ghz,
+        "tx_cross_coupling_phase_deg": args.tx_cross_coupling_phase_deg,
+        "rx_cross_coupling_phase_deg": args.rx_cross_coupling_phase_deg,
+        "tx_cross_coupling_phase_slope_deg_per_ghz": args.tx_cross_coupling_phase_slope_deg_per_ghz,
+        "rx_cross_coupling_phase_slope_deg_per_ghz": args.rx_cross_coupling_phase_slope_deg_per_ghz,
         "tx_peak_gain_dbi": args.tx_peak_gain_dbi,
         "rx_peak_gain_dbi": args.rx_peak_gain_dbi,
         "tx_pattern_cos_exp": args.tx_pattern_cos_exp,
@@ -1631,6 +1661,14 @@ def main() -> None:
         antenna_config["rx_cross_pol_leakage_db"] = 120.0
         antenna_config["tx_axial_ratio_db"] = 0.0
         antenna_config["rx_axial_ratio_db"] = 0.0
+        antenna_config["tx_cross_pol_leakage_db_slope_per_ghz"] = 0.0
+        antenna_config["rx_cross_pol_leakage_db_slope_per_ghz"] = 0.0
+        antenna_config["tx_axial_ratio_db_slope_per_ghz"] = 0.0
+        antenna_config["rx_axial_ratio_db_slope_per_ghz"] = 0.0
+        antenna_config["tx_cross_coupling_phase_deg"] = 0.0
+        antenna_config["rx_cross_coupling_phase_deg"] = 0.0
+        antenna_config["tx_cross_coupling_phase_slope_deg_per_ghz"] = 0.0
+        antenna_config["rx_cross_coupling_phase_slope_deg_per_ghz"] = 0.0
         antenna_config["tx_peak_gain_dbi"] = 0.0
         antenna_config["rx_peak_gain_dbi"] = 0.0
         antenna_config["tx_pattern_cos_exp"] = 0.0

@@ -34,6 +34,11 @@ class Antenna:
     cross_pol_leakage_db: float = 35.0
     axial_ratio_db: float = 0.0
     enable_coupling: bool = True
+    coupling_ref_freq_hz: float = 8.0e9
+    cross_pol_leakage_db_slope_per_ghz: float = 0.0
+    axial_ratio_db_slope_per_ghz: float = 0.0
+    cross_coupling_phase_deg: float = 0.0
+    cross_coupling_phase_slope_deg_per_ghz: float = 0.0
     # Optional directional gain model (power gain):
     # G(psi) = G_peak * max(cos(psi), 0)^n
     # Defaults keep isotropic behavior (0 dBi, n=0).
@@ -60,6 +65,9 @@ class Antenna:
         if np.linalg.norm(gup) < 1e-9:
             gup = np.array([0.0, 0.0, 1.0], dtype=float)
         object.__setattr__(self, "global_up", normalize(gup))
+        f0 = float(self.coupling_ref_freq_hz)
+        if not np.isfinite(f0) or f0 <= 0.0:
+            object.__setattr__(self, "coupling_ref_freq_hz", 8.0e9)
 
     def wave_basis(self, direction: Vec3) -> CMat:
         # Use a global reference vector to avoid locking wave basis to antenna H axis.
@@ -101,26 +109,37 @@ class Antenna:
         pb = self.port_basis_vectors(-np.asarray(direction, dtype=float))
         return (pb.conj().T @ wb).astype(np.complex128)
 
-    def _coupling_matrix(self, n_f: int) -> NDArray[np.complex128]:
+    def _coupling_matrix(self, f_hz: NDArray[np.float64]) -> NDArray[np.complex128]:
         if not self.enable_coupling:
             eye = np.eye(2, dtype=np.complex128)
-            return np.repeat(eye[None, :, :], n_f, axis=0)
-        leak = 10.0 ** (-self.cross_pol_leakage_db / 20.0)
-        ar = 10.0 ** (self.axial_ratio_db / 20.0)
-        ar_leak = abs((ar - 1.0) / (ar + 1.0))
-        eps = float(np.clip(leak + ar_leak, 0.0, 0.49))
-        base = np.array([[1.0, eps], [eps, 1.0]], dtype=np.complex128)
-        base /= np.sqrt(1.0 + eps**2)
-        return np.repeat(base[None, :, :], n_f, axis=0)
+            return np.repeat(eye[None, :, :], len(f_hz), axis=0)
+        ff = np.asarray(f_hz, dtype=float)
+        d_ghz = (ff - float(self.coupling_ref_freq_hz)) / 1e9
+        leak_db = float(self.cross_pol_leakage_db) + float(self.cross_pol_leakage_db_slope_per_ghz) * d_ghz
+        ar_db = float(self.axial_ratio_db) + float(self.axial_ratio_db_slope_per_ghz) * d_ghz
+        phase_deg = float(self.cross_coupling_phase_deg) + float(self.cross_coupling_phase_slope_deg_per_ghz) * d_ghz
+        leak = 10.0 ** (-np.asarray(leak_db, dtype=float) / 20.0)
+        ar = 10.0 ** (np.asarray(ar_db, dtype=float) / 20.0)
+        ar_leak = np.abs((ar - 1.0) / np.maximum(ar + 1.0, 1e-12))
+        eps = np.clip(leak + ar_leak, 0.0, 0.49)
+        phase = np.exp(1j * np.deg2rad(np.asarray(phase_deg, dtype=float)))
+        off = eps.astype(np.complex128) * phase.astype(np.complex128)
+        den = np.sqrt(1.0 + np.abs(off) ** 2)
+        out = np.zeros((len(ff), 2, 2), dtype=np.complex128)
+        out[:, 0, 0] = 1.0 / den
+        out[:, 1, 1] = 1.0 / den
+        out[:, 0, 1] = off / den
+        out[:, 1, 0] = np.conj(off) / den
+        return out
 
     def tx_port_to_wave(self, direction: Vec3, f_hz: NDArray[np.float64], wave_basis: CMat | None = None) -> NDArray[np.complex128]:
         proj = self.tx_emit_matrix(direction, wave_basis=wave_basis)
-        cpl = self._coupling_matrix(len(f_hz))
+        cpl = self._coupling_matrix(f_hz)
         return np.einsum("ab,kbc->kac", proj, cpl).astype(np.complex128)
 
     def rx_wave_to_port(self, direction: Vec3, f_hz: NDArray[np.float64], wave_basis: CMat | None = None) -> NDArray[np.complex128]:
         proj = self.rx_receive_matrix(direction, wave_basis=wave_basis)
-        cpl = self._coupling_matrix(len(f_hz))
+        cpl = self._coupling_matrix(f_hz)
         return np.einsum("kab,bc->kac", cpl.conj().transpose(0, 2, 1), proj).astype(np.complex128)
 
     @staticmethod

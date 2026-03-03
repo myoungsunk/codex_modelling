@@ -89,6 +89,20 @@ This ordering avoids conflating geometry or loss errors with polarization-model 
 - This adds effective cross-polar reflection terms in `jones_reflection`, but is not a full
   rough-surface/multilayer anisotropic solver (e.g., BRDF/Kirchhoff/cluster scattering).
 
+## Antenna Coupling Frequency Dependence
+
+- Antenna coupling is complex-valued and can be frequency-dependent:
+  - leakage level: `cross_pol_leakage_db + slope*(f-f_ref)`
+  - axial-ratio term: `axial_ratio_db + slope*(f-f_ref)`
+  - cross-coupling phase: `cross_coupling_phase_deg + slope*(f-f_ref)`
+- Supported runner CLI keys (Tx/Rx each):
+  - `--*-coupling-ref-freq-hz`
+  - `--*-cross-pol-leakage-db-slope-per-ghz`
+  - `--*-axial-ratio-db-slope-per-ghz`
+  - `--*-cross-coupling-phase-deg`
+  - `--*-cross-coupling-phase-slope-deg-per-ghz`
+- Defaults keep previous behavior (frequency-flat, real-symmetric coupling).
+
 ## FSPL and Antenna Pattern Assumptions
 
 - `scalar_gain_f` in tracer uses amplitude-domain Friis scaling: `lambda/(4*pi*R)`.
