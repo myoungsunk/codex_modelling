@@ -159,8 +159,8 @@ def fresnel_reflection(material: Material, theta_i: float, f_hz: NDArray[np.floa
                 eps_c = np.full(freq.shape, float(material.debye_eps_inf), dtype=np.complex128)
                 for d_eps, tau in zip(de, ts):
                     eps_c += d_eps / (1.0 + 1j * w * max(float(tau), 1e-15))
-                if float(material.tan_delta) > 0.0:
-                    eps_c = eps_c - 1j * np.maximum(np.real(eps_c), 1.0) * float(material.tan_delta)
+                # Debye dispersion already models frequency-dependent loss via Im{eps(omega)}.
+                # Do not apply `tan_delta` again here to avoid double-counting dielectric loss.
         else:
             eps_c = np.full(freq.shape, material.eps_r * (1.0 - 1j * material.tan_delta), dtype=np.complex128)
 
