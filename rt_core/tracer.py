@@ -402,6 +402,11 @@ def trace_paths(
                 )
             )
             if diffuse_enabled and b > 0 and diffuse_factor > 0.0 and diffuse_rays_per_hit > 0:
+                # NOTE:
+                # Current diffuse branch is an empirical proxy, not a geometric BRDF scatter solver.
+                # It perturbs polarization (SU(2) mixer) and excess delay/power around the parent
+                # specular path while preserving parent AoD/AoA/path vertices.
+                # Use for stress/sensitivity studies, not absolute scatter-angle validation.
                 nrho = float(np.clip(diffuse_factor, 0.0, 1.0))
                 if str(diffuse_model).lower() == "directive":
                     jitter_ns = 0.08 / np.sqrt(max(diffuse_lobe_alpha, 1e-6))

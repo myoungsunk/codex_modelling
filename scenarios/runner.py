@@ -1510,6 +1510,7 @@ def main() -> None:
     parser.add_argument("--diffuse-lobe-alpha", type=float, default=8.0)
     parser.add_argument("--diffuse-rays-per-hit", type=int, default=0)
     parser.add_argument("--diffuse-seed", type=int, default=0)
+    parser.add_argument("--allow-proxy-diffuse-release", action="store_true")
     parser.add_argument("--min-path-power-db", type=float, default=None)
     parser.add_argument("--max-paths-per-case", type=int, default=None)
     parser.add_argument("--force-cp-swap-on-odd-reflection", action="store_true")
@@ -1605,6 +1606,12 @@ def main() -> None:
             raise SystemExit("release-mode failed: git working tree is dirty. Commit/stash changes and rerun.")
         if str(args.model_phase_sampling_method).strip().lower() == "iid":
             args.model_phase_sampling_method = "stratified_uniform"
+        if bool(str(args.diffuse).lower() == "on") and not bool(args.allow_proxy_diffuse_release):
+            raise SystemExit(
+                "release-mode failed: diffuse currently uses proxy_jones_jitter model "
+                "(no geometric BRDF direction synthesis). "
+                "Use --allow-proxy-diffuse-release to acknowledge and continue."
+            )
 
     antenna_config = {
         "convention": args.convention,
@@ -1636,10 +1643,12 @@ def main() -> None:
     diffuse_cfg: dict[str, Any] = {
         "diffuse_enabled": bool(str(args.diffuse).lower() == "on"),
         "diffuse_model": str(args.diffuse_model),
+        "diffuse_physics_model": "proxy_jones_jitter_v1",
         "diffuse_factor": float(max(0.0, min(1.0, args.diffuse_factor))),
         "diffuse_lobe_alpha": float(max(args.diffuse_lobe_alpha, 1e-6)),
         "diffuse_rays_per_hit": int(max(0, args.diffuse_rays_per_hit)),
         "diffuse_seed": int(args.diffuse_seed),
+        "release_proxy_ack": bool(args.allow_proxy_diffuse_release),
         "min_path_power_db": (float(args.min_path_power_db) if args.min_path_power_db is not None else None),
         "max_paths_per_case": (int(args.max_paths_per_case) if args.max_paths_per_case is not None else None),
     }

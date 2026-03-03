@@ -67,6 +67,17 @@ When RT and measurement disagree, diagnose in this order:
 
 This ordering avoids conflating geometry or loss errors with polarization-model errors.
 
+## Diffuse Scattering Scope (Important)
+
+- Current `diffuse` branch in `rt_core.tracer` is an empirical proxy:
+  - depolarization mixer + controlled power scaling + delay jitter around parent specular path.
+  - it does **not** synthesize new BRDF-consistent outgoing directions / clusters.
+- Therefore:
+  - suitable for sensitivity and stress-response studies,
+  - not suitable as a physically faithful angle-resolved diffuse scattering model.
+- In `--release-mode`, diffuse is blocked by default unless explicitly acknowledged:
+  - add `--allow-proxy-diffuse-release` to proceed intentionally.
+
 ## FSPL and Antenna Pattern Assumptions
 
 - `scalar_gain_f` in tracer uses amplitude-domain Friis scaling: `lambda/(4*pi*R)`.
