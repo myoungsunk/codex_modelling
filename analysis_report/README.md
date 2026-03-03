@@ -46,6 +46,7 @@ python analysis_report/generate_proposition_plot_mapping_detailed.py --run-group
 - `/Users/kimmyoungsun/Documents/codex/analysis_report/out/<run_group>/tables/proposition_plot_mapping.csv`
 - `/Users/kimmyoungsun/Documents/codex/analysis_report/out/<run_group>/proposition_plot_mapping_detailed_report.md`
 - `/Users/kimmyoungsun/Documents/codex/analysis_report/out/<run_group>/tables/proposition_plot_mapping_detailed.csv`
+- `/Users/kimmyoungsun/Documents/codex/analysis_report/out/<run_group>/tables/plot_data/<plot_id>__data.csv` (`x,y,data` 포함)
 
 ## Notes
 - 기본 구현은 **power 기반 지표(Z/U)**만 사용합니다.

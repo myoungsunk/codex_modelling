@@ -1,0 +1,4 @@
+plot_id,series,scenario_id,case_id,link_id,x,y,data,meta
+L2-M3,var_XPD_early_excess_db,A4,,,glass,0.36319535628498617,0.36319535628498617,
+L2-M3,var_XPD_early_excess_db,A4,,,gypsum,0.4516284649883251,0.4516284649883251,
+L2-M3,var_XPD_early_excess_db,A4,,,wood,0.4396198572142574,0.4396198572142574,

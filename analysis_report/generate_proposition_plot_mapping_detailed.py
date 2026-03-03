@@ -1436,6 +1436,582 @@ def _specs() -> list[PlotSpec]:
     ]
 
 
+def _as_float_list(v: Any) -> list[float]:
+    obj = _parse_jsonish(v)
+    if not isinstance(obj, (list, tuple, np.ndarray)):
+        return []
+    out: list[float] = []
+    for it in obj:
+        fv = _to_float(it)
+        if np.isfinite(fv):
+            out.append(float(fv))
+    return out
+
+
+def _ecdf_rows(
+    values: list[float] | np.ndarray,
+    *,
+    plot_id: str,
+    series: str,
+    scenario_id: str = "",
+    case_id: str = "",
+    link_id: str = "",
+) -> list[dict[str, Any]]:
+    x = np.sort(_finite(values))
+    if len(x) == 0:
+        return []
+    y = np.arange(1, len(x) + 1, dtype=float) / float(len(x))
+    rows: list[dict[str, Any]] = []
+    for xv, yv in zip(x.tolist(), y.tolist()):
+        rows.append(
+            {
+                "plot_id": plot_id,
+                "series": series,
+                "scenario_id": scenario_id,
+                "case_id": case_id,
+                "link_id": link_id,
+                "x": float(xv),
+                "y": float(yv),
+                "data": float(xv),
+                "meta": "",
+            }
+        )
+    return rows
+
+
+def _plot_data_fieldnames() -> list[str]:
+    return ["plot_id", "series", "scenario_id", "case_id", "link_id", "x", "y", "data", "meta"]
+
+
+def _pdp_rows_from_run(run_dir: Path, scenario_id: str, plot_id: str, max_files: int) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    if not run_dir.exists():
+        return rows
+    files = sorted(run_dir.glob(f"pdp_{scenario_id}_*.npz"))[: max(1, int(max_files))]
+    for npz in files:
+        stem = npz.stem
+        parts = stem.split("_", 2)
+        case_id = parts[2] if len(parts) >= 3 else ""
+        z = np.load(npz)
+        d = np.asarray(z["delay_tau_s"], dtype=float) * 1e9
+        pco = _safe_log10(np.asarray(z["P_co"], dtype=float))
+        pcr = _safe_log10(np.asarray(z["P_cross"], dtype=float))
+        for xv, yv in zip(d.tolist(), pco.tolist()):
+            rows.append(
+                {
+                    "plot_id": plot_id,
+                    "series": "P_co_db",
+                    "scenario_id": scenario_id,
+                    "case_id": case_id,
+                    "link_id": f"{scenario_id}_{case_id}",
+                    "x": float(xv),
+                    "y": float(yv),
+                    "data": float(yv),
+                    "meta": "delay_ns",
+                }
+            )
+        for xv, yv in zip(d.tolist(), pcr.tolist()):
+            rows.append(
+                {
+                    "plot_id": plot_id,
+                    "series": "P_cross_db",
+                    "scenario_id": scenario_id,
+                    "case_id": case_id,
+                    "link_id": f"{scenario_id}_{case_id}",
+                    "x": float(xv),
+                    "y": float(yv),
+                    "data": float(yv),
+                    "meta": "delay_ns",
+                }
+            )
+        if "XPD_tau_db" in z.files:
+            xt = np.asarray(z["XPD_tau_db"], dtype=float)
+            for xv, yv in zip(d.tolist(), xt.tolist()):
+                rows.append(
+                    {
+                        "plot_id": f"{plot_id}b",
+                        "series": "XPD_tau_db",
+                        "scenario_id": scenario_id,
+                        "case_id": case_id,
+                        "link_id": f"{scenario_id}_{case_id}",
+                        "x": float(xv),
+                        "y": float(yv),
+                        "data": float(yv),
+                        "meta": "delay_ns",
+                    }
+                )
+    return rows
+
+
+def _build_plot_data_rows(
+    plot_id: str,
+    link_rows: list[dict[str, str]],
+    ray_rows: list[dict[str, str]],
+    index_rows: list[dict[str, str]],
+    tab_dir: Path,
+    diag: dict[str, Any],
+) -> list[dict[str, Any]]:
+    by = _by_scenario(link_rows)
+    rows: list[dict[str, Any]] = []
+
+    def add_row(
+        series: str,
+        x: Any,
+        y: Any,
+        data: Any,
+        *,
+        scenario_id: str = "",
+        case_id: str = "",
+        link_id: str = "",
+        meta: str = "",
+    ) -> None:
+        rows.append(
+            {
+                "plot_id": plot_id,
+                "series": series,
+                "scenario_id": scenario_id,
+                "case_id": case_id,
+                "link_id": link_id,
+                "x": x,
+                "y": y,
+                "data": data,
+                "meta": meta,
+            }
+        )
+
+    # M
+    if plot_id == "M1-1":
+        run = _first_index_run(index_rows, "C0")
+        if run:
+            rows.extend(_pdp_rows_from_run(run, "C0", plot_id, max_files=12))
+        return rows
+
+    if plot_id == "M1-2":
+        c0_link = {str(r.get("link_id", "")): r for r in by.get("C0", [])}
+        per_link: dict[str, dict[str, float]] = {}
+        for r in ray_rows:
+            if str(r.get("scenario_id", "")) != "C0":
+                continue
+            link = str(r.get("link_id", ""))
+            p = _to_float(r.get("P_lin"))
+            los = _to_int(r.get("los_flag_ray"))
+            if not np.isfinite(p):
+                continue
+            agg = per_link.setdefault(link, {"los": 0.0, "nlos": 0.0})
+            if los == 1:
+                agg["los"] += float(max(p, 0.0))
+            else:
+                agg["nlos"] += float(max(p, 0.0))
+        for link, agg in per_link.items():
+            los = max(float(agg["los"]), 1e-30)
+            nlos = max(float(agg["nlos"]), 1e-30)
+            cf = 10.0 * np.log10(nlos / los)
+            lr = c0_link.get(link, {})
+            yaw = _to_float(lr.get("yaw_deg"))
+            add_row("C_floor_db", yaw, cf, cf, scenario_id="C0", case_id=str(lr.get("case_id", "")), link_id=link)
+        return rows
+
+    if plot_id in {"M1-3", "M1-4", "M1-6"}:
+        for r in by.get("C0", []):
+            x = _to_float(r.get("d_m")) if plot_id in {"M1-3", "M1-6"} else _to_float(r.get("yaw_deg"))
+            y = _to_float(r.get("XPD_early_db"))
+            series = "XPD_floor_db"
+            if plot_id == "M1-6":
+                series = f"d={_to_float(r.get('d_m')):.2f},yaw={_to_float(r.get('yaw_deg')):.1f}"
+            add_row(
+                series,
+                x,
+                y,
+                y,
+                scenario_id="C0",
+                case_id=str(r.get("case_id", "")),
+                link_id=str(r.get("link_id", "")),
+            )
+        return rows
+
+    if plot_id == "M1-5":
+        c0 = by.get("C0", [])
+        if c0:
+            f = _as_float_list(c0[0].get("xpd_floor_freq_hz"))
+            xpd = _as_float_list(c0[0].get("xpd_floor_curve_db"))
+            n = min(len(f), len(xpd))
+            for i in range(n):
+                add_row("XPD_floor_curve_db", f[i], xpd[i], xpd[i], scenario_id="C0", meta="freq_hz")
+        return rows
+
+    if plot_id == "M1-7":
+        c = dict(diag.get("C_effect_vs_floor", {}))
+        for k in ["floor_delta_db", "repeat_delta_db", "delta_ref_db"]:
+            v = _to_float(c.get(k))
+            add_row("uncertainty_budget_db", k, v, v, scenario_id="C0")
+        return rows
+
+    if plot_id == "M2-1":
+        for r in link_rows:
+            sc = str(r.get("scenario_id", ""))
+            if sc == "C0":
+                continue
+            e = _to_float(r.get("XPD_early_excess_db"))
+            l = _to_float(r.get("XPD_late_excess_db"))
+            add_row("XPD_early_excess_db", sc, e, e, scenario_id=sc, case_id=str(r.get("case_id", "")), link_id=str(r.get("link_id", "")))
+            add_row("XPD_late_excess_db", sc, l, l, scenario_id=sc, case_id=str(r.get("case_id", "")), link_id=str(r.get("link_id", "")))
+        return rows
+
+    if plot_id == "M2-2":
+        dref = abs(_to_float(dict(diag.get("C_effect_vs_floor", {})).get("delta_ref_db")))
+        for sc, rr in by.items():
+            if sc == "C0":
+                continue
+            ev = _finite([_to_float(r.get("XPD_early_excess_db")) for r in rr])
+            lv = _finite([_to_float(r.get("XPD_late_excess_db")) for r in rr])
+            er = float(np.mean(np.abs(ev) > dref)) if len(ev) else np.nan
+            lr = float(np.mean(np.abs(lv) > dref)) if len(lv) else np.nan
+            add_row("early_exceed_rate", sc, er, er, scenario_id=sc, meta=f"delta_ref_db={dref:.4f}")
+            add_row("late_exceed_rate", sc, lr, lr, scenario_id=sc, meta=f"delta_ref_db={dref:.4f}")
+        return rows
+
+    if plot_id == "M2-3":
+        c0 = _finite([_to_float(r.get("XPD_early_db")) for r in by.get("C0", [])])
+        rows.extend(_ecdf_rows(c0, plot_id=plot_id, series="C0_floor", scenario_id="C0"))
+        indoor = [r for r in link_rows if str(r.get("scenario_id", "")) != "C0"]
+        xe = _finite([_to_float(r.get("XPD_early_excess_db")) for r in indoor])
+        rows.extend(_ecdf_rows(xe, plot_id=plot_id, series="indoor_early_excess"))
+        return rows
+
+    # G
+    if plot_id == "G1-1":
+        run = _first_index_run(index_rows, "A2")
+        if run:
+            rows.extend(_pdp_rows_from_run(run, "A2", plot_id, max_files=1))
+        return rows
+
+    if plot_id == "G1-1b":
+        run = _first_index_run(index_rows, "A2")
+        if run:
+            rr = _pdp_rows_from_run(run, "A2", "G1-1", max_files=1)
+            rows.extend([r for r in rr if str(r.get("plot_id", "")) == "G1-1b"])
+        return rows
+
+    if plot_id == "G1-2":
+        for r in by.get("A2", []):
+            y = _to_float(r.get("XPD_early_excess_db"))
+            add_row("XPD_early_excess_db", str(r.get("case_id", "")), y, y, scenario_id="A2", case_id=str(r.get("case_id", "")), link_id=str(r.get("link_id", "")))
+        return rows
+
+    if plot_id == "G1-3":
+        dom = _dominant_incidence_by_link(ray_rows, "A2")
+        for r in by.get("A2", []):
+            lk = str(r.get("link_id", ""))
+            ang = float(dom.get(lk, np.nan))
+            y = _to_float(r.get("rho_early_db"))
+            add_row("rho_early_db", ang, y, y, scenario_id="A2", case_id=str(r.get("case_id", "")), link_id=lk)
+        return rows
+
+    if plot_id == "G2-1":
+        run = _first_index_run(index_rows, "A3")
+        if run:
+            rows.extend(_pdp_rows_from_run(run, "A3", plot_id, max_files=1))
+        return rows
+
+    if plot_id in {"G2-2", "G2-3"}:
+        p = tab_dir / "A3_target_window_sign.csv"
+        if p.exists():
+            for r in _read_csv(p):
+                sc = str(r.get("scenario", ""))
+                if plot_id == "G2-2" and sc != "A3":
+                    continue
+                y = _to_float(r.get("median_xpd_target_ex_db"))
+                hit = _to_float(r.get("expected_sign_hit_rate"))
+                add_row("median_xpd_target_ex_db", sc, y, y, scenario_id=sc, meta=f"expected_sign_hit_rate={hit:.4f}")
+        return rows
+
+    if plot_id == "G2-4":
+        b = dict(diag.get("B_time_resolution", {}))
+        for k in ["A2_target_in_Wearly_rate", "A3_target_in_Wearly_rate"]:
+            v = _to_float(b.get(k))
+            add_row("target_in_Wearly_rate", k, v, v, scenario_id="A3")
+        return rows
+
+    if plot_id == "G3-1":
+        for sc in ["A2", "A3"]:
+            for r in by.get(sc, []):
+                y = _to_float(r.get("XPD_early_excess_db"))
+                add_row("XPD_early_excess_db", sc, y, y, scenario_id=sc, case_id=str(r.get("case_id", "")), link_id=str(r.get("link_id", "")))
+        return rows
+
+    if plot_id == "G3-2":
+        for sc in ["A2", "A3", "A4", "A5"]:
+            for r in by.get(sc, []):
+                x = _to_float(r.get("EL_proxy_db"))
+                y = abs(_to_float(r.get("XPD_early_excess_db")))
+                add_row("abs_XPD_early_excess_db", x, y, y, scenario_id=sc, case_id=str(r.get("case_id", "")), link_id=str(r.get("link_id", "")))
+        return rows
+
+    if plot_id == "G3-3":
+        for sc in ["A2", "A3", "A4", "A5"]:
+            vals = _finite([_to_float(r.get("XPD_early_excess_db")) for r in by.get(sc, [])])
+            if len(vals):
+                v = float(np.var(vals, ddof=1)) if len(vals) > 1 else 0.0
+                add_row("var_XPD_early_excess_db", sc, v, v, scenario_id=sc)
+        return rows
+
+    # L
+    if plot_id == "L1-1":
+        for r in link_rows:
+            sc = str(r.get("scenario_id", ""))
+            if sc == "C0":
+                continue
+            e = _to_float(r.get("XPD_early_excess_db"))
+            l = _to_float(r.get("XPD_late_excess_db"))
+            lk = str(r.get("link_id", ""))
+            cid = str(r.get("case_id", ""))
+            add_row("early", "early", e, e, scenario_id=sc, case_id=cid, link_id=lk)
+            add_row("late", "late", l, l, scenario_id=sc, case_id=cid, link_id=lk)
+        return rows
+
+    if plot_id == "L1-2":
+        for r in link_rows:
+            sc = str(r.get("scenario_id", ""))
+            if sc == "C0":
+                continue
+            y = _to_float(r.get("L_pol_db"))
+            add_row("L_pol_db", sc, y, y, scenario_id=sc, case_id=str(r.get("case_id", "")), link_id=str(r.get("link_id", "")))
+        return rows
+
+    if plot_id in {"L2-M1", "L2-M2", "L2-M3"}:
+        a4 = by.get("A4", [])
+        if plot_id in {"L2-M1", "L2-M2"}:
+            dom = _dominant_incidence_by_link(ray_rows, "A4")
+            for r in a4:
+                mat = str(r.get("material_class", "NA"))
+                lk = str(r.get("link_id", ""))
+                ang = float(dom.get(lk, np.nan))
+                val = _to_float(r.get("XPD_early_excess_db"))
+                if plot_id == "L2-M2":
+                    val = abs(val)
+                add_row(
+                    "XPD_early_excess_db" if plot_id == "L2-M1" else "abs_XPD_early_excess_db",
+                    mat,
+                    val,
+                    val,
+                    scenario_id="A4",
+                    case_id=str(r.get("case_id", "")),
+                    link_id=lk,
+                    meta=f"incidence_deg={ang:.4f}",
+                )
+        else:
+            mats = sorted({str(r.get("material_class", "NA")) for r in a4})
+            for m in mats:
+                vals = _finite([_to_float(r.get("XPD_early_excess_db")) for r in a4 if str(r.get("material_class", "NA")) == m])
+                vv = float(np.var(vals, ddof=1)) if len(vals) > 1 else (0.0 if len(vals) == 1 else np.nan)
+                add_row("var_XPD_early_excess_db", m, vv, vv, scenario_id="A4")
+        return rows
+
+    if plot_id in {"L2-S1", "L2-S2", "L2-S3"}:
+        a5 = by.get("A5", [])
+        for r in a5:
+            cond = "stress" if (_to_int(r.get("roughness_flag")) == 1 or _to_int(r.get("human_flag")) == 1 or str(r.get("stress_mode", "")).lower() not in {"", "none"}) else "base"
+            if plot_id == "L2-S1":
+                val = _to_float(r.get("L_pol_db"))
+                series = "L_pol_db"
+            elif plot_id == "L2-S2":
+                val = _to_float(r.get("XPD_late_excess_db"))
+                series = "XPD_late_excess_db"
+            else:
+                val = _to_float(r.get("delay_spread_rms_s")) * 1e9
+                series = "delay_spread_rms_ns"
+            add_row(series, cond, val, val, scenario_id="A5", case_id=str(r.get("case_id", "")), link_id=str(r.get("link_id", "")))
+        return rows
+
+    if plot_id in {"L3-1", "L3-2", "L3-3", "P1-1", "P1-2", "P1-3", "P1-4", "P2-1", "P2-2", "P2-3"}:
+        subset = [r for r in link_rows if str(r.get("scenario_id", "")) in {"A3", "A4", "B1", "B2", "B3"}]
+        x = np.asarray([_to_float(r.get("EL_proxy_db")) for r in subset], dtype=float)
+        y = np.asarray([_to_float(r.get("XPD_early_excess_db")) for r in subset], dtype=float)
+        m = np.isfinite(x) & np.isfinite(y)
+        x = x[m]
+        y = y[m]
+        if len(x) >= 2:
+            b1, b0 = np.polyfit(x, y, 1)
+            y_lin = b1 * x + b0
+            y_const = np.full_like(y, float(np.mean(y)))
+        else:
+            y_lin = np.asarray([], dtype=float)
+            y_const = np.asarray([], dtype=float)
+
+        if plot_id == "L3-1":
+            for r in subset:
+                xx = _to_float(r.get("EL_proxy_db"))
+                yy = _to_float(r.get("XPD_early_excess_db"))
+                add_row("XPD_early_excess_db", xx, yy, yy, scenario_id=str(r.get("scenario_id", "")), case_id=str(r.get("case_id", "")), link_id=str(r.get("link_id", "")))
+            return rows
+        if plot_id == "L3-2":
+            if len(x):
+                q1, q2 = np.percentile(x, [33, 66])
+                bins = np.where(x <= q1, "low", np.where(x <= q2, "mid", "high"))
+                for b in ["low", "mid", "high"]:
+                    vv = y[bins == b]
+                    for v in vv.tolist():
+                        add_row("XPD_early_excess_db", b, v, v)
+            return rows
+        if plot_id == "L3-3":
+            if len(x):
+                xx = np.linspace(float(np.nanmin(x)), float(np.nanmax(x)), 64)
+                yy = b1 * xx + b0 if len(x) >= 2 else np.full_like(xx, np.nan)
+                for xv, yv in zip(xx.tolist(), yy.tolist()):
+                    add_row("fitted_mean", xv, yv, yv)
+            return rows
+        if plot_id == "P1-1":
+            rows.extend(_ecdf_rows(y, plot_id=plot_id, series="observed"))
+            rows.extend(_ecdf_rows(y_lin, plot_id=plot_id, series="conditional-linear"))
+            rows.extend(_ecdf_rows(y_const, plot_id=plot_id, series="constant-baseline"))
+            return rows
+        if plot_id == "P1-2":
+            if len(x):
+                q1, q2 = np.percentile(x, [33, 66])
+                bins = np.where(x <= q1, "low", np.where(x <= q2, "mid", "high"))
+                for b in ["low", "mid", "high"]:
+                    idx = bins == b
+                    if np.any(idx):
+                        add_row("observed", b, float(np.median(y[idx])), float(np.median(y[idx])))
+                        add_row("conditional", b, float(np.median(y_lin[idx])), float(np.median(y_lin[idx])))
+                        add_row("constant", b, float(np.median(y_const[idx])), float(np.median(y_const[idx])))
+            return rows
+        if plot_id == "P1-3":
+            if len(y):
+                r_obs = stats.rankdata(y)
+                r_lin = stats.rankdata(y_lin)
+                r_con = stats.rankdata(y_const)
+                for xo, yl in zip(r_obs.tolist(), r_lin.tolist()):
+                    add_row("conditional", xo, yl, yl)
+                for xo, yc in zip(r_obs.tolist(), r_con.tolist()):
+                    add_row("constant", xo, yc, yc)
+            return rows
+        if plot_id == "P1-4":
+            if len(x):
+                for xv, rv in zip(x.tolist(), (y - y_lin).tolist()):
+                    add_row("conditional_residual", xv, rv, rv)
+                for xv, rv in zip(x.tolist(), (y - y_const).tolist()):
+                    add_row("constant_residual", xv, rv, rv)
+            return rows
+
+        # P2 family
+        rng = np.random.default_rng(42)
+        by_sc = _by_scenario(link_rows)
+        minimal: list[dict[str, str]] = []
+        for _s, rr in by_sc.items():
+            if len(rr) <= 2:
+                minimal.extend(rr)
+                continue
+            idx = np.arange(len(rr))
+            take = max(1, len(rr) // 2)
+            sel = rng.choice(idx, size=take, replace=False)
+            minimal.extend([rr[int(i)] for i in sel])
+
+        def _effect_dict(rows_in: list[dict[str, str]]) -> dict[str, float]:
+            bys = _by_scenario(rows_in)
+            c0 = _finite([_to_float(r.get("XPD_early_excess_db")) for r in bys.get("C0", [])])
+            a2 = _finite([_to_float(r.get("XPD_early_excess_db")) for r in bys.get("A2", [])])
+            a3 = _finite([_to_float(r.get("XPD_early_excess_db")) for r in bys.get("A3", [])])
+            bpool = [r for r in rows_in if str(r.get("scenario_id", "")) in {"B1", "B2", "B3"}]
+            los = _finite([_to_float(r.get("XPD_early_excess_db")) for r in bpool if _to_int(r.get("LOSflag")) == 1])
+            nlos = _finite([_to_float(r.get("XPD_early_excess_db")) for r in bpool if _to_int(r.get("LOSflag")) == 0])
+            sub = [r for r in rows_in if str(r.get("scenario_id", "")) in {"A3", "A4", "B1", "B2", "B3"}]
+            xx = np.asarray([_to_float(r.get("EL_proxy_db")) for r in sub], dtype=float)
+            yy = np.asarray([_to_float(r.get("XPD_early_excess_db")) for r in sub], dtype=float)
+            mm = np.isfinite(xx) & np.isfinite(yy)
+            rho = float(stats.spearmanr(xx[mm], yy[mm]).correlation) if np.sum(mm) >= 5 else np.nan
+            return {
+                "G1": float(np.nanmedian(a2) - np.nanmedian(c0)) if len(a2) and len(c0) else np.nan,
+                "G2": float(np.nanmedian(a3) - np.nanmedian(a2)) if len(a3) and len(a2) else np.nan,
+                "L3": rho,
+                "R1": float(stats.wasserstein_distance(los, nlos)) if len(los) and len(nlos) else np.nan,
+            }
+
+        if plot_id == "P2-1":
+            eff_full = _effect_dict(link_rows)
+            eff_min = _effect_dict(minimal)
+            for k in ["G1", "G2", "L3", "R1"]:
+                add_row("full", k, eff_full.get(k), eff_full.get(k))
+                add_row("minimal", k, eff_min.get(k), eff_min.get(k))
+            return rows
+
+        if plot_id == "P2-2":
+            if len(x):
+                b1s = []
+                idx = np.arange(len(x), dtype=int)
+                for i in range(200):
+                    ii = rng.choice(idx, size=max(8, len(idx) // 2), replace=True)
+                    xx = x[ii]
+                    yy = y[ii]
+                    mm = np.isfinite(xx) & np.isfinite(yy)
+                    if np.sum(mm) >= 5 and len(np.unique(np.round(xx[mm], 6))) >= 2:
+                        bb1, _bb0 = np.polyfit(xx[mm], yy[mm], 1)
+                        b1s.append(float(bb1))
+                for i, v in enumerate(b1s):
+                    add_row("bootstrap_b1", i, v, v)
+            return rows
+
+        if plot_id == "P2-3":
+            for key, series in [("XPD_early_excess_db", "XPD_early_ex"), ("L_pol_db", "L_pol")]:
+                f = _finite([_to_float(r.get(key)) for r in link_rows])
+                m2 = _finite([_to_float(r.get(key)) for r in minimal])
+                rows.extend(_ecdf_rows(f, plot_id=plot_id, series=f"{series}_full"))
+                rows.extend(_ecdf_rows(m2, plot_id=plot_id, series=f"{series}_minimal"))
+            return rows
+
+    # R
+    if plot_id in {"R1-1", "R1-2", "R1-3", "R2-1", "R2-2", "R2-3", "R2-4", "R1-4"}:
+        bpool = [r for r in link_rows if str(r.get("scenario_id", "")) in {"B1", "B2", "B3"}]
+        if plot_id == "R1-1":
+            key = "XPD_early_excess_db"
+        elif plot_id == "R1-2":
+            key = "rho_early_lin"
+        elif plot_id == "R1-3":
+            key = "L_pol_db"
+        else:
+            key = ""
+        if plot_id in {"R1-1", "R1-2", "R1-3"}:
+            for r in bpool:
+                xv = _to_float(r.get("rx_x"))
+                yv = _to_float(r.get("rx_y"))
+                dv = _to_float(r.get(key))
+                add_row(key, xv, yv, dv, scenario_id=str(r.get("scenario_id", "")), case_id=str(r.get("case_id", "")), link_id=str(r.get("link_id", "")))
+            return rows
+        if plot_id == "R1-4":
+            for metric in ["XPD_early_excess_db", "rho_early_lin", "L_pol_db"]:
+                for losv in [0, 1]:
+                    vals = _finite([_to_float(r.get(metric)) for r in bpool if _to_int(r.get("LOSflag")) == losv])
+                    rows.extend(_ecdf_rows(vals, plot_id=plot_id, series=f"{metric}_LOS{losv}"))
+            return rows
+        if plot_id == "R2-1":
+            for r in bpool:
+                x = _to_float(r.get("XPD_early_excess_db"))
+                y = _to_float(r.get("delay_spread_rms_s")) * 1e9
+                add_row("XPD_vs_DS", x, y, y, scenario_id=str(r.get("scenario_id", "")), case_id=str(r.get("case_id", "")), link_id=str(r.get("link_id", "")))
+            return rows
+        if plot_id == "R2-2":
+            for r in bpool:
+                x = _to_float(r.get("rho_early_lin"))
+                y = _to_float(r.get("delay_spread_rms_s")) * 1e9
+                add_row("rho_vs_DS", x, y, y, scenario_id=str(r.get("scenario_id", "")), case_id=str(r.get("case_id", "")), link_id=str(r.get("link_id", "")))
+            return rows
+        if plot_id == "R2-3":
+            for r in bpool:
+                x = _to_float(r.get("XPD_early_excess_db"))
+                y = _to_float(r.get("delay_spread_rms_s")) * 1e9
+                d = _to_float(r.get("L_pol_db"))
+                add_row("quadrant", x, y, d, scenario_id=str(r.get("scenario_id", "")), case_id=str(r.get("case_id", "")), link_id=str(r.get("link_id", "")))
+            return rows
+        if plot_id == "R2-4":
+            for r in bpool:
+                x = _to_float(r.get("XPD_early_excess_db"))
+                y = _to_float(r.get("early_energy_fraction"))
+                add_row("early_fraction_vs_xpd", x, y, y, scenario_id=str(r.get("scenario_id", "")), case_id=str(r.get("case_id", "")), link_id=str(r.get("link_id", "")))
+            return rows
+
+    return rows
+
+
 def _parse_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser(description="Detailed proposition-plot mapping report generator")
     ap.add_argument("--run-group", required=True, help="analysis_report/out/<run_group>")
@@ -1474,12 +2050,17 @@ def main() -> None:
     _make_p_plots(fig_dir, link_rows, detail_rows)
     made_lookup = {str(r.get("plot_id", "")): str(r.get("file", "")) for r in detail_rows}
     note_lookup = {str(r.get("plot_id", "")): str(r.get("note", "")) for r in detail_rows}
+    plot_data_dir = tab_dir / "plot_data"
+    plot_data_dir.mkdir(parents=True, exist_ok=True)
 
     rows_out: list[dict[str, Any]] = []
     for sp in _specs():
         fn = made_lookup.get(sp.plot_id, sp.expected_file)
         p = fig_dir / fn
         ready = p.exists()
+        data_rows = _build_plot_data_rows(sp.plot_id, link_rows, ray_rows, index_rows, tab_dir, diag)
+        data_fn = f"{sp.plot_id}__data.csv"
+        _write_csv(plot_data_dir / data_fn, data_rows, _plot_data_fieldnames())
         rows_out.append(
             {
                 "plot_id": sp.plot_id,
@@ -1491,6 +2072,7 @@ def main() -> None:
                 "expected_file": fn,
                 "plot_ready": "READY" if ready else "MISSING",
                 "proposition_status": pstatus.get(sp.proposition, "FAIL"),
+                "data_csv": f"tables/plot_data/{data_fn}",
                 "notes": note_lookup.get(sp.plot_id, ""),
             }
         )
@@ -1509,6 +2091,7 @@ def main() -> None:
             "proposition_status",
             "plot_ready",
             "expected_file",
+            "data_csv",
             "notes",
         ],
     )
@@ -1533,12 +2116,13 @@ def main() -> None:
     lines.append("")
     lines.append("## Mapping Table")
     lines.append("")
-    lines.append("| plot_id | 명제 | 시나리오(실험) | 필요한 데이터 | 플롯 | 통과 기준 | 명제 PASS/FAIL | 플롯 상태 |")
-    lines.append("| --- | --- | --- | --- | --- | --- | --- | --- |")
+    lines.append("| plot_id | 명제 | 시나리오(실험) | 필요한 데이터 | 플롯 | 데이터 CSV(x,y,data) | 통과 기준 | 명제 PASS/FAIL | 플롯 상태 |")
+    lines.append("| --- | --- | --- | --- | --- | --- | --- | --- | --- |")
     for r in rows_out:
         lines.append(
             f"| {r['plot_id']} | {r['proposition']} | {r['scenario']} | {r['needed_data']} | "
-            f"[{r['expected_file']}](figures/{r['expected_file']}) | {r['pass_rule']} | "
+            f"[{r['expected_file']}](figures/{r['expected_file']}) | "
+            f"[{Path(str(r['data_csv'])).name}]({r['data_csv']}) | {r['pass_rule']} | "
             f"{r['proposition_status']} | {r['plot_ready']} |"
         )
     lines.append("")
