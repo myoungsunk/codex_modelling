@@ -34,6 +34,13 @@ class Antenna:
     cross_pol_leakage_db: float = 35.0
     axial_ratio_db: float = 0.0
     enable_coupling: bool = True
+    # Optional directional gain model (power gain):
+    # G(psi) = G_peak * max(cos(psi), 0)^n
+    # Defaults keep isotropic behavior (0 dBi, n=0).
+    tx_peak_gain_dbi: float = 0.0
+    rx_peak_gain_dbi: float = 0.0
+    tx_pattern_cos_exp: float = 0.0
+    rx_pattern_cos_exp: float = 0.0
     global_up: Vec3 = field(default_factory=lambda: np.array([0.0, 0.0, 1.0], dtype=float))
 
     def __post_init__(self) -> None:
@@ -115,3 +122,24 @@ class Antenna:
         proj = self.rx_receive_matrix(direction, wave_basis=wave_basis)
         cpl = self._coupling_matrix(len(f_hz))
         return np.einsum("kab,bc->kac", cpl.conj().transpose(0, 2, 1), proj).astype(np.complex128)
+
+    @staticmethod
+    def _dir_gain_lin(look_dir: Vec3, boresight: Vec3, peak_gain_dbi: float, cos_exp: float) -> float:
+        d = normalize(np.asarray(look_dir, dtype=float))
+        b = normalize(np.asarray(boresight, dtype=float))
+        cos_psi = float(max(np.dot(d, b), 0.0))
+        n = float(max(cos_exp, 0.0))
+        g_shape = float(cos_psi**n) if n > 0.0 else 1.0
+        g_peak = float(10.0 ** (float(peak_gain_dbi) / 10.0))
+        return float(max(g_peak * g_shape, 0.0))
+
+    def tx_directional_gain_linear(self, direction: Vec3) -> float:
+        """Directional TX power gain for launch direction."""
+        return self._dir_gain_lin(direction, self.boresight, self.tx_peak_gain_dbi, self.tx_pattern_cos_exp)
+
+    def rx_directional_gain_linear(self, direction: Vec3) -> float:
+        """Directional RX power gain for incoming wave direction.
+
+        `direction` follows propagation (source -> receiver), so arrival look direction is `-direction`.
+        """
+        return self._dir_gain_lin(-np.asarray(direction, dtype=float), self.boresight, self.rx_peak_gain_dbi, self.rx_pattern_cos_exp)

@@ -16,6 +16,10 @@ def default_antennas(
     tx_axial_ratio_db: float = 0.0,
     rx_axial_ratio_db: float = 0.0,
     enable_coupling: bool = True,
+    tx_peak_gain_dbi: float = 0.0,
+    rx_peak_gain_dbi: float = 0.0,
+    tx_pattern_cos_exp: float = 0.0,
+    rx_pattern_cos_exp: float = 0.0,
 ) -> tuple[Antenna, Antenna]:
     tx = Antenna(
         position=np.array([0.0, 0.0, 1.5]),
@@ -27,6 +31,8 @@ def default_antennas(
         cross_pol_leakage_db=tx_cross_pol_leakage_db,
         axial_ratio_db=tx_axial_ratio_db,
         enable_coupling=enable_coupling,
+        tx_peak_gain_dbi=tx_peak_gain_dbi,
+        tx_pattern_cos_exp=tx_pattern_cos_exp,
     )
     rx = Antenna(
         position=np.array([6.0, 0.0, 1.5]),
@@ -38,6 +44,8 @@ def default_antennas(
         cross_pol_leakage_db=rx_cross_pol_leakage_db,
         axial_ratio_db=rx_axial_ratio_db,
         enable_coupling=enable_coupling,
+        rx_peak_gain_dbi=rx_peak_gain_dbi,
+        rx_pattern_cos_exp=rx_pattern_cos_exp,
     )
     return tx, rx
 

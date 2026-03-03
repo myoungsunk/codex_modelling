@@ -304,9 +304,16 @@ def trace_paths(
             seen.add(key)
 
             if use_fspl:
+                # Amplitude-domain Friis factor (lambda/4piR). Power scaling is its squared magnitude.
+                # Directional antenna gain is injected below as sqrt(G_tx * G_rx).
                 scalar_gain_f = (c0 / freq) / (4.0 * np.pi * total_len)
             else:
                 scalar_gain_f = np.full(n_f, 1.0 / total_len, dtype=float)
+            # Optional directional pattern gain (power) from antenna boresight model.
+            # Defaults are isotropic (G_tx=G_rx=1), preserving existing behavior.
+            g_tx_dir = float(max(tx.tx_directional_gain_linear(dirs[0]), 0.0))
+            g_rx_dir = float(max(rx.rx_directional_gain_linear(dirs[-1]), 0.0))
+            scalar_gain_f = scalar_gain_f * float(np.sqrt(max(g_tx_dir * g_rx_dir, 0.0)))
 
             wave_basis = tx.wave_basis(dirs[0])
             J = np.repeat(np.eye(2, dtype=np.complex128)[None, :, :], n_f, axis=0)

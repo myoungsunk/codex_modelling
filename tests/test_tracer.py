@@ -65,6 +65,39 @@ class TracerTests(unittest.TestCase):
         # Blocker should never appear as a reflective surface in path metadata.
         self.assertFalse(any(9101 in list(p.surface_ids) for p in paths))
 
+    def test_directional_gain_reduces_off_boresight_los_power(self) -> None:
+        tx = Antenna(
+            position=np.array([0.0, 0.0, 1.0]),
+            boresight=np.array([1.0, 0.0, 0.0]),
+            h_axis=np.array([0.0, 1.0, 0.0]),
+            v_axis=np.array([0.0, 0.0, 1.0]),
+            basis="linear",
+            tx_pattern_cos_exp=4.0,
+        )
+        rx_on = Antenna(
+            position=np.array([5.0, 0.0, 1.0]),
+            boresight=np.array([-1.0, 0.0, 0.0]),
+            h_axis=np.array([0.0, 1.0, 0.0]),
+            v_axis=np.array([0.0, 0.0, 1.0]),
+            basis="linear",
+            rx_pattern_cos_exp=4.0,
+        )
+        rx_off = Antenna(
+            position=np.array([2.5, 4.3301270189, 1.0]),  # same range ~5 m, ~60 deg off boresight
+            boresight=np.array([-1.0, 0.0, 0.0]),
+            h_axis=np.array([0.0, 1.0, 0.0]),
+            v_axis=np.array([0.0, 0.0, 1.0]),
+            basis="linear",
+            rx_pattern_cos_exp=4.0,
+        )
+        p_on = trace_paths([], tx, rx_on, self.f, max_bounce=0, los_enabled=True)
+        p_off = trace_paths([], tx, rx_off, self.f, max_bounce=0, los_enabled=True)
+        self.assertEqual(len(p_on), 1)
+        self.assertEqual(len(p_off), 1)
+        pow_on = float(np.mean(np.abs(p_on[0].A_f) ** 2))
+        pow_off = float(np.mean(np.abs(p_off[0].A_f) ** 2))
+        self.assertLess(pow_off, pow_on)
+
 
 if __name__ == "__main__":
     unittest.main()

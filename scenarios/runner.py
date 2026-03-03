@@ -354,6 +354,8 @@ def _antennas_from_points(
         cross_pol_leakage_db=float(antenna_config.get("tx_cross_pol_leakage_db", 35.0)),
         axial_ratio_db=float(antenna_config.get("tx_axial_ratio_db", 0.0)),
         enable_coupling=bool(antenna_config.get("enable_coupling", True)),
+        tx_peak_gain_dbi=float(antenna_config.get("tx_peak_gain_dbi", 0.0)),
+        tx_pattern_cos_exp=float(antenna_config.get("tx_pattern_cos_exp", 0.0)),
     )
     rx = Antenna(
         position=np.asarray(rx_pos, dtype=float),
@@ -365,6 +367,8 @@ def _antennas_from_points(
         cross_pol_leakage_db=float(antenna_config.get("rx_cross_pol_leakage_db", 35.0)),
         axial_ratio_db=float(antenna_config.get("rx_axial_ratio_db", 0.0)),
         enable_coupling=bool(antenna_config.get("enable_coupling", True)),
+        rx_peak_gain_dbi=float(antenna_config.get("rx_peak_gain_dbi", 0.0)),
+        rx_pattern_cos_exp=float(antenna_config.get("rx_pattern_cos_exp", 0.0)),
     )
     return tx, rx
 
@@ -1491,6 +1495,10 @@ def main() -> None:
     parser.add_argument("--rx-cross-pol-leakage-db", type=float, default=35.0)
     parser.add_argument("--tx-axial-ratio-db", type=float, default=0.0)
     parser.add_argument("--rx-axial-ratio-db", type=float, default=0.0)
+    parser.add_argument("--tx-peak-gain-dbi", type=float, default=0.0)
+    parser.add_argument("--rx-peak-gain-dbi", type=float, default=0.0)
+    parser.add_argument("--tx-pattern-cos-exp", type=float, default=0.0)
+    parser.add_argument("--rx-pattern-cos-exp", type=float, default=0.0)
     parser.add_argument("--disable-antenna-coupling", action="store_true")
     parser.add_argument("--physics-validation-mode", action="store_true")
     parser.add_argument("--materials-db", type=str, default=None)
@@ -1604,6 +1612,10 @@ def main() -> None:
         "rx_cross_pol_leakage_db": args.rx_cross_pol_leakage_db,
         "tx_axial_ratio_db": args.tx_axial_ratio_db,
         "rx_axial_ratio_db": args.rx_axial_ratio_db,
+        "tx_peak_gain_dbi": args.tx_peak_gain_dbi,
+        "rx_peak_gain_dbi": args.rx_peak_gain_dbi,
+        "tx_pattern_cos_exp": args.tx_pattern_cos_exp,
+        "rx_pattern_cos_exp": args.rx_pattern_cos_exp,
         "enable_coupling": not args.disable_antenna_coupling,
     }
     if args.physics_validation_mode:
@@ -1611,6 +1623,10 @@ def main() -> None:
         antenna_config["rx_cross_pol_leakage_db"] = 120.0
         antenna_config["tx_axial_ratio_db"] = 0.0
         antenna_config["rx_axial_ratio_db"] = 0.0
+        antenna_config["tx_peak_gain_dbi"] = 0.0
+        antenna_config["rx_peak_gain_dbi"] = 0.0
+        antenna_config["tx_pattern_cos_exp"] = 0.0
+        antenna_config["rx_pattern_cos_exp"] = 0.0
         antenna_config["enable_coupling"] = False
 
     run_scenarios = None

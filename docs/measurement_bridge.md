@@ -66,3 +66,18 @@ When RT and measurement disagree, diagnose in this order:
 5. Antenna embedding: coupling, leakage floor, axial-ratio/cross-pol effects (`G_tx_f`, `G_rx_f`).
 
 This ordering avoids conflating geometry or loss errors with polarization-model errors.
+
+## FSPL and Antenna Pattern Assumptions
+
+- `scalar_gain_f` in tracer uses amplitude-domain Friis scaling: `lambda/(4*pi*R)`.
+- Path power therefore scales with `|lambda/(4*pi*R)|^2`, consistent with FSPL.
+- By default, directional pattern gain is isotropic:
+  - `tx_peak_gain_dbi=0`, `rx_peak_gain_dbi=0`
+  - `tx_pattern_cos_exp=0`, `rx_pattern_cos_exp=0`
+- Optional directional gain can be enabled with a simple boresight model:
+  - `G(psi) = G_peak * max(cos(psi), 0)^n` (power gain)
+  - CLI (`scenarios.runner`): `--tx-peak-gain-dbi`, `--rx-peak-gain-dbi`,
+    `--tx-pattern-cos-exp`, `--rx-pattern-cos-exp`
+- If you compare against measured datasets with strong off-boresight attenuation,
+  keep isotropic defaults only for sanity checks; use directional settings for
+  physically tighter absolute power matching.
