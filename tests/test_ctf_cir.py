@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import unittest
+import warnings
 
 import numpy as np
 
@@ -30,13 +31,15 @@ class CtfCirTests(unittest.TestCase):
         f = np.linspace(6e9, 10e9, 128)
         f[10] += 1e3
         H = np.ones((len(f), 2, 2), dtype=np.complex128)
-        h, tau = ctf_to_cir(H, f, nfft=256, window="hann")
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            h, tau = ctf_to_cir(H, f, nfft=256, window="hann", nonuniform_warn_rel_max=1e-8)
         self.assertEqual(h.shape[0], 256)
         self.assertEqual(len(tau), 256)
+        self.assertTrue(any("nonuniform frequency grid" in str(ww.message).lower() for ww in w))
         info = cir_bandlimit_info(f, nfft=256)
         self.assertGreaterEqual(float(info["grid_uniformity_rel_max"]), 0.0)
 
 
 if __name__ == "__main__":
     unittest.main()
-

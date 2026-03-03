@@ -43,6 +43,22 @@ class PolarizationCoreTests(unittest.TestCase):
         self.assertGreater(float(np.max(np.abs(r[:, 0, 1]))), 0.0)
         self.assertGreater(float(np.max(np.abs(r[:, 1, 0]))), 0.0)
 
+    def test_jones_reflection_asymmetric_offdiag_hook_enabled(self) -> None:
+        f = np.linspace(6e9, 8e9, 9)
+        mat = Material.dielectric(
+            eps_r=4.2,
+            tan_delta=0.02,
+            name="test",
+            xpol_coupling_hv_db=18.0,
+            xpol_coupling_hv_phase_deg=30.0,
+            xpol_coupling_vh_db=24.0,
+            xpol_coupling_vh_phase_deg=-20.0,
+        )
+        r = jones_reflection(mat, theta_i=np.deg2rad(35.0), f_hz=f)
+        self.assertGreater(float(np.max(np.abs(r[:, 0, 1]))), 0.0)
+        self.assertGreater(float(np.max(np.abs(r[:, 1, 0]))), 0.0)
+        self.assertFalse(np.allclose(r[:, 1, 0], np.conj(r[:, 0, 1]), atol=1e-9))
+
     def test_dielectric_fresnel_is_passive(self) -> None:
         mat = Material.dielectric(eps_r=4.2, tan_delta=0.02, name="test")
         f = np.linspace(6e9, 10e9, 17)
@@ -51,6 +67,15 @@ class PolarizationCoreTests(unittest.TestCase):
         self.assertTrue(np.all(np.isfinite(gp)))
         self.assertLessEqual(float(np.max(np.abs(gs))), 1.0000001)
         self.assertLessEqual(float(np.max(np.abs(gp))), 1.0000001)
+
+    def test_fresnel_branch_is_phase_continuous_near_brewster(self) -> None:
+        mat = Material.dielectric(eps_r=4.0, tan_delta=0.08, name="lossy")
+        f = np.array([8.0e9], dtype=float)
+        th = np.deg2rad(np.linspace(40.0, 80.0, 81))
+        gp = np.array([fresnel_reflection(mat, theta_i=float(t), f_hz=f)[1][0] for t in th], dtype=np.complex128)
+        phase = np.unwrap(np.angle(gp))
+        self.assertTrue(np.all(np.isfinite(phase)))
+        self.assertLess(float(np.max(np.abs(np.diff(phase)))), np.pi / 1.5)
 
     def test_depol_matrix_is_unitary(self) -> None:
         rng = np.random.default_rng(42)

@@ -144,6 +144,40 @@ class TracerTests(unittest.TestCase):
         k_fine_2 = _path_key(p2, seq, 1.0e-8, point_tol_m=1e-8, tau_tol_s=1e-14)
         self.assertNotEqual(k_fine_1, k_fine_2)
 
+    def test_trace_diagnostics_and_sequence_truncation_flags(self) -> None:
+        p1 = Plane(id=1, p0=np.array([0.0, 3.0, 0.0]), normal=np.array([0.0, -1.0, 0.0]), material=Material.pec())
+        p2 = Plane(id=2, p0=np.array([3.0, 0.0, 0.0]), normal=np.array([-1.0, 0.0, 0.0]), material=Material.pec())
+        diag: dict[str, int | float] = {}
+        _ = trace_paths(
+            [p1, p2],
+            self.tx,
+            self.rx,
+            self.f,
+            max_bounce=2,
+            los_enabled=False,
+            max_sequence_candidates_per_bounce=1,
+            diagnostics=diag,
+        )
+        self.assertIn("sequence_candidates_total_b2", diag)
+        self.assertIn("sequence_candidates_truncated_b2", diag)
+        self.assertIn("path_results_total", diag)
+
+    def test_diffuse_paths_are_flagged_as_proxy(self) -> None:
+        plane = Plane(id=1, p0=np.array([0.0, 2.0, 0.0]), normal=np.array([0.0, -1.0, 0.0]), material=Material.pec())
+        paths = trace_paths(
+            [plane],
+            self.tx,
+            self.rx,
+            self.f,
+            max_bounce=1,
+            los_enabled=False,
+            diffuse_enabled=True,
+            diffuse_factor=0.3,
+            diffuse_rays_per_hit=1,
+        )
+        self.assertTrue(any(bool(p.is_proxy_diffuse) for p in paths))
+        self.assertTrue(any(not bool(p.is_proxy_diffuse) for p in paths))
+
 
 if __name__ == "__main__":
     unittest.main()

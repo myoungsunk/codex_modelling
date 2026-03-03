@@ -41,6 +41,12 @@ class Material:
     # None -> disabled (pure diagonal Fresnel).
     xpol_coupling_db: float | None = None
     xpol_coupling_phase_deg: float = 0.0
+    # Optional asymmetric off-diagonal terms (empirical hook).
+    # When provided, these override symmetric xpol_coupling_db for each direction.
+    xpol_coupling_hv_db: float | None = None
+    xpol_coupling_hv_phase_deg: float = 0.0
+    xpol_coupling_vh_db: float | None = None
+    xpol_coupling_vh_phase_deg: float = 0.0
     # PEC TM sign convention in local p basis.
     # Legacy/default tracer convention uses -1.0 for continuity.
     # Use +1.0 to match textbook TE/TM table under alternate p-vector conventions.
@@ -50,12 +56,20 @@ class Material:
     def pec(
         xpol_coupling_db: float | None = None,
         xpol_coupling_phase_deg: float = 0.0,
+        xpol_coupling_hv_db: float | None = None,
+        xpol_coupling_hv_phase_deg: float = 0.0,
+        xpol_coupling_vh_db: float | None = None,
+        xpol_coupling_vh_phase_deg: float = 0.0,
         pec_tm_sign: float = -1.0,
     ) -> "Material":
         return Material(
             kind="PEC",
             xpol_coupling_db=xpol_coupling_db,
             xpol_coupling_phase_deg=float(xpol_coupling_phase_deg),
+            xpol_coupling_hv_db=xpol_coupling_hv_db,
+            xpol_coupling_hv_phase_deg=float(xpol_coupling_hv_phase_deg),
+            xpol_coupling_vh_db=xpol_coupling_vh_db,
+            xpol_coupling_vh_phase_deg=float(xpol_coupling_vh_phase_deg),
             pec_tm_sign=float(pec_tm_sign),
         )
 
@@ -67,6 +81,10 @@ class Material:
         name: str = "",
         xpol_coupling_db: float | None = None,
         xpol_coupling_phase_deg: float = 0.0,
+        xpol_coupling_hv_db: float | None = None,
+        xpol_coupling_hv_phase_deg: float = 0.0,
+        xpol_coupling_vh_db: float | None = None,
+        xpol_coupling_vh_phase_deg: float = 0.0,
     ) -> "Material":
         return Material(
             kind="dielectric",
@@ -76,6 +94,10 @@ class Material:
             complex_eps_r=complex_eps_r,
             xpol_coupling_db=xpol_coupling_db,
             xpol_coupling_phase_deg=float(xpol_coupling_phase_deg),
+            xpol_coupling_hv_db=xpol_coupling_hv_db,
+            xpol_coupling_hv_phase_deg=float(xpol_coupling_hv_phase_deg),
+            xpol_coupling_vh_db=xpol_coupling_vh_db,
+            xpol_coupling_vh_phase_deg=float(xpol_coupling_vh_phase_deg),
         )
 
     @staticmethod
@@ -86,6 +108,10 @@ class Material:
         name: str = "",
         xpol_coupling_db: float | None = None,
         xpol_coupling_phase_deg: float = 0.0,
+        xpol_coupling_hv_db: float | None = None,
+        xpol_coupling_hv_phase_deg: float = 0.0,
+        xpol_coupling_vh_db: float | None = None,
+        xpol_coupling_vh_phase_deg: float = 0.0,
     ) -> "Material":
         f = tuple(float(x) for x in f_hz)
         e = tuple(float(x) for x in eps_r)
@@ -108,6 +134,10 @@ class Material:
             table_tan_delta=t,
             xpol_coupling_db=xpol_coupling_db,
             xpol_coupling_phase_deg=float(xpol_coupling_phase_deg),
+            xpol_coupling_hv_db=xpol_coupling_hv_db,
+            xpol_coupling_hv_phase_deg=float(xpol_coupling_hv_phase_deg),
+            xpol_coupling_vh_db=xpol_coupling_vh_db,
+            xpol_coupling_vh_phase_deg=float(xpol_coupling_vh_phase_deg),
         )
 
     @staticmethod
@@ -119,6 +149,10 @@ class Material:
         name: str = "",
         xpol_coupling_db: float | None = None,
         xpol_coupling_phase_deg: float = 0.0,
+        xpol_coupling_hv_db: float | None = None,
+        xpol_coupling_hv_phase_deg: float = 0.0,
+        xpol_coupling_vh_db: float | None = None,
+        xpol_coupling_vh_phase_deg: float = 0.0,
     ) -> "Material":
         de = tuple(float(x) for x in delta_eps)
         ts = tuple(float(x) for x in tau_s)
@@ -135,6 +169,10 @@ class Material:
             debye_tau_s=ts,
             xpol_coupling_db=xpol_coupling_db,
             xpol_coupling_phase_deg=float(xpol_coupling_phase_deg),
+            xpol_coupling_hv_db=xpol_coupling_hv_db,
+            xpol_coupling_hv_phase_deg=float(xpol_coupling_hv_phase_deg),
+            xpol_coupling_vh_db=xpol_coupling_vh_db,
+            xpol_coupling_vh_phase_deg=float(xpol_coupling_vh_phase_deg),
         )
 
 

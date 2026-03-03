@@ -91,9 +91,24 @@ def material_from_spec(name: str, spec: dict[str, Any], material_dispersion: str
     xpol_db_raw = spec.get("xpol_coupling_db", None)
     xpol_db = (None if xpol_db_raw is None else float(xpol_db_raw))
     xpol_ph = float(spec.get("xpol_coupling_phase_deg", 0.0))
+    xpol_hv_db_raw = spec.get("xpol_coupling_hv_db", None)
+    xpol_hv_db = (None if xpol_hv_db_raw is None else float(xpol_hv_db_raw))
+    xpol_hv_ph = float(spec.get("xpol_coupling_hv_phase_deg", 0.0))
+    xpol_vh_db_raw = spec.get("xpol_coupling_vh_db", None)
+    xpol_vh_db = (None if xpol_vh_db_raw is None else float(xpol_vh_db_raw))
+    xpol_vh_ph = float(spec.get("xpol_coupling_vh_phase_deg", 0.0))
+    pec_tm_sign = float(spec.get("pec_tm_sign", -1.0))
 
     if model == "pec":
-        return Material.pec(xpol_coupling_db=xpol_db, xpol_coupling_phase_deg=xpol_ph)
+        return Material.pec(
+            xpol_coupling_db=xpol_db,
+            xpol_coupling_phase_deg=xpol_ph,
+            xpol_coupling_hv_db=xpol_hv_db,
+            xpol_coupling_hv_phase_deg=xpol_hv_ph,
+            xpol_coupling_vh_db=xpol_vh_db,
+            xpol_coupling_vh_phase_deg=xpol_vh_ph,
+            pec_tm_sign=pec_tm_sign,
+        )
 
     if mode == "off":
         if model == "table":
@@ -104,6 +119,10 @@ def material_from_spec(name: str, spec: dict[str, Any], material_dispersion: str
                 name=name,
                 xpol_coupling_db=xpol_db,
                 xpol_coupling_phase_deg=xpol_ph,
+                xpol_coupling_hv_db=xpol_hv_db,
+                xpol_coupling_hv_phase_deg=xpol_hv_ph,
+                xpol_coupling_vh_db=xpol_vh_db,
+                xpol_coupling_vh_phase_deg=xpol_vh_ph,
             )
         if model == "debye":
             eps_r, tan_delta = _debye_to_const(spec)
@@ -113,6 +132,10 @@ def material_from_spec(name: str, spec: dict[str, Any], material_dispersion: str
                 name=name,
                 xpol_coupling_db=xpol_db,
                 xpol_coupling_phase_deg=xpol_ph,
+                xpol_coupling_hv_db=xpol_hv_db,
+                xpol_coupling_hv_phase_deg=xpol_hv_ph,
+                xpol_coupling_vh_db=xpol_vh_db,
+                xpol_coupling_vh_phase_deg=xpol_vh_ph,
             )
         return Material.dielectric(
             eps_r=float(max(float(spec.get("eps_r", 2.0)), 1.0)),
@@ -120,6 +143,10 @@ def material_from_spec(name: str, spec: dict[str, Any], material_dispersion: str
             name=name,
             xpol_coupling_db=xpol_db,
             xpol_coupling_phase_deg=xpol_ph,
+            xpol_coupling_hv_db=xpol_hv_db,
+            xpol_coupling_hv_phase_deg=xpol_hv_ph,
+            xpol_coupling_vh_db=xpol_vh_db,
+            xpol_coupling_vh_phase_deg=xpol_vh_ph,
         )
 
     # dispersion ON/DEBYE mode: keep spec model if available.
@@ -131,6 +158,10 @@ def material_from_spec(name: str, spec: dict[str, Any], material_dispersion: str
             name=name,
             xpol_coupling_db=xpol_db,
             xpol_coupling_phase_deg=xpol_ph,
+            xpol_coupling_hv_db=xpol_hv_db,
+            xpol_coupling_hv_phase_deg=xpol_hv_ph,
+            xpol_coupling_vh_db=xpol_vh_db,
+            xpol_coupling_vh_phase_deg=xpol_vh_ph,
         )
     if model == "debye":
         return Material.dielectric_debye(
@@ -141,6 +172,10 @@ def material_from_spec(name: str, spec: dict[str, Any], material_dispersion: str
             name=name,
             xpol_coupling_db=xpol_db,
             xpol_coupling_phase_deg=xpol_ph,
+            xpol_coupling_hv_db=xpol_hv_db,
+            xpol_coupling_hv_phase_deg=xpol_hv_ph,
+            xpol_coupling_vh_db=xpol_vh_db,
+            xpol_coupling_vh_phase_deg=xpol_vh_ph,
         )
     return Material.dielectric(
         eps_r=float(max(float(spec.get("eps_r", 2.0)), 1.0)),
@@ -148,6 +183,10 @@ def material_from_spec(name: str, spec: dict[str, Any], material_dispersion: str
         name=name,
         xpol_coupling_db=xpol_db,
         xpol_coupling_phase_deg=xpol_ph,
+        xpol_coupling_hv_db=xpol_hv_db,
+        xpol_coupling_hv_phase_deg=xpol_hv_ph,
+        xpol_coupling_vh_db=xpol_vh_db,
+        xpol_coupling_vh_phase_deg=xpol_vh_ph,
     )
 
 

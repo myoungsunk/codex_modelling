@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Literal
+import warnings
 
 import h5py
 import numpy as np
@@ -99,6 +100,7 @@ def ctf_to_cir(
     nfft: int | None = None,
     window: WindowName = "hann",
     kaiser_beta: float = 8.0,
+    nonuniform_warn_rel_max: float = 1e-3,
 ) -> tuple[NDArray[np.complex128], NDArray[np.float64]]:
     """Convert sampled CTF on measured RF band to delay-domain CIR taps.
 
@@ -132,7 +134,18 @@ def ctf_to_cir(
 
     h_tau = np.fft.ifft(hw, axis=0)
     if n > 1:
-        df = float(np.median(np.diff(freq)))
+        dff = np.diff(freq)
+        df = float(np.median(dff))
+        rel = np.abs((dff - df) / max(abs(df), 1e-30))
+        if float(np.max(rel)) > float(max(nonuniform_warn_rel_max, 0.0)):
+            warnings.warn(
+                (
+                    "ctf_to_cir() received nonuniform frequency grid; IFFT delay taps are an approximation "
+                    "based on median df. Check cir_bandlimit_info()['grid_uniformity_rel_max']."
+                ),
+                RuntimeWarning,
+                stacklevel=2,
+            )
     else:
         df = 1.0
     tau = np.arange(m, dtype=float) / (m * df)

@@ -58,6 +58,38 @@ class AntennaCouplingTests(unittest.TestCase):
         ph = np.unwrap(np.angle(off12))
         self.assertNotAlmostEqual(float(ph[-1]), float(ph[0]), places=6)
 
+    def test_coupling_can_disable_conjugate_symmetry(self) -> None:
+        ant = self._ant(
+            cross_pol_leakage_db=22.0,
+            cross_coupling_phase_deg=15.0,
+            coupling_conjugate_symmetric=False,
+            cross_coupling_vh_mag_ratio=0.7,
+            cross_coupling_vh_phase_offset_deg=40.0,
+        )
+        f = np.array([8e9], dtype=float)
+        c = ant._coupling_matrix(f)
+        self.assertFalse(np.allclose(c[:, 1, 0], np.conj(c[:, 0, 1]), atol=1e-12))
+
+    def test_max_coupling_eps_is_configurable(self) -> None:
+        ant = self._ant(cross_pol_leakage_db=0.0, axial_ratio_db=0.0, max_coupling_eps=0.2)
+        f = np.array([8e9], dtype=float)
+        c = ant._coupling_matrix(f)
+        self.assertLessEqual(float(np.max(np.abs(c[:, 0, 1]))), 0.2 + 1e-9)
+
+    def test_directional_gain_frequency_dependence(self) -> None:
+        ant = self._ant(
+            tx_peak_gain_dbi=0.0,
+            tx_peak_gain_dbi_slope_per_ghz=2.0,
+            tx_pattern_cos_exp=2.0,
+            tx_pattern_cos_exp_slope_per_ghz=1.0,
+            directional_gain_ref_freq_hz=8e9,
+        )
+        f = np.array([6e9, 8e9, 10e9], dtype=float)
+        g = ant.tx_directional_gain_linear_f(np.array([1.0, 0.0, 0.0]), f)
+        self.assertTrue(np.all(np.isfinite(g)))
+        self.assertLess(float(g[0]), float(g[1]))
+        self.assertLess(float(g[1]), float(g[2]))
+
     def test_vectors_are_read_only(self) -> None:
         ant = self._ant()
         self.assertFalse(bool(ant.position.flags.writeable))

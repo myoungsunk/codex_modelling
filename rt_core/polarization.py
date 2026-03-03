@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Callable
+import warnings
 
 import numpy as np
 from numpy.typing import NDArray
@@ -126,6 +127,15 @@ def fresnel_reflection(material: Material, theta_i: float, f_hz: NDArray[np.floa
 
     sin2 = float(np.sin(theta_i) ** 2)
     cos_i = float(np.cos(theta_i))
+    if cos_i < 1e-5:
+        warnings.warn(
+            (
+                "grazing-incidence Fresnel evaluation: theta_i is very close to 90 deg; "
+                "Gamma phase may be branch-sensitive near the boundary."
+            ),
+            RuntimeWarning,
+            stacklevel=2,
+        )
     if material.complex_eps_r is not None:
         eps_c = np.full(freq.shape, material.complex_eps_r, dtype=np.complex128)
     else:
@@ -167,6 +177,11 @@ def fresnel_reflection(material: Material, theta_i: float, f_hz: NDArray[np.floa
             eps_c = np.full(freq.shape, material.eps_r * (1.0 - 1j * material.tan_delta), dtype=np.complex128)
 
     root = np.sqrt(eps_c - sin2)
+    # Keep a passive/causal branch consistently (avoid sign flips from principal sqrt branch cut).
+    flip_re = np.real(root) < 0.0
+    root = np.where(flip_re, -root, root)
+    flip_im = (np.real(root) == 0.0) & (np.imag(root) < 0.0)
+    root = np.where(flip_im, -root, root)
     gamma_s = (cos_i - root) / (cos_i + root)
     gamma_p = (eps_c * cos_i - root) / (eps_c * cos_i + root)
     # Passive-media guard: preserve phase while limiting |Gamma|<=1.
@@ -195,17 +210,42 @@ def jones_reflection(material: Material, theta_i: float, f_hz: NDArray[np.float6
     out = np.zeros((n, 2, 2), dtype=np.complex128)
     out[:, 0, 0] = gs
     out[:, 1, 1] = gp
+    # Legacy symmetric hook.
     xdb = getattr(material, "xpol_coupling_db", None)
-    if xdb is not None and np.isfinite(float(xdb)):
-        # Amplitude coupling relative to diagonal magnitude scale.
-        amp = float(10.0 ** (-float(xdb) / 20.0))
-        phi = float(np.deg2rad(float(getattr(material, "xpol_coupling_phase_deg", 0.0))))
-        phase = np.exp(1j * phi)
-        # Bound cross term by geometric mean diagonal magnitude.
+    xph = float(getattr(material, "xpol_coupling_phase_deg", 0.0))
+    # Optional asymmetric hooks (override if provided).
+    xdb_hv = getattr(material, "xpol_coupling_hv_db", None)
+    xph_hv = float(getattr(material, "xpol_coupling_hv_phase_deg", xph))
+    xdb_vh = getattr(material, "xpol_coupling_vh_db", None)
+    xph_vh = float(getattr(material, "xpol_coupling_vh_phase_deg", -xph))
+
+    if xdb_hv is not None and not np.isfinite(float(xdb_hv)):
+        xdb_hv = None
+    if xdb_vh is not None and not np.isfinite(float(xdb_vh)):
+        xdb_vh = None
+
+    if xdb_hv is None and xdb_vh is None:
+        if xdb is not None and np.isfinite(float(xdb)):
+            xdb_hv = float(xdb)
+            xdb_vh = float(xdb)
+            xph_hv = xph
+            xph_vh = -xph
+    else:
+        if xdb_hv is None and xdb_vh is not None and np.isfinite(float(xdb_vh)):
+            xdb_hv = float(xdb_vh)
+            xph_hv = -xph_vh
+        if xdb_vh is None and xdb_hv is not None and np.isfinite(float(xdb_hv)):
+            xdb_vh = float(xdb_hv)
+            xph_vh = -xph_hv
+
+    if xdb_hv is not None and xdb_vh is not None:
         diag_scale = np.sqrt(np.maximum(np.abs(gs * gp), 0.0))
-        c = (amp * diag_scale * phase).astype(np.complex128)
-        out[:, 0, 1] = c
-        out[:, 1, 0] = np.conj(c)
+        amp_hv = float(10.0 ** (-float(xdb_hv) / 20.0))
+        amp_vh = float(10.0 ** (-float(xdb_vh) / 20.0))
+        phase_hv = np.exp(1j * float(np.deg2rad(xph_hv)))
+        phase_vh = np.exp(1j * float(np.deg2rad(xph_vh)))
+        out[:, 0, 1] = (amp_hv * diag_scale * phase_hv).astype(np.complex128)
+        out[:, 1, 0] = (amp_vh * diag_scale * phase_vh).astype(np.complex128)
     return out
 
 
