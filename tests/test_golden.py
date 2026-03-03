@@ -97,7 +97,7 @@ class GoldenTests(unittest.TestCase):
 
     def test_p2_a3_even_bounce_same_hand_recovery(self) -> None:
         tx, rx = self._cp_pair()
-        rx.position[:] = [3.0, 4.0, 1.5]
+        rx = rx.with_position([3.0, 4.0, 1.5])
         p1 = Plane(
             id=1,
             p0=np.array([0.0, 3.0, 0.0]),

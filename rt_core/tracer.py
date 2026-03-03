@@ -16,14 +16,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from itertools import product
-from typing import Callable, Sequence
+from typing import Callable, Iterator, Sequence
 
 import numpy as np
 from numpy.typing import NDArray
 
 from rt_core.antenna import Antenna
 from rt_core.geometry import Plane, line_plane_intersection, normalize, path_length, ray_plane_intersection, reflect_point
-from rt_core.polarization import DepolConfig, apply_depol, basis_change, depol_matrix, jones_reflection, local_sp_bases
+from rt_core.polarization import DepolConfig, apply_depol, basis_change, depol_matrix, jones_reflection, local_sp_bases, transverse_basis
 
 
 @dataclass
@@ -69,10 +69,26 @@ class PathResult:
         }
 
 
-def _enumerate_sequences(num_planes: int, bounce: int) -> list[tuple[int, ...]]:
+def _enumerate_sequences(
+    num_planes: int,
+    bounce: int,
+    max_candidates: int | None = None,
+    forbid_immediate_repeat: bool = False,
+) -> Iterator[tuple[int, ...]]:
     if bounce == 0:
-        return [tuple()]
-    return list(product(range(num_planes), repeat=bounce))
+        yield tuple()
+        return
+    if num_planes <= 0 or bounce < 0:
+        return
+    cap = int(max_candidates) if max_candidates is not None and int(max_candidates) > 0 else None
+    emitted = 0
+    for seq in product(range(num_planes), repeat=bounce):
+        if bool(forbid_immediate_repeat) and any(seq[i] == seq[i - 1] for i in range(1, bounce)):
+            continue
+        yield tuple(seq)
+        emitted += 1
+        if cap is not None and emitted >= cap:
+            break
 
 
 def _is_occluder_only_plane(plane: Plane) -> bool:
@@ -195,6 +211,22 @@ def _default_rho(_: dict) -> float:
     return 0.0
 
 
+def _transport_wave_basis(k_out: NDArray[np.float64], prev_basis: NDArray[np.complex128], fallback_up: NDArray[np.float64]) -> NDArray[np.complex128]:
+    """Parallel-transport-like wave basis update to reduce gauge jumps."""
+    k = normalize(np.asarray(k_out, dtype=float))
+    u_prev = np.real(np.asarray(prev_basis[:, 0], dtype=np.complex128)).astype(float)
+    v_prev = np.real(np.asarray(prev_basis[:, 1], dtype=np.complex128)).astype(float)
+    u = u_prev - float(np.dot(u_prev, k)) * k
+    if np.linalg.norm(u) < 1e-9:
+        u = v_prev - float(np.dot(v_prev, k)) * k
+    if np.linalg.norm(u) < 1e-9:
+        u, v = transverse_basis(k, np.asarray(fallback_up, dtype=float))
+        return np.column_stack([u, v]).astype(np.complex128)
+    u = normalize(u)
+    v = normalize(np.cross(k, u))
+    return np.column_stack([u, v]).astype(np.complex128)
+
+
 def _segment_blocked(
     a: NDArray[np.float64],
     b: NDArray[np.float64],
@@ -231,10 +263,22 @@ def _path_occluded(points: list[NDArray[np.float64]], planes: Sequence[Plane], s
     return False
 
 
-def _path_key(points: list[NDArray[np.float64]], seq: Sequence[Plane], tau_s: float) -> tuple:
+def _path_key(
+    points: list[NDArray[np.float64]],
+    seq: Sequence[Plane],
+    tau_s: float,
+    point_tol_m: float = 1e-7,
+    tau_tol_s: float = 1e-13,
+) -> tuple:
     sid = tuple(pl.id for pl in seq)
-    pflat = tuple(tuple(np.round(p, 6).tolist()) for p in points[1:-1])
-    return (sid, pflat, round(float(tau_s), 12))
+    ptol = float(max(abs(float(point_tol_m)), 1e-12))
+    ttol = float(max(abs(float(tau_tol_s)), 1e-18))
+    pflat = tuple(
+        tuple(int(np.rint(float(x) / ptol)) for x in np.asarray(p, dtype=float))
+        for p in points[1:-1]
+    )
+    tau_q = int(np.rint(float(tau_s) / ttol))
+    return (sid, pflat, tau_q)
 
 
 def trace_paths(
@@ -254,8 +298,13 @@ def trace_paths(
     diffuse_lobe_alpha: float = 8.0,
     diffuse_rays_per_hit: int = 0,
     diffuse_seed: int = 0,
+    wave_basis_mode: str = "transport",
     min_path_power_db: float | None = None,
     max_paths_per_case: int | None = None,
+    max_sequence_candidates_per_bounce: int | None = None,
+    forbid_immediate_surface_repeat: bool = False,
+    dedup_point_tol_m: float = 1e-7,
+    dedup_tau_tol_s: float = 1e-13,
 ) -> list[PathResult]:
     """Trace paths and return per-path delay and 2x2 transfer matrix over frequency."""
 
@@ -263,6 +312,9 @@ def trace_paths(
         raise ValueError("max_bounce must be >= 0")
 
     dep = depol or DepolConfig(enabled=False)
+    wb_mode = str(wave_basis_mode).strip().lower()
+    if wb_mode not in {"transport", "global_up"}:
+        raise ValueError("wave_basis_mode must be one of: transport, global_up")
     rng = np.random.default_rng(dep.seed)
     drng = np.random.default_rng(int(diffuse_seed))
     rho_fn: Callable[[dict], float] = dep.rho_func or _default_rho
@@ -280,7 +332,12 @@ def trace_paths(
             continue
         if b > 0 and len(reflective_planes) == 0:
             continue
-        for idx_seq in _enumerate_sequences(len(reflective_planes), b):
+        for idx_seq in _enumerate_sequences(
+            len(reflective_planes),
+            b,
+            max_candidates=max_sequence_candidates_per_bounce,
+            forbid_immediate_repeat=forbid_immediate_surface_repeat,
+        ):
             seq = [reflective_planes[i] for i in idx_seq]
             points = _construct_reflection_points(tx.position, rx.position, seq)
             if points is None or not _path_valid(points):
@@ -298,15 +355,28 @@ def trace_paths(
             if total_len <= 0.0:
                 continue
             tau = total_len / c0
-            key = _path_key(points, seq, tau)
+            key = _path_key(
+                points,
+                seq,
+                tau,
+                point_tol_m=float(dedup_point_tol_m),
+                tau_tol_s=float(dedup_tau_tol_s),
+            )
             if key in seen:
                 continue
             seen.add(key)
 
             if use_fspl:
+                # Amplitude-domain Friis factor (lambda/4piR). Power scaling is its squared magnitude.
+                # Directional antenna gain is injected below as sqrt(G_tx * G_rx).
                 scalar_gain_f = (c0 / freq) / (4.0 * np.pi * total_len)
             else:
                 scalar_gain_f = np.full(n_f, 1.0 / total_len, dtype=float)
+            # Optional directional pattern gain (power) from antenna boresight model.
+            # Defaults are isotropic (G_tx=G_rx=1), preserving existing behavior.
+            g_tx_dir = float(max(tx.tx_directional_gain_linear(dirs[0]), 0.0))
+            g_rx_dir = float(max(rx.rx_directional_gain_linear(dirs[-1]), 0.0))
+            scalar_gain_f = scalar_gain_f * float(np.sqrt(max(g_tx_dir * g_rx_dir, 0.0)))
 
             wave_basis = tx.wave_basis(dirs[0])
             J = np.repeat(np.eye(2, dtype=np.complex128)[None, :, :], n_f, axis=0)
@@ -333,7 +403,10 @@ def trace_paths(
                 sp_out = np.column_stack([s_out, p_out]).astype(np.complex128)
 
                 t_in = basis_change(wave_basis, sp_in)
-                next_basis = tx.wave_basis(k_out)
+                if wb_mode == "global_up":
+                    next_basis = tx.wave_basis(k_out)
+                else:
+                    next_basis = _transport_wave_basis(k_out, wave_basis, tx.global_up)
                 t_out = basis_change(next_basis, sp_out)
                 r_f = jones_reflection(pl.material, theta_i, freq)
 
@@ -395,6 +468,11 @@ def trace_paths(
                 )
             )
             if diffuse_enabled and b > 0 and diffuse_factor > 0.0 and diffuse_rays_per_hit > 0:
+                # NOTE:
+                # Current diffuse branch is an empirical proxy, not a geometric BRDF scatter solver.
+                # It perturbs polarization (SU(2) mixer) and excess delay/power around the parent
+                # specular path while preserving parent AoD/AoA/path vertices.
+                # Use for stress/sensitivity studies, not absolute scatter-angle validation.
                 nrho = float(np.clip(diffuse_factor, 0.0, 1.0))
                 if str(diffuse_model).lower() == "directive":
                     jitter_ns = 0.08 / np.sqrt(max(diffuse_lobe_alpha, 1e-6))

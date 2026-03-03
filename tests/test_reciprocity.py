@@ -23,7 +23,7 @@ class ReciprocityTests(unittest.TestCase):
             rx_axial_ratio_db=0.0,
             enable_coupling=False,
         )
-        rx.position[:] = [6.0, 0.0, 1.5]
+        rx = rx.with_position([6.0, 0.0, 1.5])
         out = reciprocity_sanity(
             scene=build_scene(),
             tx=tx,

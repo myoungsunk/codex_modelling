@@ -16,6 +16,20 @@ def default_antennas(
     tx_axial_ratio_db: float = 0.0,
     rx_axial_ratio_db: float = 0.0,
     enable_coupling: bool = True,
+    tx_coupling_ref_freq_hz: float = 8.0e9,
+    rx_coupling_ref_freq_hz: float = 8.0e9,
+    tx_cross_pol_leakage_db_slope_per_ghz: float = 0.0,
+    rx_cross_pol_leakage_db_slope_per_ghz: float = 0.0,
+    tx_axial_ratio_db_slope_per_ghz: float = 0.0,
+    rx_axial_ratio_db_slope_per_ghz: float = 0.0,
+    tx_cross_coupling_phase_deg: float = 0.0,
+    rx_cross_coupling_phase_deg: float = 0.0,
+    tx_cross_coupling_phase_slope_deg_per_ghz: float = 0.0,
+    rx_cross_coupling_phase_slope_deg_per_ghz: float = 0.0,
+    tx_peak_gain_dbi: float = 0.0,
+    rx_peak_gain_dbi: float = 0.0,
+    tx_pattern_cos_exp: float = 0.0,
+    rx_pattern_cos_exp: float = 0.0,
 ) -> tuple[Antenna, Antenna]:
     tx = Antenna(
         position=np.array([0.0, 0.0, 1.5]),
@@ -27,6 +41,13 @@ def default_antennas(
         cross_pol_leakage_db=tx_cross_pol_leakage_db,
         axial_ratio_db=tx_axial_ratio_db,
         enable_coupling=enable_coupling,
+        coupling_ref_freq_hz=tx_coupling_ref_freq_hz,
+        cross_pol_leakage_db_slope_per_ghz=tx_cross_pol_leakage_db_slope_per_ghz,
+        axial_ratio_db_slope_per_ghz=tx_axial_ratio_db_slope_per_ghz,
+        cross_coupling_phase_deg=tx_cross_coupling_phase_deg,
+        cross_coupling_phase_slope_deg_per_ghz=tx_cross_coupling_phase_slope_deg_per_ghz,
+        tx_peak_gain_dbi=tx_peak_gain_dbi,
+        tx_pattern_cos_exp=tx_pattern_cos_exp,
     )
     rx = Antenna(
         position=np.array([6.0, 0.0, 1.5]),
@@ -38,6 +59,13 @@ def default_antennas(
         cross_pol_leakage_db=rx_cross_pol_leakage_db,
         axial_ratio_db=rx_axial_ratio_db,
         enable_coupling=enable_coupling,
+        coupling_ref_freq_hz=rx_coupling_ref_freq_hz,
+        cross_pol_leakage_db_slope_per_ghz=rx_cross_pol_leakage_db_slope_per_ghz,
+        axial_ratio_db_slope_per_ghz=rx_axial_ratio_db_slope_per_ghz,
+        cross_coupling_phase_deg=rx_cross_coupling_phase_deg,
+        cross_coupling_phase_slope_deg_per_ghz=rx_cross_coupling_phase_slope_deg_per_ghz,
+        rx_peak_gain_dbi=rx_peak_gain_dbi,
+        rx_pattern_cos_exp=rx_pattern_cos_exp,
     )
     return tx, rx
 

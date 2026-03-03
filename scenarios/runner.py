@@ -354,6 +354,13 @@ def _antennas_from_points(
         cross_pol_leakage_db=float(antenna_config.get("tx_cross_pol_leakage_db", 35.0)),
         axial_ratio_db=float(antenna_config.get("tx_axial_ratio_db", 0.0)),
         enable_coupling=bool(antenna_config.get("enable_coupling", True)),
+        coupling_ref_freq_hz=float(antenna_config.get("tx_coupling_ref_freq_hz", 8.0e9)),
+        cross_pol_leakage_db_slope_per_ghz=float(antenna_config.get("tx_cross_pol_leakage_db_slope_per_ghz", 0.0)),
+        axial_ratio_db_slope_per_ghz=float(antenna_config.get("tx_axial_ratio_db_slope_per_ghz", 0.0)),
+        cross_coupling_phase_deg=float(antenna_config.get("tx_cross_coupling_phase_deg", 0.0)),
+        cross_coupling_phase_slope_deg_per_ghz=float(antenna_config.get("tx_cross_coupling_phase_slope_deg_per_ghz", 0.0)),
+        tx_peak_gain_dbi=float(antenna_config.get("tx_peak_gain_dbi", 0.0)),
+        tx_pattern_cos_exp=float(antenna_config.get("tx_pattern_cos_exp", 0.0)),
     )
     rx = Antenna(
         position=np.asarray(rx_pos, dtype=float),
@@ -365,6 +372,13 @@ def _antennas_from_points(
         cross_pol_leakage_db=float(antenna_config.get("rx_cross_pol_leakage_db", 35.0)),
         axial_ratio_db=float(antenna_config.get("rx_axial_ratio_db", 0.0)),
         enable_coupling=bool(antenna_config.get("enable_coupling", True)),
+        coupling_ref_freq_hz=float(antenna_config.get("rx_coupling_ref_freq_hz", 8.0e9)),
+        cross_pol_leakage_db_slope_per_ghz=float(antenna_config.get("rx_cross_pol_leakage_db_slope_per_ghz", 0.0)),
+        axial_ratio_db_slope_per_ghz=float(antenna_config.get("rx_axial_ratio_db_slope_per_ghz", 0.0)),
+        cross_coupling_phase_deg=float(antenna_config.get("rx_cross_coupling_phase_deg", 0.0)),
+        cross_coupling_phase_slope_deg_per_ghz=float(antenna_config.get("rx_cross_coupling_phase_slope_deg_per_ghz", 0.0)),
+        rx_peak_gain_dbi=float(antenna_config.get("rx_peak_gain_dbi", 0.0)),
+        rx_pattern_cos_exp=float(antenna_config.get("rx_pattern_cos_exp", 0.0)),
     )
     return tx, rx
 
@@ -1491,6 +1505,20 @@ def main() -> None:
     parser.add_argument("--rx-cross-pol-leakage-db", type=float, default=35.0)
     parser.add_argument("--tx-axial-ratio-db", type=float, default=0.0)
     parser.add_argument("--rx-axial-ratio-db", type=float, default=0.0)
+    parser.add_argument("--tx-coupling-ref-freq-hz", type=float, default=8.0e9)
+    parser.add_argument("--rx-coupling-ref-freq-hz", type=float, default=8.0e9)
+    parser.add_argument("--tx-cross-pol-leakage-db-slope-per-ghz", type=float, default=0.0)
+    parser.add_argument("--rx-cross-pol-leakage-db-slope-per-ghz", type=float, default=0.0)
+    parser.add_argument("--tx-axial-ratio-db-slope-per-ghz", type=float, default=0.0)
+    parser.add_argument("--rx-axial-ratio-db-slope-per-ghz", type=float, default=0.0)
+    parser.add_argument("--tx-cross-coupling-phase-deg", type=float, default=0.0)
+    parser.add_argument("--rx-cross-coupling-phase-deg", type=float, default=0.0)
+    parser.add_argument("--tx-cross-coupling-phase-slope-deg-per-ghz", type=float, default=0.0)
+    parser.add_argument("--rx-cross-coupling-phase-slope-deg-per-ghz", type=float, default=0.0)
+    parser.add_argument("--tx-peak-gain-dbi", type=float, default=0.0)
+    parser.add_argument("--rx-peak-gain-dbi", type=float, default=0.0)
+    parser.add_argument("--tx-pattern-cos-exp", type=float, default=0.0)
+    parser.add_argument("--rx-pattern-cos-exp", type=float, default=0.0)
     parser.add_argument("--disable-antenna-coupling", action="store_true")
     parser.add_argument("--physics-validation-mode", action="store_true")
     parser.add_argument("--materials-db", type=str, default=None)
@@ -1502,8 +1530,14 @@ def main() -> None:
     parser.add_argument("--diffuse-lobe-alpha", type=float, default=8.0)
     parser.add_argument("--diffuse-rays-per-hit", type=int, default=0)
     parser.add_argument("--diffuse-seed", type=int, default=0)
+    parser.add_argument("--wave-basis-mode", type=str, default="transport", choices=["transport", "global_up"])
+    parser.add_argument("--allow-proxy-diffuse-release", action="store_true")
     parser.add_argument("--min-path-power-db", type=float, default=None)
     parser.add_argument("--max-paths-per-case", type=int, default=None)
+    parser.add_argument("--max-sequence-candidates-per-bounce", type=int, default=None)
+    parser.add_argument("--forbid-immediate-surface-repeat", action="store_true")
+    parser.add_argument("--dedup-point-tol-m", type=float, default=1e-7)
+    parser.add_argument("--dedup-tau-tol-s", type=float, default=1e-13)
     parser.add_argument("--force-cp-swap-on-odd-reflection", action="store_true")
     parser.add_argument("--model-compare", dest="model_compare", action="store_true")
     parser.add_argument("--no-model-compare", dest="model_compare", action="store_false")
@@ -1590,6 +1624,10 @@ def main() -> None:
             args.min_path_power_db = -120.0
         if args.max_paths_per_case is None:
             args.max_paths_per_case = 256
+        if args.max_sequence_candidates_per_bounce is None:
+            args.max_sequence_candidates_per_bounce = 50000
+        if not bool(args.forbid_immediate_surface_repeat):
+            args.forbid_immediate_surface_repeat = True
 
     if bool(args.release_mode):
         _, dirty_now = _git_meta()
@@ -1597,6 +1635,12 @@ def main() -> None:
             raise SystemExit("release-mode failed: git working tree is dirty. Commit/stash changes and rerun.")
         if str(args.model_phase_sampling_method).strip().lower() == "iid":
             args.model_phase_sampling_method = "stratified_uniform"
+        if bool(str(args.diffuse).lower() == "on") and not bool(args.allow_proxy_diffuse_release):
+            raise SystemExit(
+                "release-mode failed: diffuse currently uses proxy_jones_jitter model "
+                "(no geometric BRDF direction synthesis). "
+                "Use --allow-proxy-diffuse-release to acknowledge and continue."
+            )
 
     antenna_config = {
         "convention": args.convention,
@@ -1604,6 +1648,20 @@ def main() -> None:
         "rx_cross_pol_leakage_db": args.rx_cross_pol_leakage_db,
         "tx_axial_ratio_db": args.tx_axial_ratio_db,
         "rx_axial_ratio_db": args.rx_axial_ratio_db,
+        "tx_coupling_ref_freq_hz": args.tx_coupling_ref_freq_hz,
+        "rx_coupling_ref_freq_hz": args.rx_coupling_ref_freq_hz,
+        "tx_cross_pol_leakage_db_slope_per_ghz": args.tx_cross_pol_leakage_db_slope_per_ghz,
+        "rx_cross_pol_leakage_db_slope_per_ghz": args.rx_cross_pol_leakage_db_slope_per_ghz,
+        "tx_axial_ratio_db_slope_per_ghz": args.tx_axial_ratio_db_slope_per_ghz,
+        "rx_axial_ratio_db_slope_per_ghz": args.rx_axial_ratio_db_slope_per_ghz,
+        "tx_cross_coupling_phase_deg": args.tx_cross_coupling_phase_deg,
+        "rx_cross_coupling_phase_deg": args.rx_cross_coupling_phase_deg,
+        "tx_cross_coupling_phase_slope_deg_per_ghz": args.tx_cross_coupling_phase_slope_deg_per_ghz,
+        "rx_cross_coupling_phase_slope_deg_per_ghz": args.rx_cross_coupling_phase_slope_deg_per_ghz,
+        "tx_peak_gain_dbi": args.tx_peak_gain_dbi,
+        "rx_peak_gain_dbi": args.rx_peak_gain_dbi,
+        "tx_pattern_cos_exp": args.tx_pattern_cos_exp,
+        "rx_pattern_cos_exp": args.rx_pattern_cos_exp,
         "enable_coupling": not args.disable_antenna_coupling,
     }
     if args.physics_validation_mode:
@@ -1611,6 +1669,18 @@ def main() -> None:
         antenna_config["rx_cross_pol_leakage_db"] = 120.0
         antenna_config["tx_axial_ratio_db"] = 0.0
         antenna_config["rx_axial_ratio_db"] = 0.0
+        antenna_config["tx_cross_pol_leakage_db_slope_per_ghz"] = 0.0
+        antenna_config["rx_cross_pol_leakage_db_slope_per_ghz"] = 0.0
+        antenna_config["tx_axial_ratio_db_slope_per_ghz"] = 0.0
+        antenna_config["rx_axial_ratio_db_slope_per_ghz"] = 0.0
+        antenna_config["tx_cross_coupling_phase_deg"] = 0.0
+        antenna_config["rx_cross_coupling_phase_deg"] = 0.0
+        antenna_config["tx_cross_coupling_phase_slope_deg_per_ghz"] = 0.0
+        antenna_config["rx_cross_coupling_phase_slope_deg_per_ghz"] = 0.0
+        antenna_config["tx_peak_gain_dbi"] = 0.0
+        antenna_config["rx_peak_gain_dbi"] = 0.0
+        antenna_config["tx_pattern_cos_exp"] = 0.0
+        antenna_config["rx_pattern_cos_exp"] = 0.0
         antenna_config["enable_coupling"] = False
 
     run_scenarios = None
@@ -1620,12 +1690,23 @@ def main() -> None:
     diffuse_cfg: dict[str, Any] = {
         "diffuse_enabled": bool(str(args.diffuse).lower() == "on"),
         "diffuse_model": str(args.diffuse_model),
+        "diffuse_physics_model": "proxy_jones_jitter_v1",
+        "wave_basis_mode": str(args.wave_basis_mode),
         "diffuse_factor": float(max(0.0, min(1.0, args.diffuse_factor))),
         "diffuse_lobe_alpha": float(max(args.diffuse_lobe_alpha, 1e-6)),
         "diffuse_rays_per_hit": int(max(0, args.diffuse_rays_per_hit)),
         "diffuse_seed": int(args.diffuse_seed),
+        "release_proxy_ack": bool(args.allow_proxy_diffuse_release),
         "min_path_power_db": (float(args.min_path_power_db) if args.min_path_power_db is not None else None),
         "max_paths_per_case": (int(args.max_paths_per_case) if args.max_paths_per_case is not None else None),
+        "max_sequence_candidates_per_bounce": (
+            int(args.max_sequence_candidates_per_bounce)
+            if args.max_sequence_candidates_per_bounce is not None
+            else None
+        ),
+        "forbid_immediate_surface_repeat": bool(args.forbid_immediate_surface_repeat),
+        "dedup_point_tol_m": float(max(abs(float(args.dedup_point_tol_m)), 1e-12)),
+        "dedup_tau_tol_s": float(max(abs(float(args.dedup_tau_tol_s)), 1e-18)),
     }
 
     bases = _parse_bases(args.basis, args.bases)

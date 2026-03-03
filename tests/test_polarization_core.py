@@ -7,15 +7,41 @@ import unittest
 import numpy as np
 
 from rt_core.geometry import Material
-from rt_core.polarization import depol_matrix, fresnel_reflection, local_sp_bases
+from rt_core.polarization import depol_matrix, fresnel_reflection, jones_reflection, local_sp_bases
 
 
 class PolarizationCoreTests(unittest.TestCase):
-    def test_fresnel_pec_is_minus_one(self) -> None:
+    def test_fresnel_pec_default_legacy_sign(self) -> None:
         f = np.linspace(6e9, 8e9, 9)
         gs, gp = fresnel_reflection(Material.pec(), theta_i=np.deg2rad(33.0), f_hz=f)
         self.assertTrue(np.allclose(gs, -1.0 + 0.0j))
         self.assertTrue(np.allclose(gp, -1.0 + 0.0j))
+
+    def test_fresnel_pec_tm_sign_override_plus_one(self) -> None:
+        f = np.linspace(6e9, 8e9, 9)
+        gs, gp = fresnel_reflection(Material.pec(pec_tm_sign=1.0), theta_i=np.deg2rad(33.0), f_hz=f)
+        self.assertTrue(np.allclose(gs, -1.0 + 0.0j))
+        self.assertTrue(np.allclose(gp, 1.0 + 0.0j))
+
+    def test_jones_reflection_default_is_diagonal(self) -> None:
+        f = np.linspace(6e9, 8e9, 9)
+        mat = Material.dielectric(eps_r=4.2, tan_delta=0.02, name="test")
+        r = jones_reflection(mat, theta_i=np.deg2rad(30.0), f_hz=f)
+        self.assertTrue(np.allclose(r[:, 0, 1], 0.0 + 0.0j))
+        self.assertTrue(np.allclose(r[:, 1, 0], 0.0 + 0.0j))
+
+    def test_jones_reflection_offdiag_hook_enabled(self) -> None:
+        f = np.linspace(6e9, 8e9, 9)
+        mat = Material.dielectric(
+            eps_r=4.2,
+            tan_delta=0.02,
+            name="test",
+            xpol_coupling_db=20.0,
+            xpol_coupling_phase_deg=45.0,
+        )
+        r = jones_reflection(mat, theta_i=np.deg2rad(30.0), f_hz=f)
+        self.assertGreater(float(np.max(np.abs(r[:, 0, 1]))), 0.0)
+        self.assertGreater(float(np.max(np.abs(r[:, 1, 0]))), 0.0)
 
     def test_dielectric_fresnel_is_passive(self) -> None:
         mat = Material.dielectric(eps_r=4.2, tan_delta=0.02, name="test")
@@ -45,6 +71,18 @@ class PolarizationCoreTests(unittest.TestCase):
         self.assertAlmostEqual(float(np.linalg.norm(p_out)), 1.0, places=12)
         # Effective normal must oppose incident direction.
         self.assertLessEqual(float(np.dot(k_in / np.linalg.norm(k_in), n_eff)), 0.0)
+
+    def test_local_sp_bases_normal_incidence_alignment(self) -> None:
+        # Exact normal incidence should not create arbitrary s_in/s_out flips.
+        k_in = np.array([0.0, 0.0, -1.0], dtype=float)
+        k_out = np.array([0.0, 0.0, 1.0], dtype=float)
+        n = np.array([0.0, 0.0, 1.0], dtype=float)
+        s_in, p_in, s_out, p_out, _theta_i, _n_eff = local_sp_bases(k_in, k_out, n)
+        self.assertGreater(float(np.dot(s_in, s_out)), 0.999999)
+        self.assertAlmostEqual(float(np.linalg.norm(s_in)), 1.0, places=12)
+        self.assertAlmostEqual(float(np.linalg.norm(s_out)), 1.0, places=12)
+        self.assertAlmostEqual(float(np.dot(s_in, p_in)), 0.0, places=12)
+        self.assertAlmostEqual(float(np.dot(s_out, p_out)), 0.0, places=12)
 
 
 if __name__ == "__main__":

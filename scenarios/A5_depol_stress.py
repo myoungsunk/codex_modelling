@@ -125,7 +125,7 @@ def run_case(
             "A5 invalid geometry: Rx must satisfy rx_x<offset and rx_y<offset "
             f"(rx_x={rx_x}, rx_y={rx_y}, offset={off})"
         )
-    rx.position[:] = [rx_x, rx_y, 1.5]
+    rx = rx.with_position([rx_x, rx_y, 1.5])
     scene = build_scene(offset=off)
     mode = str(stress_mode).lower().strip()
     if mode in {"geometry", "hybrid"} and int(scatterer_count) > 0:

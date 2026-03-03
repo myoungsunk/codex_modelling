@@ -137,11 +137,30 @@ def plot_scatter(
 def plot_pdp_overlay(delay_s: np.ndarray, p_co: np.ndarray, p_cross: np.ndarray, out_png: str | Path, title: str) -> str:
     p = _prep_out(out_png)
     d_ns = np.asarray(delay_s, dtype=float) * 1e9
-    co_db = 10.0 * np.log10(np.maximum(np.asarray(p_co, dtype=float), 1e-20))
-    cr_db = 10.0 * np.log10(np.maximum(np.asarray(p_cross, dtype=float), 1e-20))
+    pco = np.asarray(p_co, dtype=float)
+    pcr = np.asarray(p_cross, dtype=float)
+    co_db = 10.0 * np.log10(np.maximum(pco, 1e-20))
+    cr_db = 10.0 * np.log10(np.maximum(pcr, 1e-20))
+    nz_co = np.isfinite(pco) & (pco > 0.0)
+    nz_cr = np.isfinite(pcr) & (pcr > 0.0)
+    sparse = int(np.sum(nz_co)) <= 16 and int(np.sum(nz_cr)) <= 16
+    floor_db = -200.0
     fig, ax = plt.subplots(figsize=(7.0, 4.5))
-    ax.plot(d_ns, co_db, label="P_co")
-    ax.plot(d_ns, cr_db, label="P_cross")
+    if sparse:
+        if np.any(nz_co):
+            ax.vlines(d_ns[nz_co], floor_db, co_db[nz_co], colors="tab:red", linewidth=2.0, alpha=0.9)
+            ax.scatter(d_ns[nz_co], co_db[nz_co], color="tab:red", s=24, label="P_co")
+        if np.any(nz_cr):
+            ax.vlines(d_ns[nz_cr], floor_db, cr_db[nz_cr], colors="tab:blue", linewidth=2.0, linestyles="--", alpha=0.9)
+            ax.scatter(d_ns[nz_cr], cr_db[nz_cr], color="tab:blue", s=24, label="P_cross")
+        finite_peaks = np.concatenate([co_db[nz_co], cr_db[nz_cr]]) if (np.any(nz_co) or np.any(nz_cr)) else np.array([])
+        if finite_peaks.size:
+            y_max = float(np.max(finite_peaks) + 3.0)
+            y_min = float(max(np.min(finite_peaks) - 25.0, -120.0))
+            ax.set_ylim(y_min, y_max)
+    else:
+        ax.plot(d_ns, co_db, label="P_co", color="tab:red", linewidth=1.7, zorder=3)
+        ax.plot(d_ns, cr_db, label="P_cross", color="tab:blue", linewidth=1.5, linestyle="--", zorder=2)
     ax.set_title(title)
     ax.set_xlabel("Delay (ns)")
     ax.set_ylabel("Power (dB)")

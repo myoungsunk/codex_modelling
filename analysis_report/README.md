@@ -27,6 +27,12 @@ python analysis_report/generate_warning_report.py --config analysis_report/confi
 
 # 4) 최종 판정 보고서(템플릿 기반, 문서용)
 python analysis_report/generate_final_decision_report.py --config analysis_report/config.yaml
+
+# 5) 명제-실험-데이터-플롯 매칭표 + PASS/FAIL
+python analysis_report/generate_proposition_matrix_report.py --run-group <run_group>
+
+# 6) 상세 명제(M/G/L/R/P) 플롯 매칭표(세부 Plot ID 기준)
+python analysis_report/generate_proposition_plot_mapping_detailed.py --run-group <run_group>
 ```
 
 ## Outputs
@@ -36,6 +42,11 @@ python analysis_report/generate_final_decision_report.py --config analysis_repor
 - `/Users/kimmyoungsun/Documents/codex/analysis_report/out/<run_group>/figures/*.png`
 - `/Users/kimmyoungsun/Documents/codex/analysis_report/out/<run_group>/tables/*.csv`
 - `/Users/kimmyoungsun/Documents/codex/analysis_report/out/<run_group>/index.csv`
+- `/Users/kimmyoungsun/Documents/codex/analysis_report/out/<run_group>/proposition_plot_mapping_report.md`
+- `/Users/kimmyoungsun/Documents/codex/analysis_report/out/<run_group>/tables/proposition_plot_mapping.csv`
+- `/Users/kimmyoungsun/Documents/codex/analysis_report/out/<run_group>/proposition_plot_mapping_detailed_report.md`
+- `/Users/kimmyoungsun/Documents/codex/analysis_report/out/<run_group>/tables/proposition_plot_mapping_detailed.csv`
+- `/Users/kimmyoungsun/Documents/codex/analysis_report/out/<run_group>/tables/plot_data/<plot_id>__data.csv` (`x,y,data` 포함)
 
 ## Notes
 - 기본 구현은 **power 기반 지표(Z/U)**만 사용합니다.

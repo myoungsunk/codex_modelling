@@ -43,10 +43,10 @@ def run_case(
         R = np.array([[c, 0.0, s], [0.0, 1.0, 0.0], [-s, 0.0, c]], dtype=float)
         return R @ np.asarray(v, dtype=float)
 
-    rx.boresight[:] = _rot_y(_rot_z(rx.boresight, yaw_deg), pitch_deg)
-    rx.h_axis[:] = _rot_y(_rot_z(rx.h_axis, yaw_deg), pitch_deg)
-    rx.v_axis[:] = _rot_y(_rot_z(rx.v_axis, yaw_deg), pitch_deg)
-    rx.position[:] = [params["distance_m"], 0.0, 1.5]
+    rx_b = _rot_y(_rot_z(np.asarray(rx.boresight, dtype=float), yaw_deg), pitch_deg)
+    rx_h = _rot_y(_rot_z(np.asarray(rx.h_axis, dtype=float), yaw_deg), pitch_deg)
+    rx_v = _rot_y(_rot_z(np.asarray(rx.v_axis, dtype=float), yaw_deg), pitch_deg)
+    rx = rx.with_orientation(boresight=rx_b, h_axis=rx_h, v_axis=rx_v).with_position([params["distance_m"], 0.0, 1.5])
     trace_kwargs = dict(diffuse_config or {})
     return trace_paths(
         build_scene(),
