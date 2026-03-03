@@ -8,7 +8,7 @@ import numpy as np
 
 from rt_core.antenna import Antenna
 from rt_core.geometry import Material, Plane
-from rt_core.tracer import trace_paths
+from rt_core.tracer import _enumerate_sequences, trace_paths
 from scenarios.common import make_los_blocker_plane
 
 
@@ -121,6 +121,16 @@ class TracerTests(unittest.TestCase):
     def test_invalid_wave_basis_mode_raises(self) -> None:
         with self.assertRaises(ValueError):
             trace_paths([], self.tx, self.rx, self.f, max_bounce=0, wave_basis_mode="bad_mode")
+
+    def test_sequence_enumerator_budget(self) -> None:
+        seq = list(_enumerate_sequences(3, 3, max_candidates=5))
+        self.assertEqual(len(seq), 5)
+        self.assertEqual(seq[0], (0, 0, 0))
+
+    def test_sequence_enumerator_forbid_immediate_repeat(self) -> None:
+        seq = list(_enumerate_sequences(2, 3, forbid_immediate_repeat=True))
+        self.assertEqual(len(seq), 2)
+        self.assertTrue(all(s[i] != s[i - 1] for s in seq for i in range(1, len(s))))
 
 
 if __name__ == "__main__":

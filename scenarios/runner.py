@@ -1534,6 +1534,8 @@ def main() -> None:
     parser.add_argument("--allow-proxy-diffuse-release", action="store_true")
     parser.add_argument("--min-path-power-db", type=float, default=None)
     parser.add_argument("--max-paths-per-case", type=int, default=None)
+    parser.add_argument("--max-sequence-candidates-per-bounce", type=int, default=None)
+    parser.add_argument("--forbid-immediate-surface-repeat", action="store_true")
     parser.add_argument("--force-cp-swap-on-odd-reflection", action="store_true")
     parser.add_argument("--model-compare", dest="model_compare", action="store_true")
     parser.add_argument("--no-model-compare", dest="model_compare", action="store_false")
@@ -1620,6 +1622,10 @@ def main() -> None:
             args.min_path_power_db = -120.0
         if args.max_paths_per_case is None:
             args.max_paths_per_case = 256
+        if args.max_sequence_candidates_per_bounce is None:
+            args.max_sequence_candidates_per_bounce = 50000
+        if not bool(args.forbid_immediate_surface_repeat):
+            args.forbid_immediate_surface_repeat = True
 
     if bool(args.release_mode):
         _, dirty_now = _git_meta()
@@ -1691,6 +1697,12 @@ def main() -> None:
         "release_proxy_ack": bool(args.allow_proxy_diffuse_release),
         "min_path_power_db": (float(args.min_path_power_db) if args.min_path_power_db is not None else None),
         "max_paths_per_case": (int(args.max_paths_per_case) if args.max_paths_per_case is not None else None),
+        "max_sequence_candidates_per_bounce": (
+            int(args.max_sequence_candidates_per_bounce)
+            if args.max_sequence_candidates_per_bounce is not None
+            else None
+        ),
+        "forbid_immediate_surface_repeat": bool(args.forbid_immediate_surface_repeat),
     }
 
     bases = _parse_bases(args.basis, args.bases)

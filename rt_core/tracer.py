@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from itertools import product
-from typing import Callable, Sequence
+from typing import Callable, Iterator, Sequence
 
 import numpy as np
 from numpy.typing import NDArray
@@ -69,10 +69,26 @@ class PathResult:
         }
 
 
-def _enumerate_sequences(num_planes: int, bounce: int) -> list[tuple[int, ...]]:
+def _enumerate_sequences(
+    num_planes: int,
+    bounce: int,
+    max_candidates: int | None = None,
+    forbid_immediate_repeat: bool = False,
+) -> Iterator[tuple[int, ...]]:
     if bounce == 0:
-        return [tuple()]
-    return list(product(range(num_planes), repeat=bounce))
+        yield tuple()
+        return
+    if num_planes <= 0 or bounce < 0:
+        return
+    cap = int(max_candidates) if max_candidates is not None and int(max_candidates) > 0 else None
+    emitted = 0
+    for seq in product(range(num_planes), repeat=bounce):
+        if bool(forbid_immediate_repeat) and any(seq[i] == seq[i - 1] for i in range(1, bounce)):
+            continue
+        yield tuple(seq)
+        emitted += 1
+        if cap is not None and emitted >= cap:
+            break
 
 
 def _is_occluder_only_plane(plane: Plane) -> bool:
@@ -273,6 +289,8 @@ def trace_paths(
     wave_basis_mode: str = "transport",
     min_path_power_db: float | None = None,
     max_paths_per_case: int | None = None,
+    max_sequence_candidates_per_bounce: int | None = None,
+    forbid_immediate_surface_repeat: bool = False,
 ) -> list[PathResult]:
     """Trace paths and return per-path delay and 2x2 transfer matrix over frequency."""
 
@@ -300,7 +318,12 @@ def trace_paths(
             continue
         if b > 0 and len(reflective_planes) == 0:
             continue
-        for idx_seq in _enumerate_sequences(len(reflective_planes), b):
+        for idx_seq in _enumerate_sequences(
+            len(reflective_planes),
+            b,
+            max_candidates=max_sequence_candidates_per_bounce,
+            forbid_immediate_repeat=forbid_immediate_surface_repeat,
+        ):
             seq = [reflective_planes[i] for i in idx_seq]
             points = _construct_reflection_points(tx.position, rx.position, seq)
             if points is None or not _path_valid(points):
