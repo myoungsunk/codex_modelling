@@ -707,26 +707,26 @@ def _build_scene_snapshot(
     los_blocker = str(los_block_mode).lower().strip() == "occluder"
 
     if s == "C0":
-        rx.position[:] = [float(params.get("distance_m", 1.0)), 0.0, 1.5]
+        rx = rx.with_position([float(params.get("distance_m", 1.0)), 0.0, 1.5])
         return np.asarray(tx.position, dtype=float), np.asarray(rx.position, dtype=float), scene
 
     if s == "A2":
-        rx.position[:] = [float(params.get("distance_m", 6.0)), 0.0, 1.5]
+        rx = rx.with_position([float(params.get("distance_m", 6.0)), 0.0, 1.5])
         scene = A2_pec_plane.build_scene(y_plane=float(params.get("y_plane", 2.0)))
         if los_blocker:
             scene.append(make_los_blocker_plane(tx.position, rx.position, plane_id=9101))
         return np.asarray(tx.position, dtype=float), np.asarray(rx.position, dtype=float), scene
 
     if s == "A3":
-        tx.position[:] = [0.0, 0.0, 1.5]
-        rx.position[:] = [float(params.get("rx_x", 3.5)), float(params.get("rx_y", 4.5)), 1.5]
+        tx = tx.with_position([0.0, 0.0, 1.5])
+        rx = rx.with_position([float(params.get("rx_x", 3.5)), float(params.get("rx_y", 4.5)), 1.5])
         scene = A3_corner_2bounce.build_scene(offset=float(params.get("offset", 3.5)))
         if los_blocker:
             scene.append(make_los_blocker_plane(tx.position, rx.position, plane_id=9201))
         return np.asarray(tx.position, dtype=float), np.asarray(rx.position, dtype=float), scene
 
     if s == "A4":
-        rx.position[:] = [float(params.get("distance_m", 6.0)), 0.0, 1.5]
+        rx = rx.with_position([float(params.get("distance_m", 6.0)), 0.0, 1.5])
         scene = A4_dielectric_plane.build_scene(
             str(params.get("material", "wood")),
             y_plane=float(params.get("y_plane", 2.0)),
@@ -746,7 +746,7 @@ def _build_scene_snapshot(
         return np.asarray(tx.position, dtype=float), np.asarray(rx.position, dtype=float), scene
 
     if s == "A5":
-        rx.position[:] = [float(params.get("rx_x", 2.5)), float(params.get("rx_y", 0.5)), 1.5]
+        rx = rx.with_position([float(params.get("rx_x", 2.5)), float(params.get("rx_y", 0.5)), 1.5])
         scene = A5_depol_stress.build_scene(offset=float(params.get("offset", 3.5)))
         mode = str(a5_stress_mode).lower().strip()
         if mode in {"geometry", "hybrid"} and int(a5_scatterer_count) > 0:
@@ -771,8 +771,8 @@ def _build_scene_snapshot(
         return np.asarray(tx.position, dtype=float), np.asarray(rx.position, dtype=float), scene
 
     if s in {"B1", "B2", "B3"}:
-        tx.position[:] = [2.0, 0.0, 1.5]
-        rx.position[:] = [float(params.get("rx_x", 2.0)), float(params.get("rx_y", 0.0)), 1.5]
+        tx = tx.with_position([2.0, 0.0, 1.5])
+        rx = rx.with_position([float(params.get("rx_x", 2.0)), float(params.get("rx_y", 0.0)), 1.5])
         scene = _build_room_scene(s)
         return np.asarray(tx.position, dtype=float), np.asarray(rx.position, dtype=float), scene
 
@@ -833,8 +833,8 @@ def _export_scene_debug_for_case(
 
 def _run_room_case(kind: str, rx_x: float, rx_y: float, f_hz: np.ndarray, basis: str = "circular") -> list[dict[str, Any]]:
     tx, rx = default_antennas(basis=basis)
-    tx.position[:] = [2.0, 0.0, 1.5]
-    rx.position[:] = [rx_x, rx_y, 1.5]
+    tx = tx.with_position([2.0, 0.0, 1.5])
+    rx = rx.with_position([rx_x, rx_y, 1.5])
     scene = _build_room_scene(kind)
     paths = trace_paths(scene, tx, rx, f_hz, max_bounce=2, los_enabled=True)
     return paths_to_records(paths)

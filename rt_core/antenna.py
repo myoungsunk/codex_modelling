@@ -11,7 +11,7 @@ Example:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 from numpy.typing import NDArray
@@ -49,25 +49,51 @@ class Antenna:
     global_up: Vec3 = field(default_factory=lambda: np.array([0.0, 0.0, 1.0], dtype=float))
 
     def __post_init__(self) -> None:
-        p = np.asarray(self.position, dtype=float)
-        b = normalize(np.asarray(self.boresight, dtype=float))
-        h = np.asarray(self.h_axis, dtype=float)
+        p = np.array(self.position, dtype=float, copy=True)
+        b = normalize(np.array(self.boresight, dtype=float, copy=True))
+        h = np.array(self.h_axis, dtype=float, copy=True)
         h = h - float(np.dot(h, b)) * b
         h = normalize(h)
-        v = np.asarray(self.v_axis, dtype=float)
+        v = np.array(self.v_axis, dtype=float, copy=True)
         v = v - float(np.dot(v, b)) * b - float(np.dot(v, h)) * h
         v = normalize(v)
+        gup = np.array(self.global_up, dtype=float, copy=True)
+        if np.linalg.norm(gup) < 1e-9:
+            gup = np.array([0.0, 0.0, 1.0], dtype=float)
+        gup = normalize(gup)
+        f0 = float(self.coupling_ref_freq_hz)
+        if not np.isfinite(f0) or f0 <= 0.0:
+            object.__setattr__(self, "coupling_ref_freq_hz", 8.0e9)
+        for arr in (p, b, h, v, gup):
+            arr.setflags(write=False)
         object.__setattr__(self, "position", p)
         object.__setattr__(self, "boresight", b)
         object.__setattr__(self, "h_axis", h)
         object.__setattr__(self, "v_axis", v)
-        gup = np.asarray(self.global_up, dtype=float)
-        if np.linalg.norm(gup) < 1e-9:
-            gup = np.array([0.0, 0.0, 1.0], dtype=float)
-        object.__setattr__(self, "global_up", normalize(gup))
-        f0 = float(self.coupling_ref_freq_hz)
-        if not np.isfinite(f0) or f0 <= 0.0:
-            object.__setattr__(self, "coupling_ref_freq_hz", 8.0e9)
+        object.__setattr__(self, "global_up", gup)
+
+    def with_position(self, position: Vec3) -> "Antenna":
+        """Return a copy with updated position."""
+        return replace(self, position=np.asarray(position, dtype=float))
+
+    def with_orientation(
+        self,
+        boresight: Vec3 | None = None,
+        h_axis: Vec3 | None = None,
+        v_axis: Vec3 | None = None,
+        global_up: Vec3 | None = None,
+    ) -> "Antenna":
+        """Return a copy with updated orientation vectors.
+
+        The returned instance is re-normalized in `__post_init__`.
+        """
+        return replace(
+            self,
+            boresight=np.asarray(self.boresight if boresight is None else boresight, dtype=float),
+            h_axis=np.asarray(self.h_axis if h_axis is None else h_axis, dtype=float),
+            v_axis=np.asarray(self.v_axis if v_axis is None else v_axis, dtype=float),
+            global_up=np.asarray(self.global_up if global_up is None else global_up, dtype=float),
+        )
 
     def wave_basis(self, direction: Vec3) -> CMat:
         # Use a global reference vector to avoid locking wave basis to antenna H axis.

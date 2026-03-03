@@ -132,8 +132,8 @@ def run_case(
     diffuse_config: dict[str, Any] | None = None,
 ):
     tx, rx = default_antennas(basis=basis, **(antenna_config or {}))
-    tx.position[:] = [2.0, 0.0, 1.5]
-    rx.position[:] = [params["rx_x"], params["rx_y"], params.get("rx_z", 1.5)]
+    tx = tx.with_position([2.0, 0.0, 1.5])
+    rx = rx.with_position([params["rx_x"], params["rx_y"], params.get("rx_z", 1.5)])
     scene = build_scene()
     trace_kwargs = dict(diffuse_config or {})
     return trace_paths(

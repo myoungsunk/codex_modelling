@@ -117,11 +117,11 @@ def run_case(
     max_bounce = int(max_bounce_override) if max_bounce_override is not None else target_bounce
 
     if mode == "odd":
-        tx.position[:] = [2.0, -2.0, 1.5]
+        tx = tx.with_position([2.0, -2.0, 1.5])
     else:
-        tx.position[:] = [2.0, 1.0, 1.5]
+        tx = tx.with_position([2.0, 1.0, 1.5])
 
-    rx.position[:] = [params["rx_x"], params["rx_y"], params["rx_z"]]
+    rx = rx.with_position([params["rx_x"], params["rx_y"], params["rx_z"]])
 
     paths = trace_paths(
         scene,

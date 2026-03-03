@@ -60,8 +60,8 @@ def run_case(
     diffuse_config: dict[str, Any] | None = None,
 ):
     tx, rx = default_antennas(basis=basis, **(antenna_config or {}))
-    tx.position[:] = [0.0, -1.0, 1.5]
-    rx.position[:] = [params["distance_m"], 1.0, 1.7]
+    tx = tx.with_position([0.0, -1.0, 1.5])
+    rx = rx.with_position([params["distance_m"], 1.0, 1.7])
     scene = build_scene(
         y_plane=float(params["y_plane"]),
         tilt_x_deg=float(params["tilt_x_deg"]),

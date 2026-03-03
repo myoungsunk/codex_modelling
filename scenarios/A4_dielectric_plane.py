@@ -94,7 +94,7 @@ def run_case(
     y_late_offset: float = 2.4,
 ):
     tx, rx = default_antennas(basis=basis, **(antenna_config or {}))
-    rx.position[:] = [params["distance_m"], 0.0, 1.5]
+    rx = rx.with_position([params["distance_m"], 0.0, 1.5])
     scene = build_scene(
         params["material"],
         y_plane=params["y_plane"],

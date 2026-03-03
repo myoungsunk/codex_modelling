@@ -46,7 +46,7 @@ def run_case(
     los_enabled_override: bool | None = None,
 ):
     tx, rx = default_antennas(basis=basis, **(antenna_config or {}))
-    rx.position[:] = [params["distance_m"], 0.0, 1.5]
+    rx = rx.with_position([params["distance_m"], 0.0, 1.5])
     scene = build_scene(y_plane=params["y_plane"])
     if bool(los_blocker):
         scene.append(make_los_blocker_plane(tx.position, rx.position, plane_id=9101))

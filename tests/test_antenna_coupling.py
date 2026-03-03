@@ -58,7 +58,27 @@ class AntennaCouplingTests(unittest.TestCase):
         ph = np.unwrap(np.angle(off12))
         self.assertNotAlmostEqual(float(ph[-1]), float(ph[0]), places=6)
 
+    def test_vectors_are_read_only(self) -> None:
+        ant = self._ant()
+        self.assertFalse(bool(ant.position.flags.writeable))
+        self.assertFalse(bool(ant.boresight.flags.writeable))
+        with self.assertRaises(ValueError):
+            ant.position[0] = 1.0
+
+    def test_with_orientation_re_normalizes_axes(self) -> None:
+        ant = self._ant()
+        new_ant = ant.with_orientation(
+            boresight=np.array([2.0, 0.0, 0.0]),
+            h_axis=np.array([0.5, 1.0, 0.0]),
+            v_axis=np.array([0.1, 0.2, 3.0]),
+        ).with_position(np.array([1.0, 2.0, 3.0]))
+        self.assertTrue(np.allclose(new_ant.position, np.array([1.0, 2.0, 3.0]), atol=1e-12))
+        self.assertAlmostEqual(float(np.linalg.norm(new_ant.boresight)), 1.0, places=12)
+        self.assertAlmostEqual(float(np.linalg.norm(new_ant.h_axis)), 1.0, places=12)
+        self.assertAlmostEqual(float(np.linalg.norm(new_ant.v_axis)), 1.0, places=12)
+        self.assertAlmostEqual(float(np.dot(new_ant.boresight, new_ant.h_axis)), 0.0, places=12)
+        self.assertAlmostEqual(float(np.dot(new_ant.boresight, new_ant.v_axis)), 0.0, places=12)
+
 
 if __name__ == "__main__":
     unittest.main()
-

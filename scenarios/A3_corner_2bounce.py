@@ -66,8 +66,8 @@ def run_case(
             "A3 invalid geometry: Rx must satisfy rx_x<offset and rx_y<offset "
             f"(rx_x={rx_x}, rx_y={rx_y}, offset={off})"
         )
-    tx.position[:] = [0.0, 0.0, 1.5]
-    rx.position[:] = [rx_x, rx_y, 1.5]
+    tx = tx.with_position([0.0, 0.0, 1.5])
+    rx = rx.with_position([rx_x, rx_y, 1.5])
     scene = build_scene(offset=off)
     if bool(los_blocker):
         scene.append(make_los_blocker_plane(tx.position, rx.position, plane_id=9201))

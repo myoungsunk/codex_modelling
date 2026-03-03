@@ -46,8 +46,8 @@ class TracerTests(unittest.TestCase):
     def test_two_bounce_corner_exists(self) -> None:
         p1 = Plane(id=1, p0=np.array([0.0, 3.0, 0.0]), normal=np.array([0.0, -1.0, 0.0]), material=Material.pec())
         p2 = Plane(id=2, p0=np.array([3.0, 0.0, 0.0]), normal=np.array([-1.0, 0.0, 0.0]), material=Material.pec())
-        self.rx.position[:] = [3.0, 4.0, 1.0]
-        paths = trace_paths([p1, p2], self.tx, self.rx, self.f, max_bounce=2, los_enabled=False)
+        rx = self.rx.with_position([3.0, 4.0, 1.0])
+        paths = trace_paths([p1, p2], self.tx, rx, self.f, max_bounce=2, los_enabled=False)
         self.assertTrue(any(p.bounce_count == 2 for p in paths))
 
     def test_absorber_proxy_is_occluder_not_reflector(self) -> None:
