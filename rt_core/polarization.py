@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Callable
+import warnings
 
 import numpy as np
 from numpy.typing import NDArray
@@ -54,12 +55,14 @@ def basis_change(src_basis: NDArray[np.complex128], dst_basis: NDArray[np.comple
     return (dst_basis.conj().T @ src_basis).astype(np.complex128)
 
 
-def _safe_s(k_in: Vec3, n_eff: Vec3) -> Vec3:
-    s = np.cross(k_in, n_eff)
-    if np.linalg.norm(s) < 1e-9:
-        alt = np.array([0.0, 0.0, 1.0]) if abs(k_in[2]) < 0.8 else np.array([0.0, 1.0, 0.0])
-        s = np.cross(k_in, alt)
-    return normalize(s)
+def _fallback_tangent_from_normal(n_eff: Vec3) -> Vec3:
+    """Return deterministic tangent vector orthogonal to effective normal."""
+    n = normalize(np.asarray(n_eff, dtype=float))
+    alt = np.array([0.0, 0.0, 1.0], dtype=float) if abs(n[2]) < 0.8 else np.array([0.0, 1.0, 0.0], dtype=float)
+    t = np.cross(n, alt)
+    if np.linalg.norm(t) < 1e-9:
+        t = np.cross(n, np.array([1.0, 0.0, 0.0], dtype=float))
+    return normalize(t)
 
 
 def local_sp_bases(k_in: Vec3, k_out: Vec3, normal: Vec3) -> tuple[Vec3, Vec3, Vec3, Vec3, float, Vec3]:
@@ -82,8 +85,31 @@ def local_sp_bases(k_in: Vec3, k_out: Vec3, normal: Vec3) -> tuple[Vec3, Vec3, V
     cos_i = -float(np.dot(kin, n))
     cos_i = float(np.clip(cos_i, 0.0, 1.0))
     theta_i = float(np.arccos(cos_i))
-    s_in = _safe_s(kin, n)
-    s_out = _safe_s(kout, n)
+    s_in_raw = np.cross(kin, n)
+    s_out_raw = np.cross(kout, n)
+    n_in = float(np.linalg.norm(s_in_raw))
+    n_out = float(np.linalg.norm(s_out_raw))
+    eps = 1e-9
+
+    # Near normal incidence, k x n can vanish for incident/reflected directions.
+    # Use a shared deterministic tangent to avoid arbitrary basis jumps between s_in/s_out.
+    if n_in < eps and n_out < eps:
+        s_ref = _fallback_tangent_from_normal(n)
+        s_in = s_ref.copy()
+        s_out = s_ref.copy()
+    elif n_in < eps:
+        s_out = normalize(s_out_raw)
+        s_in = s_out.copy()
+    elif n_out < eps:
+        s_in = normalize(s_in_raw)
+        s_out = s_in.copy()
+    else:
+        s_in = normalize(s_in_raw)
+        s_out = normalize(s_out_raw)
+        # Keep in/out transverse axes aligned when both are well-defined.
+        if float(np.dot(s_in, s_out)) < 0.0:
+            s_out = -s_out
+
     p_in = normalize(np.cross(kin, s_in))
     p_out = normalize(np.cross(kout, s_out))
     return s_in, p_in, s_out, p_out, theta_i, n
@@ -94,11 +120,22 @@ def fresnel_reflection(material: Material, theta_i: float, f_hz: NDArray[np.floa
 
     freq = np.asarray(f_hz, dtype=float)
     if material.kind.upper() == "PEC":
-        ones = -np.ones(freq.shape, dtype=np.complex128)
-        return ones, ones
+        gamma_s = -np.ones(freq.shape, dtype=np.complex128)
+        tm_sign = float(getattr(material, "pec_tm_sign", -1.0))
+        gamma_p = (np.ones(freq.shape, dtype=np.complex128) if tm_sign >= 0.0 else -np.ones(freq.shape, dtype=np.complex128))
+        return gamma_s, gamma_p
 
     sin2 = float(np.sin(theta_i) ** 2)
     cos_i = float(np.cos(theta_i))
+    if cos_i < 1e-5:
+        warnings.warn(
+            (
+                "grazing-incidence Fresnel evaluation: theta_i is very close to 90 deg; "
+                "Gamma phase may be branch-sensitive near the boundary."
+            ),
+            RuntimeWarning,
+            stacklevel=2,
+        )
     if material.complex_eps_r is not None:
         eps_c = np.full(freq.shape, material.complex_eps_r, dtype=np.complex128)
     else:
@@ -134,12 +171,17 @@ def fresnel_reflection(material: Material, theta_i: float, f_hz: NDArray[np.floa
                 eps_c = np.full(freq.shape, float(material.debye_eps_inf), dtype=np.complex128)
                 for d_eps, tau in zip(de, ts):
                     eps_c += d_eps / (1.0 + 1j * w * max(float(tau), 1e-15))
-                if float(material.tan_delta) > 0.0:
-                    eps_c = eps_c - 1j * np.maximum(np.real(eps_c), 1.0) * float(material.tan_delta)
+                # Debye dispersion already models frequency-dependent loss via Im{eps(omega)}.
+                # Do not apply `tan_delta` again here to avoid double-counting dielectric loss.
         else:
             eps_c = np.full(freq.shape, material.eps_r * (1.0 - 1j * material.tan_delta), dtype=np.complex128)
 
     root = np.sqrt(eps_c - sin2)
+    # Keep a passive/causal branch consistently (avoid sign flips from principal sqrt branch cut).
+    flip_re = np.real(root) < 0.0
+    root = np.where(flip_re, -root, root)
+    flip_im = (np.real(root) == 0.0) & (np.imag(root) < 0.0)
+    root = np.where(flip_im, -root, root)
     gamma_s = (cos_i - root) / (cos_i + root)
     gamma_p = (eps_c * cos_i - root) / (eps_c * cos_i + root)
     # Passive-media guard: preserve phase while limiting |Gamma|<=1.
@@ -154,13 +196,56 @@ def fresnel_reflection(material: Material, theta_i: float, f_hz: NDArray[np.floa
 
 
 def jones_reflection(material: Material, theta_i: float, f_hz: NDArray[np.float64]) -> NDArray[np.complex128]:
-    """Return R(f) with shape (Nf,2,2) in local (s,p) basis."""
+    """Return R(f) with shape (Nf,2,2) in local (s,p) basis.
+
+    Default model is diagonal Fresnel reflection (smooth, isotropic interface).
+    Optional effective off-diagonal coupling can be enabled via material fields:
+    - material.xpol_coupling_db
+    - material.xpol_coupling_phase_deg
+    This is an empirical extension hook (not full rough-surface BRDF physics).
+    """
 
     gs, gp = fresnel_reflection(material, theta_i, f_hz)
     n = len(f_hz)
     out = np.zeros((n, 2, 2), dtype=np.complex128)
     out[:, 0, 0] = gs
     out[:, 1, 1] = gp
+    # Legacy symmetric hook.
+    xdb = getattr(material, "xpol_coupling_db", None)
+    xph = float(getattr(material, "xpol_coupling_phase_deg", 0.0))
+    # Optional asymmetric hooks (override if provided).
+    xdb_hv = getattr(material, "xpol_coupling_hv_db", None)
+    xph_hv = float(getattr(material, "xpol_coupling_hv_phase_deg", xph))
+    xdb_vh = getattr(material, "xpol_coupling_vh_db", None)
+    xph_vh = float(getattr(material, "xpol_coupling_vh_phase_deg", -xph))
+
+    if xdb_hv is not None and not np.isfinite(float(xdb_hv)):
+        xdb_hv = None
+    if xdb_vh is not None and not np.isfinite(float(xdb_vh)):
+        xdb_vh = None
+
+    if xdb_hv is None and xdb_vh is None:
+        if xdb is not None and np.isfinite(float(xdb)):
+            xdb_hv = float(xdb)
+            xdb_vh = float(xdb)
+            xph_hv = xph
+            xph_vh = -xph
+    else:
+        if xdb_hv is None and xdb_vh is not None and np.isfinite(float(xdb_vh)):
+            xdb_hv = float(xdb_vh)
+            xph_hv = -xph_vh
+        if xdb_vh is None and xdb_hv is not None and np.isfinite(float(xdb_hv)):
+            xdb_vh = float(xdb_hv)
+            xph_vh = -xph_hv
+
+    if xdb_hv is not None and xdb_vh is not None:
+        diag_scale = np.sqrt(np.maximum(np.abs(gs * gp), 0.0))
+        amp_hv = float(10.0 ** (-float(xdb_hv) / 20.0))
+        amp_vh = float(10.0 ** (-float(xdb_vh) / 20.0))
+        phase_hv = np.exp(1j * float(np.deg2rad(xph_hv)))
+        phase_vh = np.exp(1j * float(np.deg2rad(xph_vh)))
+        out[:, 0, 1] = (amp_hv * diag_scale * phase_hv).astype(np.complex128)
+        out[:, 1, 0] = (amp_vh * diag_scale * phase_vh).astype(np.complex128)
     return out
 
 

@@ -11,7 +11,7 @@ Example:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 from numpy.typing import NDArray
@@ -34,25 +34,78 @@ class Antenna:
     cross_pol_leakage_db: float = 35.0
     axial_ratio_db: float = 0.0
     enable_coupling: bool = True
+    coupling_ref_freq_hz: float = 8.0e9
+    cross_pol_leakage_db_slope_per_ghz: float = 0.0
+    axial_ratio_db_slope_per_ghz: float = 0.0
+    cross_coupling_phase_deg: float = 0.0
+    cross_coupling_phase_slope_deg_per_ghz: float = 0.0
+    coupling_conjugate_symmetric: bool = True
+    cross_coupling_vh_mag_ratio: float = 1.0
+    cross_coupling_vh_phase_offset_deg: float = 0.0
+    max_coupling_eps: float = 0.49
+    # Optional directional gain model (power gain):
+    # G(psi) = G_peak * max(cos(psi), 0)^n
+    # Defaults keep isotropic behavior (0 dBi, n=0).
+    tx_peak_gain_dbi: float = 0.0
+    rx_peak_gain_dbi: float = 0.0
+    tx_pattern_cos_exp: float = 0.0
+    rx_pattern_cos_exp: float = 0.0
+    directional_gain_ref_freq_hz: float = 8.0e9
+    tx_peak_gain_dbi_slope_per_ghz: float = 0.0
+    rx_peak_gain_dbi_slope_per_ghz: float = 0.0
+    tx_pattern_cos_exp_slope_per_ghz: float = 0.0
+    rx_pattern_cos_exp_slope_per_ghz: float = 0.0
     global_up: Vec3 = field(default_factory=lambda: np.array([0.0, 0.0, 1.0], dtype=float))
 
     def __post_init__(self) -> None:
-        p = np.asarray(self.position, dtype=float)
-        b = normalize(np.asarray(self.boresight, dtype=float))
-        h = np.asarray(self.h_axis, dtype=float)
+        p = np.array(self.position, dtype=float, copy=True)
+        b = normalize(np.array(self.boresight, dtype=float, copy=True))
+        h = np.array(self.h_axis, dtype=float, copy=True)
         h = h - float(np.dot(h, b)) * b
         h = normalize(h)
-        v = np.asarray(self.v_axis, dtype=float)
+        v = np.array(self.v_axis, dtype=float, copy=True)
         v = v - float(np.dot(v, b)) * b - float(np.dot(v, h)) * h
         v = normalize(v)
+        gup = np.array(self.global_up, dtype=float, copy=True)
+        if np.linalg.norm(gup) < 1e-9:
+            gup = np.array([0.0, 0.0, 1.0], dtype=float)
+        gup = normalize(gup)
+        f0 = float(self.coupling_ref_freq_hz)
+        if not np.isfinite(f0) or f0 <= 0.0:
+            object.__setattr__(self, "coupling_ref_freq_hz", 8.0e9)
+        g0 = float(self.directional_gain_ref_freq_hz)
+        if not np.isfinite(g0) or g0 <= 0.0:
+            object.__setattr__(self, "directional_gain_ref_freq_hz", 8.0e9)
+        for arr in (p, b, h, v, gup):
+            arr.setflags(write=False)
         object.__setattr__(self, "position", p)
         object.__setattr__(self, "boresight", b)
         object.__setattr__(self, "h_axis", h)
         object.__setattr__(self, "v_axis", v)
-        gup = np.asarray(self.global_up, dtype=float)
-        if np.linalg.norm(gup) < 1e-9:
-            gup = np.array([0.0, 0.0, 1.0], dtype=float)
-        object.__setattr__(self, "global_up", normalize(gup))
+        object.__setattr__(self, "global_up", gup)
+
+    def with_position(self, position: Vec3) -> "Antenna":
+        """Return a copy with updated position."""
+        return replace(self, position=np.asarray(position, dtype=float))
+
+    def with_orientation(
+        self,
+        boresight: Vec3 | None = None,
+        h_axis: Vec3 | None = None,
+        v_axis: Vec3 | None = None,
+        global_up: Vec3 | None = None,
+    ) -> "Antenna":
+        """Return a copy with updated orientation vectors.
+
+        The returned instance is re-normalized in `__post_init__`.
+        """
+        return replace(
+            self,
+            boresight=np.asarray(self.boresight if boresight is None else boresight, dtype=float),
+            h_axis=np.asarray(self.h_axis if h_axis is None else h_axis, dtype=float),
+            v_axis=np.asarray(self.v_axis if v_axis is None else v_axis, dtype=float),
+            global_up=np.asarray(self.global_up if global_up is None else global_up, dtype=float),
+        )
 
     def wave_basis(self, direction: Vec3) -> CMat:
         # Use a global reference vector to avoid locking wave basis to antenna H axis.
@@ -94,24 +147,83 @@ class Antenna:
         pb = self.port_basis_vectors(-np.asarray(direction, dtype=float))
         return (pb.conj().T @ wb).astype(np.complex128)
 
-    def _coupling_matrix(self, n_f: int) -> NDArray[np.complex128]:
+    def _coupling_matrix(self, f_hz: NDArray[np.float64]) -> NDArray[np.complex128]:
         if not self.enable_coupling:
             eye = np.eye(2, dtype=np.complex128)
-            return np.repeat(eye[None, :, :], n_f, axis=0)
-        leak = 10.0 ** (-self.cross_pol_leakage_db / 20.0)
-        ar = 10.0 ** (self.axial_ratio_db / 20.0)
-        ar_leak = abs((ar - 1.0) / (ar + 1.0))
-        eps = float(np.clip(leak + ar_leak, 0.0, 0.49))
-        base = np.array([[1.0, eps], [eps, 1.0]], dtype=np.complex128)
-        base /= np.sqrt(1.0 + eps**2)
-        return np.repeat(base[None, :, :], n_f, axis=0)
+            return np.repeat(eye[None, :, :], len(f_hz), axis=0)
+        ff = np.asarray(f_hz, dtype=float)
+        d_ghz = (ff - float(self.coupling_ref_freq_hz)) / 1e9
+        leak_db = float(self.cross_pol_leakage_db) + float(self.cross_pol_leakage_db_slope_per_ghz) * d_ghz
+        ar_db = float(self.axial_ratio_db) + float(self.axial_ratio_db_slope_per_ghz) * d_ghz
+        phase_deg = float(self.cross_coupling_phase_deg) + float(self.cross_coupling_phase_slope_deg_per_ghz) * d_ghz
+        leak = 10.0 ** (-np.asarray(leak_db, dtype=float) / 20.0)
+        ar = 10.0 ** (np.asarray(ar_db, dtype=float) / 20.0)
+        ar_leak = np.abs((ar - 1.0) / np.maximum(ar + 1.0, 1e-12))
+        eps = np.clip(leak + ar_leak, 0.0, float(max(0.0, self.max_coupling_eps)))
+        phase = np.exp(1j * np.deg2rad(np.asarray(phase_deg, dtype=float)))
+        off = eps.astype(np.complex128) * phase.astype(np.complex128)
+        if bool(self.coupling_conjugate_symmetric):
+            off_vh = np.conj(off)
+        else:
+            vh_ratio = float(max(self.cross_coupling_vh_mag_ratio, 0.0))
+            vh_phase = np.exp(1j * np.deg2rad(float(self.cross_coupling_vh_phase_offset_deg)))
+            off_vh = (vh_ratio * off * vh_phase).astype(np.complex128)
+        den = np.sqrt(np.maximum(1.0 + np.abs(off) * np.abs(off_vh), 1e-18))
+        out = np.zeros((len(ff), 2, 2), dtype=np.complex128)
+        out[:, 0, 0] = 1.0 / den
+        out[:, 1, 1] = 1.0 / den
+        out[:, 0, 1] = off / den
+        out[:, 1, 0] = off_vh / den
+        return out
 
     def tx_port_to_wave(self, direction: Vec3, f_hz: NDArray[np.float64], wave_basis: CMat | None = None) -> NDArray[np.complex128]:
         proj = self.tx_emit_matrix(direction, wave_basis=wave_basis)
-        cpl = self._coupling_matrix(len(f_hz))
+        cpl = self._coupling_matrix(f_hz)
         return np.einsum("ab,kbc->kac", proj, cpl).astype(np.complex128)
 
     def rx_wave_to_port(self, direction: Vec3, f_hz: NDArray[np.float64], wave_basis: CMat | None = None) -> NDArray[np.complex128]:
         proj = self.rx_receive_matrix(direction, wave_basis=wave_basis)
-        cpl = self._coupling_matrix(len(f_hz))
+        cpl = self._coupling_matrix(f_hz)
         return np.einsum("kab,bc->kac", cpl.conj().transpose(0, 2, 1), proj).astype(np.complex128)
+
+    @staticmethod
+    def _dir_gain_lin(look_dir: Vec3, boresight: Vec3, peak_gain_dbi: float, cos_exp: float) -> float:
+        d = normalize(np.asarray(look_dir, dtype=float))
+        b = normalize(np.asarray(boresight, dtype=float))
+        cos_psi = float(max(np.dot(d, b), 0.0))
+        n = float(max(cos_exp, 0.0))
+        g_shape = float(cos_psi**n) if n > 0.0 else 1.0
+        g_peak = float(10.0 ** (float(peak_gain_dbi) / 10.0))
+        return float(max(g_peak * g_shape, 0.0))
+
+    def _freq_offset_ghz(self, f_hz: NDArray[np.float64]) -> NDArray[np.float64]:
+        ff = np.asarray(f_hz, dtype=float)
+        return (ff - float(self.directional_gain_ref_freq_hz)) / 1e9
+
+    def tx_directional_gain_linear(self, direction: Vec3) -> float:
+        """Directional TX power gain for launch direction."""
+        return float(self.tx_directional_gain_linear_f(direction, np.array([self.directional_gain_ref_freq_hz], dtype=float))[0])
+
+    def rx_directional_gain_linear(self, direction: Vec3) -> float:
+        """Directional RX power gain for incoming wave direction.
+
+        `direction` follows propagation (source -> receiver), so arrival look direction is `-direction`.
+        """
+        return float(self.rx_directional_gain_linear_f(direction, np.array([self.directional_gain_ref_freq_hz], dtype=float))[0])
+
+    def tx_directional_gain_linear_f(self, direction: Vec3, f_hz: NDArray[np.float64]) -> NDArray[np.float64]:
+        """Directional TX power gain per-frequency (frequency-flat by default)."""
+
+        dghz = self._freq_offset_ghz(f_hz)
+        peak = float(self.tx_peak_gain_dbi) + float(self.tx_peak_gain_dbi_slope_per_ghz) * dghz
+        expo = float(self.tx_pattern_cos_exp) + float(self.tx_pattern_cos_exp_slope_per_ghz) * dghz
+        return np.asarray([self._dir_gain_lin(direction, self.boresight, p, e) for p, e in zip(peak, expo)], dtype=float)
+
+    def rx_directional_gain_linear_f(self, direction: Vec3, f_hz: NDArray[np.float64]) -> NDArray[np.float64]:
+        """Directional RX power gain per-frequency (frequency-flat by default)."""
+
+        dghz = self._freq_offset_ghz(f_hz)
+        peak = float(self.rx_peak_gain_dbi) + float(self.rx_peak_gain_dbi_slope_per_ghz) * dghz
+        expo = float(self.rx_pattern_cos_exp) + float(self.rx_pattern_cos_exp_slope_per_ghz) * dghz
+        look = -np.asarray(direction, dtype=float)
+        return np.asarray([self._dir_gain_lin(look, self.boresight, p, e) for p, e in zip(peak, expo)], dtype=float)

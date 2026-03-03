@@ -26,7 +26,7 @@ def run_case(
     diffuse_config: dict[str, Any] | None = None,
 ):
     tx, rx = default_antennas(basis=basis, **(antenna_config or {}))
-    rx.position[:] = [params["distance_m"], 0.2, 1.5]
+    rx = rx.with_position([params["distance_m"], 0.2, 1.5])
     trace_kwargs = dict(diffuse_config or {})
     return trace_paths(
         build_scene(),

@@ -16,14 +16,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from itertools import product
-from typing import Callable, Sequence
+from typing import Callable, Iterator, Sequence
 
 import numpy as np
 from numpy.typing import NDArray
 
 from rt_core.antenna import Antenna
 from rt_core.geometry import Plane, line_plane_intersection, normalize, path_length, ray_plane_intersection, reflect_point
-from rt_core.polarization import DepolConfig, apply_depol, basis_change, depol_matrix, jones_reflection, local_sp_bases
+from rt_core.polarization import DepolConfig, apply_depol, basis_change, depol_matrix, jones_reflection, local_sp_bases, transverse_basis
 
 
 @dataclass
@@ -45,6 +45,7 @@ class PathResult:
     AoA: NDArray[np.float64]
     points: list[NDArray[np.float64]]
     segment_basis_uv: list[dict[str, list[float]]]
+    is_proxy_diffuse: bool = False
 
     @staticmethod
     def _complex_array_to_dict(x: NDArray[np.complex128]) -> dict:
@@ -62,6 +63,7 @@ class PathResult:
             "AoD": self.AoD.tolist(),
             "AoA": self.AoA.tolist(),
             "segment_basis_uv": self.segment_basis_uv,
+            "is_proxy_diffuse": bool(self.is_proxy_diffuse),
             "J_f": self._complex_array_to_dict(self.J_f),
             "scalar_gain_f": self.scalar_gain_f.tolist(),
             "G_tx_f": self._complex_array_to_dict(self.G_tx_f),
@@ -69,10 +71,45 @@ class PathResult:
         }
 
 
-def _enumerate_sequences(num_planes: int, bounce: int) -> list[tuple[int, ...]]:
+def _enumerate_sequences(
+    num_planes: int,
+    bounce: int,
+    max_candidates: int | None = None,
+    forbid_immediate_repeat: bool = False,
+) -> Iterator[tuple[int, ...]]:
     if bounce == 0:
-        return [tuple()]
-    return list(product(range(num_planes), repeat=bounce))
+        yield tuple()
+        return
+    if num_planes <= 0 or bounce < 0:
+        return
+    cap = int(max_candidates) if max_candidates is not None and int(max_candidates) > 0 else None
+    emitted = 0
+    for seq in product(range(num_planes), repeat=bounce):
+        if bool(forbid_immediate_repeat) and any(seq[i] == seq[i - 1] for i in range(1, bounce)):
+            continue
+        yield tuple(seq)
+        emitted += 1
+        if cap is not None and emitted >= cap:
+            break
+
+
+def _is_occluder_only_plane(plane: Plane) -> bool:
+    """Return True when a plane should block rays but never generate reflections.
+
+    LOS blockers are exported with absorber-like material names and dedicated IDs.
+    Keep them in occlusion checks, but remove from bounce-sequence enumeration.
+    """
+
+    try:
+        mat_name = str(getattr(plane.material, "name", "") or "").strip().lower()
+    except Exception:
+        mat_name = ""
+    pid = int(getattr(plane, "id", -1))
+    if "absorber_proxy" in mat_name or "occluder" in mat_name:
+        return True
+    if pid in {9101, 9201, 9301, 9401}:
+        return True
+    return False
 
 
 def _construct_reflection_points_source_images(
@@ -127,7 +164,12 @@ def _construct_reflection_points_receiver_images(
     return out
 
 
-def _construct_reflection_points(tx: NDArray[np.float64], rx: NDArray[np.float64], seq: Sequence[Plane]) -> list[NDArray[np.float64]] | None:
+def _construct_reflection_points(
+    tx: NDArray[np.float64],
+    rx: NDArray[np.float64],
+    seq: Sequence[Plane],
+    diagnostics: dict[str, int | float] | None = None,
+) -> list[NDArray[np.float64]] | None:
     """Solve specular reflection points for a plane sequence.
 
     We try source-image and receiver-image formulations to avoid
@@ -136,8 +178,20 @@ def _construct_reflection_points(tx: NDArray[np.float64], rx: NDArray[np.float64
 
     pts = _construct_reflection_points_source_images(tx, rx, seq)
     if pts is not None:
+        if diagnostics is not None:
+            diagnostics["construct_source_success"] = int(diagnostics.get("construct_source_success", 0)) + 1
         return pts
-    return _construct_reflection_points_receiver_images(tx, rx, seq)
+    if diagnostics is not None:
+        diagnostics["construct_source_fail"] = int(diagnostics.get("construct_source_fail", 0)) + 1
+    pts = _construct_reflection_points_receiver_images(tx, rx, seq)
+    if pts is not None:
+        if diagnostics is not None:
+            diagnostics["construct_receiver_success"] = int(diagnostics.get("construct_receiver_success", 0)) + 1
+        return pts
+    if diagnostics is not None:
+        diagnostics["construct_receiver_fail"] = int(diagnostics.get("construct_receiver_fail", 0)) + 1
+        diagnostics["reject_construct_none"] = int(diagnostics.get("reject_construct_none", 0)) + 1
+    return None
 
 
 def _path_valid(points: list[NDArray[np.float64]]) -> bool:
@@ -176,6 +230,22 @@ def _default_rho(_: dict) -> float:
     return 0.0
 
 
+def _transport_wave_basis(k_out: NDArray[np.float64], prev_basis: NDArray[np.complex128], fallback_up: NDArray[np.float64]) -> NDArray[np.complex128]:
+    """Parallel-transport-like wave basis update to reduce gauge jumps."""
+    k = normalize(np.asarray(k_out, dtype=float))
+    u_prev = np.real(np.asarray(prev_basis[:, 0], dtype=np.complex128)).astype(float)
+    v_prev = np.real(np.asarray(prev_basis[:, 1], dtype=np.complex128)).astype(float)
+    u = u_prev - float(np.dot(u_prev, k)) * k
+    if np.linalg.norm(u) < 1e-9:
+        u = v_prev - float(np.dot(v_prev, k)) * k
+    if np.linalg.norm(u) < 1e-9:
+        u, v = transverse_basis(k, np.asarray(fallback_up, dtype=float))
+        return np.column_stack([u, v]).astype(np.complex128)
+    u = normalize(u)
+    v = normalize(np.cross(k, u))
+    return np.column_stack([u, v]).astype(np.complex128)
+
+
 def _segment_blocked(
     a: NDArray[np.float64],
     b: NDArray[np.float64],
@@ -212,10 +282,22 @@ def _path_occluded(points: list[NDArray[np.float64]], planes: Sequence[Plane], s
     return False
 
 
-def _path_key(points: list[NDArray[np.float64]], seq: Sequence[Plane], tau_s: float) -> tuple:
+def _path_key(
+    points: list[NDArray[np.float64]],
+    seq: Sequence[Plane],
+    tau_s: float,
+    point_tol_m: float = 1e-7,
+    tau_tol_s: float = 1e-13,
+) -> tuple:
     sid = tuple(pl.id for pl in seq)
-    pflat = tuple(tuple(np.round(p, 6).tolist()) for p in points[1:-1])
-    return (sid, pflat, round(float(tau_s), 12))
+    ptol = float(max(abs(float(point_tol_m)), 1e-12))
+    ttol = float(max(abs(float(tau_tol_s)), 1e-18))
+    pflat = tuple(
+        tuple(int(np.rint(float(x) / ptol)) for x in np.asarray(p, dtype=float))
+        for p in points[1:-1]
+    )
+    tau_q = int(np.rint(float(tau_s) / ttol))
+    return (sid, pflat, tau_q)
 
 
 def trace_paths(
@@ -235,8 +317,14 @@ def trace_paths(
     diffuse_lobe_alpha: float = 8.0,
     diffuse_rays_per_hit: int = 0,
     diffuse_seed: int = 0,
+    wave_basis_mode: str = "transport",
     min_path_power_db: float | None = None,
     max_paths_per_case: int | None = None,
+    max_sequence_candidates_per_bounce: int | None = None,
+    forbid_immediate_surface_repeat: bool = False,
+    dedup_point_tol_m: float = 1e-7,
+    dedup_tau_tol_s: float = 1e-13,
+    diagnostics: dict[str, int | float] | None = None,
 ) -> list[PathResult]:
     """Trace paths and return per-path delay and 2x2 transfer matrix over frequency."""
 
@@ -244,6 +332,9 @@ def trace_paths(
         raise ValueError("max_bounce must be >= 0")
 
     dep = depol or DepolConfig(enabled=False)
+    wb_mode = str(wave_basis_mode).strip().lower()
+    if wb_mode not in {"transport", "global_up"}:
+        raise ValueError("wave_basis_mode must be one of: transport, global_up")
     rng = np.random.default_rng(dep.seed)
     drng = np.random.default_rng(int(diffuse_seed))
     rho_fn: Callable[[dict], float] = dep.rho_func or _default_rho
@@ -253,21 +344,51 @@ def trace_paths(
     results: list[PathResult] = []
     seen: set[tuple] = set()
     plate_eps = 1e-6
+    # Use all planes for occlusion checks, but only reflective planes for bounce generation.
+    reflective_planes = [pl for pl in planes if not _is_occluder_only_plane(pl)]
+    diag = diagnostics if diagnostics is not None else {}
+    diag["num_planes_total"] = int(len(planes))
+    diag["num_planes_reflective"] = int(len(reflective_planes))
+    diag["path_results_total"] = 0
+    diag["path_results_diffuse"] = 0
 
     for b in range(max_bounce + 1):
         if b == 0 and not los_enabled:
             continue
-        for idx_seq in _enumerate_sequences(len(planes), b):
-            seq = [planes[i] for i in idx_seq]
-            points = _construct_reflection_points(tx.position, rx.position, seq)
-            if points is None or not _path_valid(points):
+        if b > 0 and len(reflective_planes) == 0:
+            continue
+        total_candidates = int((len(reflective_planes) ** b) if b > 0 else 1)
+        cap = int(max_sequence_candidates_per_bounce) if max_sequence_candidates_per_bounce is not None and int(max_sequence_candidates_per_bounce) > 0 else None
+        diag[f"sequence_candidates_total_b{b}"] = total_candidates
+        if cap is not None and total_candidates > cap:
+            diag[f"sequence_candidates_truncated_b{b}"] = 1
+            diag[f"sequence_candidates_cap_b{b}"] = cap
+        for idx_seq in _enumerate_sequences(
+            len(reflective_planes),
+            b,
+            max_candidates=max_sequence_candidates_per_bounce,
+            forbid_immediate_repeat=forbid_immediate_surface_repeat,
+        ):
+            diag["sequence_candidates_emitted"] = int(diag.get("sequence_candidates_emitted", 0)) + 1
+            seq = [reflective_planes[i] for i in idx_seq]
+            points = _construct_reflection_points(tx.position, rx.position, seq, diagnostics=diag)
+            if points is None:
+                continue
+            if not _path_valid(points):
+                diag["reject_path_valid"] = int(diag.get("reject_path_valid", 0)) + 1
                 continue
             points = _fit_reflection_points_to_bounds(points, seq, eps=plate_eps, clamp_tol=plate_eps)
-            if points is None or not _path_valid(points):
+            if points is None:
+                diag["reject_bounds_fit"] = int(diag.get("reject_bounds_fit", 0)) + 1
+                continue
+            if not _path_valid(points):
+                diag["reject_path_valid_postfit"] = int(diag.get("reject_path_valid_postfit", 0)) + 1
                 continue
             if any(not seq[i].contains_point(points[i + 1], eps=plate_eps) for i in range(len(seq))):
+                diag["reject_contains_bounds"] = int(diag.get("reject_contains_bounds", 0)) + 1
                 continue
             if _path_occluded(points, planes, seq, eps=plate_eps):
+                diag["reject_occluded"] = int(diag.get("reject_occluded", 0)) + 1
                 continue
 
             dirs = [normalize(points[i + 1] - points[i]) for i in range(len(points) - 1)]
@@ -275,15 +396,29 @@ def trace_paths(
             if total_len <= 0.0:
                 continue
             tau = total_len / c0
-            key = _path_key(points, seq, tau)
+            key = _path_key(
+                points,
+                seq,
+                tau,
+                point_tol_m=float(dedup_point_tol_m),
+                tau_tol_s=float(dedup_tau_tol_s),
+            )
             if key in seen:
+                diag["reject_dedup"] = int(diag.get("reject_dedup", 0)) + 1
                 continue
             seen.add(key)
 
             if use_fspl:
+                # Amplitude-domain Friis factor (lambda/4piR). Power scaling is its squared magnitude.
+                # Directional antenna gain is injected below as sqrt(G_tx * G_rx).
                 scalar_gain_f = (c0 / freq) / (4.0 * np.pi * total_len)
             else:
                 scalar_gain_f = np.full(n_f, 1.0 / total_len, dtype=float)
+            # Optional directional pattern gain (power) from antenna boresight model.
+            # Defaults are isotropic (G_tx=G_rx=1), preserving existing behavior.
+            g_tx_dir_f = np.asarray(tx.tx_directional_gain_linear_f(dirs[0], freq), dtype=float)
+            g_rx_dir_f = np.asarray(rx.rx_directional_gain_linear_f(dirs[-1], freq), dtype=float)
+            scalar_gain_f = scalar_gain_f * np.sqrt(np.maximum(g_tx_dir_f * g_rx_dir_f, 0.0))
 
             wave_basis = tx.wave_basis(dirs[0])
             J = np.repeat(np.eye(2, dtype=np.complex128)[None, :, :], n_f, axis=0)
@@ -310,14 +445,14 @@ def trace_paths(
                 sp_out = np.column_stack([s_out, p_out]).astype(np.complex128)
 
                 t_in = basis_change(wave_basis, sp_in)
-                next_basis = tx.wave_basis(k_out)
+                if wb_mode == "global_up":
+                    next_basis = tx.wave_basis(k_out)
+                else:
+                    next_basis = _transport_wave_basis(k_out, wave_basis, tx.global_up)
                 t_out = basis_change(next_basis, sp_out)
                 r_f = jones_reflection(pl.material, theta_i, freq)
 
-                updated = np.zeros_like(J)
-                for k in range(n_f):
-                    updated[k] = t_out.conj().T @ r_f[k] @ t_in @ J[k]
-                J = updated
+                J = np.einsum("ab,kbc,cd,kde->kae", t_out.conj().T, r_f, t_in, J).astype(np.complex128)
                 wave_basis = next_basis
                 seg_basis_uv.append(
                     {
@@ -369,9 +504,16 @@ def trace_paths(
                     AoA=dirs[-1],
                     points=[np.asarray(p, dtype=float) for p in points],
                     segment_basis_uv=seg_basis_uv,
+                    is_proxy_diffuse=False,
                 )
             )
+            diag["path_results_total"] = int(diag.get("path_results_total", 0)) + 1
             if diffuse_enabled and b > 0 and diffuse_factor > 0.0 and diffuse_rays_per_hit > 0:
+                # NOTE:
+                # Current diffuse branch is an empirical proxy, not a geometric BRDF scatter solver.
+                # It perturbs polarization (SU(2) mixer) and excess delay/power around the parent
+                # specular path while preserving parent AoD/AoA/path vertices.
+                # Use for stress/sensitivity studies, not absolute scatter-angle validation.
                 nrho = float(np.clip(diffuse_factor, 0.0, 1.0))
                 if str(diffuse_model).lower() == "directive":
                     jitter_ns = 0.08 / np.sqrt(max(diffuse_lobe_alpha, 1e-6))
@@ -410,8 +552,11 @@ def trace_paths(
                             AoA=dirs[-1],
                             points=[np.asarray(p, dtype=float) for p in points],
                             segment_basis_uv=seg_basis_uv,
+                            is_proxy_diffuse=True,
                         )
                     )
+                    diag["path_results_total"] = int(diag.get("path_results_total", 0)) + 1
+                    diag["path_results_diffuse"] = int(diag.get("path_results_diffuse", 0)) + 1
 
     if min_path_power_db is not None:
         pmin = float(min_path_power_db)

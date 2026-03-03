@@ -7,6 +7,7 @@ Example:
 from __future__ import annotations
 
 import argparse
+import csv
 import inspect
 import json
 from pathlib import Path
@@ -16,10 +17,13 @@ import sys
 from typing import Any
 
 import numpy as np
+import matplotlib.pyplot as plt
 
+from analysis.dualcp_metrics import compute_dualcp_metrics_from_rt_paths
 from analysis.reciprocity import reciprocity_sanity
 from analysis.measurement_compare import (
     compare_measured_to_dataset,
+    load_measurement_dualcp_two_csv,
     load_measurement_four_csv,
     load_measurement_matrix_csv,
 )
@@ -139,6 +143,102 @@ def _gof_by_bucket(
     return out
 
 
+def _parse_float_list(raw: str | None) -> list[float]:
+    if raw is None:
+        return []
+    out: list[float] = []
+    for tok in str(raw).split(","):
+        s = tok.strip()
+        if not s:
+            continue
+        try:
+            out.append(float(s))
+        except ValueError:
+            continue
+    return out
+
+
+def _load_json_file(path: str | Path | None) -> dict[str, Any] | None:
+    if not path:
+        return None
+    p = Path(path)
+    if not p.exists():
+        raise ValueError(f"JSON file not found: {p}")
+    obj = json.loads(p.read_text(encoding="utf-8"))
+    if not isinstance(obj, dict):
+        raise ValueError(f"JSON root must be object: {p}")
+    return obj
+
+
+def _scalar_csv_value(v: Any) -> Any:
+    if isinstance(v, (str, int, float, bool, np.bool_)):
+        return v
+    if isinstance(v, np.generic):
+        return v.item()
+    return None
+
+
+def _write_dualcp_outputs(
+    rows: list[dict[str, Any]],
+    out_csv: Path,
+    out_json: Path,
+    meta: dict[str, Any],
+) -> None:
+    out_csv.parent.mkdir(parents=True, exist_ok=True)
+    out_json.parent.mkdir(parents=True, exist_ok=True)
+
+    keys = sorted(
+        {
+            k
+            for r in rows
+            for k, v in r.items()
+            if _scalar_csv_value(v) is not None
+        }
+    )
+    with out_csv.open("w", encoding="utf-8", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=keys)
+        w.writeheader()
+        for r in rows:
+            w.writerow({k: _scalar_csv_value(r.get(k)) for k in keys})
+
+    payload = {"meta": meta, "rows": rows}
+    out_json.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
+
+
+def _plot_dualcp_metrics(rows: list[dict[str, Any]], out_dir: Path) -> dict[str, str]:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    x = np.arange(len(rows), dtype=int)
+    xpd_e = np.asarray([float(r.get("xpd_early_db", np.nan)) for r in rows], dtype=float)
+    xpd_l = np.asarray([float(r.get("xpd_late_db", np.nan)) for r in rows], dtype=float)
+    tau_rms = np.asarray([float(r.get("tau_rms_ns", np.nan)) for r in rows], dtype=float)
+
+    fig, ax = plt.subplots(figsize=(9, 4))
+    ax.plot(x, xpd_e, "o-", label="XPD early")
+    ax.plot(x, xpd_l, "s-", label="XPD late")
+    ax.set_xlabel("case index")
+    ax.set_ylabel("XPD [dB]")
+    ax.set_title("Dual-CP XPD Early/Late by Case")
+    ax.grid(True, alpha=0.3)
+    ax.legend(fontsize=8)
+    fig.tight_layout()
+    p1 = out_dir / "dualcp_metrics_xpd.png"
+    fig.savefig(p1, dpi=180)
+    plt.close(fig)
+
+    fig2, ax2 = plt.subplots(figsize=(9, 4))
+    ax2.plot(x, tau_rms, "o-", color="tab:green", label="tau_rms")
+    ax2.set_xlabel("case index")
+    ax2.set_ylabel("tau_rms [ns]")
+    ax2.set_title("Dual-CP Delay Spread by Case")
+    ax2.grid(True, alpha=0.3)
+    ax2.legend(fontsize=8)
+    fig2.tight_layout()
+    p2 = out_dir / "dualcp_metrics_delay.png"
+    fig2.savefig(p2, dpi=180)
+    plt.close(fig2)
+    return {"xpd_plot": str(p1), "delay_plot": str(p2)}
+
+
 def _git_meta() -> tuple[str, bool]:
     try:
         commit = subprocess.check_output(["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL, text=True).strip()
@@ -254,6 +354,13 @@ def _antennas_from_points(
         cross_pol_leakage_db=float(antenna_config.get("tx_cross_pol_leakage_db", 35.0)),
         axial_ratio_db=float(antenna_config.get("tx_axial_ratio_db", 0.0)),
         enable_coupling=bool(antenna_config.get("enable_coupling", True)),
+        coupling_ref_freq_hz=float(antenna_config.get("tx_coupling_ref_freq_hz", 8.0e9)),
+        cross_pol_leakage_db_slope_per_ghz=float(antenna_config.get("tx_cross_pol_leakage_db_slope_per_ghz", 0.0)),
+        axial_ratio_db_slope_per_ghz=float(antenna_config.get("tx_axial_ratio_db_slope_per_ghz", 0.0)),
+        cross_coupling_phase_deg=float(antenna_config.get("tx_cross_coupling_phase_deg", 0.0)),
+        cross_coupling_phase_slope_deg_per_ghz=float(antenna_config.get("tx_cross_coupling_phase_slope_deg_per_ghz", 0.0)),
+        tx_peak_gain_dbi=float(antenna_config.get("tx_peak_gain_dbi", 0.0)),
+        tx_pattern_cos_exp=float(antenna_config.get("tx_pattern_cos_exp", 0.0)),
     )
     rx = Antenna(
         position=np.asarray(rx_pos, dtype=float),
@@ -265,6 +372,13 @@ def _antennas_from_points(
         cross_pol_leakage_db=float(antenna_config.get("rx_cross_pol_leakage_db", 35.0)),
         axial_ratio_db=float(antenna_config.get("rx_axial_ratio_db", 0.0)),
         enable_coupling=bool(antenna_config.get("enable_coupling", True)),
+        coupling_ref_freq_hz=float(antenna_config.get("rx_coupling_ref_freq_hz", 8.0e9)),
+        cross_pol_leakage_db_slope_per_ghz=float(antenna_config.get("rx_cross_pol_leakage_db_slope_per_ghz", 0.0)),
+        axial_ratio_db_slope_per_ghz=float(antenna_config.get("rx_axial_ratio_db_slope_per_ghz", 0.0)),
+        cross_coupling_phase_deg=float(antenna_config.get("rx_cross_coupling_phase_deg", 0.0)),
+        cross_coupling_phase_slope_deg_per_ghz=float(antenna_config.get("rx_cross_coupling_phase_slope_deg_per_ghz", 0.0)),
+        rx_peak_gain_dbi=float(antenna_config.get("rx_peak_gain_dbi", 0.0)),
+        rx_pattern_cos_exp=float(antenna_config.get("rx_pattern_cos_exp", 0.0)),
     )
     return tx, rx
 
@@ -1391,6 +1505,20 @@ def main() -> None:
     parser.add_argument("--rx-cross-pol-leakage-db", type=float, default=35.0)
     parser.add_argument("--tx-axial-ratio-db", type=float, default=0.0)
     parser.add_argument("--rx-axial-ratio-db", type=float, default=0.0)
+    parser.add_argument("--tx-coupling-ref-freq-hz", type=float, default=8.0e9)
+    parser.add_argument("--rx-coupling-ref-freq-hz", type=float, default=8.0e9)
+    parser.add_argument("--tx-cross-pol-leakage-db-slope-per-ghz", type=float, default=0.0)
+    parser.add_argument("--rx-cross-pol-leakage-db-slope-per-ghz", type=float, default=0.0)
+    parser.add_argument("--tx-axial-ratio-db-slope-per-ghz", type=float, default=0.0)
+    parser.add_argument("--rx-axial-ratio-db-slope-per-ghz", type=float, default=0.0)
+    parser.add_argument("--tx-cross-coupling-phase-deg", type=float, default=0.0)
+    parser.add_argument("--rx-cross-coupling-phase-deg", type=float, default=0.0)
+    parser.add_argument("--tx-cross-coupling-phase-slope-deg-per-ghz", type=float, default=0.0)
+    parser.add_argument("--rx-cross-coupling-phase-slope-deg-per-ghz", type=float, default=0.0)
+    parser.add_argument("--tx-peak-gain-dbi", type=float, default=0.0)
+    parser.add_argument("--rx-peak-gain-dbi", type=float, default=0.0)
+    parser.add_argument("--tx-pattern-cos-exp", type=float, default=0.0)
+    parser.add_argument("--rx-pattern-cos-exp", type=float, default=0.0)
     parser.add_argument("--disable-antenna-coupling", action="store_true")
     parser.add_argument("--physics-validation-mode", action="store_true")
     parser.add_argument("--materials-db", type=str, default=None)
@@ -1402,8 +1530,14 @@ def main() -> None:
     parser.add_argument("--diffuse-lobe-alpha", type=float, default=8.0)
     parser.add_argument("--diffuse-rays-per-hit", type=int, default=0)
     parser.add_argument("--diffuse-seed", type=int, default=0)
+    parser.add_argument("--wave-basis-mode", type=str, default="transport", choices=["transport", "global_up"])
+    parser.add_argument("--allow-proxy-diffuse-release", action="store_true")
     parser.add_argument("--min-path-power-db", type=float, default=None)
     parser.add_argument("--max-paths-per-case", type=int, default=None)
+    parser.add_argument("--max-sequence-candidates-per-bounce", type=int, default=None)
+    parser.add_argument("--forbid-immediate-surface-repeat", action="store_true")
+    parser.add_argument("--dedup-point-tol-m", type=float, default=1e-7)
+    parser.add_argument("--dedup-tau-tol-s", type=float, default=1e-13)
     parser.add_argument("--force-cp-swap-on-odd-reflection", action="store_true")
     parser.add_argument("--model-compare", dest="model_compare", action="store_true")
     parser.add_argument("--no-model-compare", dest="model_compare", action="store_false")
@@ -1423,12 +1557,19 @@ def main() -> None:
     parser.add_argument("--model-offdiag-amp-ratio-min", type=float, default=1e-3)
     parser.add_argument("--model-seed", type=int, default=0)
     parser.add_argument("--measurement-compare", action="store_true")
-    parser.add_argument("--measurement-format", type=str, default="matrix_csv", choices=["matrix_csv", "four_csv"])
+    parser.add_argument(
+        "--measurement-format",
+        type=str,
+        default="matrix_csv",
+        choices=["matrix_csv", "four_csv", "dualcp_two_csv"],
+    )
     parser.add_argument("--measurement-matrix-csv", type=str, default=None)
     parser.add_argument("--measurement-hh-csv", type=str, default=None)
     parser.add_argument("--measurement-hv-csv", type=str, default=None)
     parser.add_argument("--measurement-vh-csv", type=str, default=None)
     parser.add_argument("--measurement-vv-csv", type=str, default=None)
+    parser.add_argument("--measurement-co-csv", type=str, default=None)
+    parser.add_argument("--measurement-cross-csv", type=str, default=None)
     parser.add_argument("--measurement-scenario", type=str, default=None)
     parser.add_argument("--measurement-case", type=str, default=None)
     parser.add_argument(
@@ -1442,6 +1583,19 @@ def main() -> None:
     parser.add_argument("--measurement-eval-basis", type=str, default=None, choices=["linear", "circular"])
     parser.add_argument("--measurement-eval-convention", type=str, default=None)
     parser.add_argument("--measurement-plots-dir", type=str, default=None)
+    parser.add_argument("--dualcp-metrics", type=str, default="off", choices=["on", "off"])
+    parser.add_argument("--dualcp-metrics-csv", type=str, default="outputs/dualcp_metrics.csv")
+    parser.add_argument("--dualcp-metrics-json", type=str, default="outputs/dualcp_metrics.json")
+    parser.add_argument("--calibration-floor-json", type=str, default=None)
+    parser.add_argument("--early-window-ns", type=float, default=3.0)
+    parser.add_argument("--early-window-sensitivity-ns", type=str, default="")
+    parser.add_argument("--tmax-ns", type=float, default=30.0)
+    parser.add_argument("--noise-tail-ns", type=float, default=8.0)
+    parser.add_argument("--threshold-db", type=float, default=6.0)
+    parser.add_argument("--dualcp-metrics-nfft", type=int, default=2048)
+    parser.add_argument("--dualcp-metrics-window", type=str, default="hann", choices=["hann", "kaiser", "none"])
+    parser.add_argument("--dualcp-delay-spread-source", type=str, default="total", choices=["total", "co"])
+    parser.add_argument("--dualcp-detect-power", type=str, default="total", choices=["total", "co"])
     parser.add_argument("--release-mode", action="store_true")
     parser.add_argument("--reciprocity-scenarios", type=str, default="all")
     parser.add_argument("--reciprocity-tau-tol-s", type=float, default=1e-12)
@@ -1470,6 +1624,10 @@ def main() -> None:
             args.min_path_power_db = -120.0
         if args.max_paths_per_case is None:
             args.max_paths_per_case = 256
+        if args.max_sequence_candidates_per_bounce is None:
+            args.max_sequence_candidates_per_bounce = 50000
+        if not bool(args.forbid_immediate_surface_repeat):
+            args.forbid_immediate_surface_repeat = True
 
     if bool(args.release_mode):
         _, dirty_now = _git_meta()
@@ -1477,6 +1635,12 @@ def main() -> None:
             raise SystemExit("release-mode failed: git working tree is dirty. Commit/stash changes and rerun.")
         if str(args.model_phase_sampling_method).strip().lower() == "iid":
             args.model_phase_sampling_method = "stratified_uniform"
+        if bool(str(args.diffuse).lower() == "on") and not bool(args.allow_proxy_diffuse_release):
+            raise SystemExit(
+                "release-mode failed: diffuse currently uses proxy_jones_jitter model "
+                "(no geometric BRDF direction synthesis). "
+                "Use --allow-proxy-diffuse-release to acknowledge and continue."
+            )
 
     antenna_config = {
         "convention": args.convention,
@@ -1484,6 +1648,20 @@ def main() -> None:
         "rx_cross_pol_leakage_db": args.rx_cross_pol_leakage_db,
         "tx_axial_ratio_db": args.tx_axial_ratio_db,
         "rx_axial_ratio_db": args.rx_axial_ratio_db,
+        "tx_coupling_ref_freq_hz": args.tx_coupling_ref_freq_hz,
+        "rx_coupling_ref_freq_hz": args.rx_coupling_ref_freq_hz,
+        "tx_cross_pol_leakage_db_slope_per_ghz": args.tx_cross_pol_leakage_db_slope_per_ghz,
+        "rx_cross_pol_leakage_db_slope_per_ghz": args.rx_cross_pol_leakage_db_slope_per_ghz,
+        "tx_axial_ratio_db_slope_per_ghz": args.tx_axial_ratio_db_slope_per_ghz,
+        "rx_axial_ratio_db_slope_per_ghz": args.rx_axial_ratio_db_slope_per_ghz,
+        "tx_cross_coupling_phase_deg": args.tx_cross_coupling_phase_deg,
+        "rx_cross_coupling_phase_deg": args.rx_cross_coupling_phase_deg,
+        "tx_cross_coupling_phase_slope_deg_per_ghz": args.tx_cross_coupling_phase_slope_deg_per_ghz,
+        "rx_cross_coupling_phase_slope_deg_per_ghz": args.rx_cross_coupling_phase_slope_deg_per_ghz,
+        "tx_peak_gain_dbi": args.tx_peak_gain_dbi,
+        "rx_peak_gain_dbi": args.rx_peak_gain_dbi,
+        "tx_pattern_cos_exp": args.tx_pattern_cos_exp,
+        "rx_pattern_cos_exp": args.rx_pattern_cos_exp,
         "enable_coupling": not args.disable_antenna_coupling,
     }
     if args.physics_validation_mode:
@@ -1491,6 +1669,18 @@ def main() -> None:
         antenna_config["rx_cross_pol_leakage_db"] = 120.0
         antenna_config["tx_axial_ratio_db"] = 0.0
         antenna_config["rx_axial_ratio_db"] = 0.0
+        antenna_config["tx_cross_pol_leakage_db_slope_per_ghz"] = 0.0
+        antenna_config["rx_cross_pol_leakage_db_slope_per_ghz"] = 0.0
+        antenna_config["tx_axial_ratio_db_slope_per_ghz"] = 0.0
+        antenna_config["rx_axial_ratio_db_slope_per_ghz"] = 0.0
+        antenna_config["tx_cross_coupling_phase_deg"] = 0.0
+        antenna_config["rx_cross_coupling_phase_deg"] = 0.0
+        antenna_config["tx_cross_coupling_phase_slope_deg_per_ghz"] = 0.0
+        antenna_config["rx_cross_coupling_phase_slope_deg_per_ghz"] = 0.0
+        antenna_config["tx_peak_gain_dbi"] = 0.0
+        antenna_config["rx_peak_gain_dbi"] = 0.0
+        antenna_config["tx_pattern_cos_exp"] = 0.0
+        antenna_config["rx_pattern_cos_exp"] = 0.0
         antenna_config["enable_coupling"] = False
 
     run_scenarios = None
@@ -1500,17 +1690,31 @@ def main() -> None:
     diffuse_cfg: dict[str, Any] = {
         "diffuse_enabled": bool(str(args.diffuse).lower() == "on"),
         "diffuse_model": str(args.diffuse_model),
+        "diffuse_physics_model": "proxy_jones_jitter_v1",
+        "wave_basis_mode": str(args.wave_basis_mode),
         "diffuse_factor": float(max(0.0, min(1.0, args.diffuse_factor))),
         "diffuse_lobe_alpha": float(max(args.diffuse_lobe_alpha, 1e-6)),
         "diffuse_rays_per_hit": int(max(0, args.diffuse_rays_per_hit)),
         "diffuse_seed": int(args.diffuse_seed),
+        "release_proxy_ack": bool(args.allow_proxy_diffuse_release),
         "min_path_power_db": (float(args.min_path_power_db) if args.min_path_power_db is not None else None),
         "max_paths_per_case": (int(args.max_paths_per_case) if args.max_paths_per_case is not None else None),
+        "max_sequence_candidates_per_bounce": (
+            int(args.max_sequence_candidates_per_bounce)
+            if args.max_sequence_candidates_per_bounce is not None
+            else None
+        ),
+        "forbid_immediate_surface_repeat": bool(args.forbid_immediate_surface_repeat),
+        "dedup_point_tol_m": float(max(abs(float(args.dedup_point_tol_m)), 1e-12)),
+        "dedup_tau_tol_s": float(max(abs(float(args.dedup_tau_tol_s)), 1e-18)),
     }
 
     bases = _parse_bases(args.basis, args.bases)
     multi = len(bases) > 1
     release_gate_failures: list[str] = []
+    dualcp_on = str(args.dualcp_metrics).lower() == "on"
+    dualcp_floor = _load_json_file(args.calibration_floor_json) if args.calibration_floor_json else None
+    dualcp_sens = tuple(_parse_float_list(args.early_window_sensitivity_ns))
 
     for b in bases:
         data = build_dataset(
@@ -1659,7 +1863,7 @@ def main() -> None:
                 if not args.measurement_matrix_csv:
                     raise SystemExit("--measurement-matrix-csv is required when --measurement-format matrix_csv")
                 measurement = load_measurement_matrix_csv(args.measurement_matrix_csv)
-            else:
+            elif args.measurement_format == "four_csv":
                 req = [args.measurement_hh_csv, args.measurement_hv_csv, args.measurement_vh_csv, args.measurement_vv_csv]
                 if any(x is None for x in req):
                     raise SystemExit(
@@ -1671,6 +1875,15 @@ def main() -> None:
                     args.measurement_hv_csv,
                     args.measurement_vh_csv,
                     args.measurement_vv_csv,
+                )
+            else:
+                if args.measurement_co_csv is None or args.measurement_cross_csv is None:
+                    raise SystemExit(
+                        "--measurement-co-csv/--measurement-cross-csv are required when --measurement-format dualcp_two_csv"
+                    )
+                measurement = load_measurement_dualcp_two_csv(
+                    co_csv=args.measurement_co_csv,
+                    cross_csv=args.measurement_cross_csv,
                 )
             if args.measurement_plots_dir:
                 meas_plot_dir = _basis_output_dir(args.measurement_plots_dir, b, multi)
@@ -1694,6 +1907,88 @@ def main() -> None:
                 out_dir=meas_plot_dir,
                 create_plots=True,
             )
+
+        dualcp_rows: list[dict[str, Any]] = []
+        dualcp_meta: dict[str, Any] | None = None
+        if dualcp_on:
+            freq = np.asarray(data["frequency"], dtype=float)
+            dualcp_params = {
+                "nfft": int(max(64, args.dualcp_metrics_nfft)),
+                "window": str(args.dualcp_metrics_window),
+                "early_window_ns": float(max(0.0, args.early_window_ns)),
+                "early_window_sensitivity_ns": list(dualcp_sens),
+                "tmax_ns": float(max(0.0, args.tmax_ns)),
+                "noise_tail_ns": float(max(0.0, args.noise_tail_ns)),
+                "threshold_db": float(args.threshold_db),
+                "detect_power": str(args.dualcp_detect_power),
+                "delay_spread_source": str(args.dualcp_delay_spread_source),
+                "eval_basis": "circular",
+                "convention": str(args.convention),
+            }
+            for sid, sc in data.get("scenarios", {}).items():
+                for cid, case in sc.get("cases", {}).items():
+                    paths = case.get("paths", [])
+                    m = compute_dualcp_metrics_from_rt_paths(
+                        paths=paths,
+                        f_hz=freq,
+                        params=dualcp_params,
+                        matrix_source=str(args.xpd_matrix_source),
+                        input_basis=str(b),
+                        eval_basis="circular",
+                        convention=str(args.convention),
+                        calibration_floor=dualcp_floor,
+                    )
+                    m["scenario_id"] = str(sid)
+                    m["case_id"] = str(cid)
+                    m["path_count"] = int(len(paths))
+                    params_case = case.get("params", {}) or {}
+                    m["material"] = str(params_case.get("material", "NA"))
+                    m["scatter_stress"] = str(params_case.get("scatter_stress", params_case.get("stress", "NA")))
+                    if "distance_d_m" in params_case:
+                        m["distance_d_m"] = float(params_case.get("distance_d_m"))
+                    elif paths and np.isfinite(float(paths[0].get("path_length_m", np.nan))):
+                        m["distance_d_m"] = float(paths[0].get("path_length_m"))
+                    has_los = bool(any(int((p.get("meta", {}) or {}).get("bounce_count", 0)) == 0 for p in paths))
+                    m["los_blocked"] = int(not has_los)
+                    if paths:
+                        pwr = np.asarray([_path_power(p, matrix_source=str(args.xpd_matrix_source)) for p in paths], dtype=float)
+                        j = int(np.argmax(pwr))
+                        meta_j = (paths[j].get("meta", {}) or {})
+                        bc = int(meta_j.get("bounce_count", 0))
+                        m["bounce_count"] = bc
+                        m["parity"] = "even" if (bc % 2 == 0) else "odd"
+                        m["incidence_angle_bin"] = incidence_angle_bin_label(
+                            meta_j.get("incidence_angles", []),
+                            bins_deg=[0.0, 20.0, 40.0, 60.0, 90.0],
+                        )
+                    else:
+                        m["bounce_count"] = -1
+                        m["parity"] = "NA"
+                        m["incidence_angle_bin"] = "NA"
+                    pwr_lin = max(float(m.get("window_energy_total", 0.0)), 1e-18)
+                    m["pathloss_proxy_db"] = float(10.0 * np.log10(pwr_lin))
+                    m["excess_loss_proxy_db"] = float(-10.0 * np.log10(pwr_lin))
+                    dualcp_rows.append(m)
+
+            dualcp_csv = _basis_output_path(args.dualcp_metrics_csv, b, multi)
+            dualcp_json = _basis_output_path(args.dualcp_metrics_json, b, multi)
+            dualcp_plots = _plot_dualcp_metrics(dualcp_rows, out_dir=Path(out_plot) / "dualcp_metrics") if dualcp_rows else {}
+            dualcp_meta = {
+                "enabled": True,
+                "n_cases": int(len(dualcp_rows)),
+                "params": dualcp_params,
+                "calibration_floor_json": str(args.calibration_floor_json or ""),
+                "basis_input": str(b),
+                "basis_eval": "circular",
+                "convention": str(args.convention),
+                "plots": dualcp_plots,
+            }
+            _write_dualcp_outputs(dualcp_rows, out_csv=dualcp_csv, out_json=dualcp_json, meta=dualcp_meta)
+            data.setdefault("meta", {})["dualcp_metrics_outputs"] = {
+                "csv": str(dualcp_csv),
+                "json": str(dualcp_json),
+                "plots": dualcp_plots,
+            }
 
         report_path = build_quality_report(
             data,

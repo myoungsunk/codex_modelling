@@ -1,0 +1,47 @@
+{
+  "run_group": "report_20260227_current",
+  "input_runs": [
+    "outputs/step1_diag/C0",
+    "outputs/step4_controlled/a2",
+    "outputs/step1_diag/A3_tuned",
+    "outputs/step1_diag/A4_tuned2",
+    "outputs/step1_diag/A5_base",
+    "outputs/step1_diag/A5_stress",
+    "outputs/step1_diag/B1",
+    "outputs/step1_diag/B2_far",
+    "outputs/step1_diag/B3_far"
+  ],
+  "scenario_map": {},
+  "floor_policy": {
+    "mode": "from_C0",
+    "delta_method": "p5_p95"
+  },
+  "windows": {
+    "Te_ns": 10.0,
+    "Tmax_ns": 200.0,
+    "tau0_method": "threshold",
+    "noise_tail_ns": 50.0,
+    "threshold_margin_db": 6.0
+  },
+  "measurement_sweep": {
+    "BW_Hz": 1000000000.0,
+    "df_Hz": 1000000.0
+  },
+  "plots": {
+    "max_links_for_pdp_examples": 3,
+    "pdp_example_selection": "highest_energy"
+  },
+  "stats": {
+    "alpha": 0.05,
+    "bootstrap_n": 1000
+  },
+  "scene_plots": {
+    "enabled": true,
+    "source": "scene_debug_json",
+    "debug_rays_k": 20,
+    "ray_selection": "top_power",
+    "max_cases_per_scenario": 8,
+    "figure_size": [10, 6],
+    "save_format": "png"
+  }
+}

@@ -1,0 +1,5 @@
+plot_id,series,scenario_id,case_id,link_id,x,y,data,meta
+G3-3,var_XPD_early_excess_db,A2,,,A2,1.4392039473266426e-14,1.4392039473266426e-14,
+G3-3,var_XPD_early_excess_db,A3,,,A3,38.49275133426841,38.49275133426841,
+G3-3,var_XPD_early_excess_db,A4,,,A4,11.339444541163722,11.339444541163722,
+G3-3,var_XPD_early_excess_db,A5,,,A5,10.181340708560906,10.181340708560906,

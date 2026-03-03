@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Literal
+import warnings
 
 import h5py
 import numpy as np
@@ -99,7 +100,20 @@ def ctf_to_cir(
     nfft: int | None = None,
     window: WindowName = "hann",
     kaiser_beta: float = 8.0,
+    nonuniform_warn_rel_max: float = 1e-3,
 ) -> tuple[NDArray[np.complex128], NDArray[np.float64]]:
+    """Convert sampled CTF on measured RF band to delay-domain CIR taps.
+
+    Notes on interpretation:
+    - This IFFT is performed on the available frequency grid only (often band-limited,
+      e.g. 6-10 GHz). It is *not* a full 0..F Nyquist/baseband reconstruction.
+    - Delay tap spacing is set by total FFT span in frequency-sample domain:
+      `dt = 1 / (nfft * df)`.
+    - Multipath separability is fundamentally bandwidth-limited (roughly `~1/BW` main-lobe
+      scale, BW = f_max - f_min), regardless of zero padding.
+    - If `f_hz` is non-uniform, this routine still assumes quasi-uniform spacing and uses
+      median `df`; use with caution.
+    """
     freq = np.asarray(f_hz, dtype=float)
     n = len(freq)
     m = int(nfft or n)
@@ -119,7 +133,21 @@ def ctf_to_cir(
         hw = np.concatenate([hw, pad], axis=0)
 
     h_tau = np.fft.ifft(hw, axis=0)
-    df = float(freq[1] - freq[0]) if n > 1 else 1.0
+    if n > 1:
+        dff = np.diff(freq)
+        df = float(np.median(dff))
+        rel = np.abs((dff - df) / max(abs(df), 1e-30))
+        if float(np.max(rel)) > float(max(nonuniform_warn_rel_max, 0.0)):
+            warnings.warn(
+                (
+                    "ctf_to_cir() received nonuniform frequency grid; IFFT delay taps are an approximation "
+                    "based on median df. Check cir_bandlimit_info()['grid_uniformity_rel_max']."
+                ),
+                RuntimeWarning,
+                stacklevel=2,
+            )
+    else:
+        df = 1.0
     tau = np.arange(m, dtype=float) / (m * df)
     return h_tau, tau
 
@@ -146,8 +174,47 @@ def tau_resolution_s(f_hz: NDArray[np.float64], nfft: int | None = None) -> floa
     if len(f) <= 1:
         return 0.0
     m = int(nfft or len(f))
-    df = float(f[1] - f[0])
+    df = float(np.median(np.diff(f)))
     return float(1.0 / (m * df))
+
+
+def cir_bandlimit_info(f_hz: NDArray[np.float64], nfft: int | None = None) -> dict[str, float | bool]:
+    """Return diagnostics for interpreting CIR from band-limited CTF sampling."""
+
+    f = np.asarray(f_hz, dtype=float)
+    if len(f) <= 1:
+        return {
+            "passband_only": bool(len(f) == 1 and float(f[0]) > 0.0) if len(f) else False,
+            "f_min_hz": float(f[0]) if len(f) else np.nan,
+            "f_max_hz": float(f[0]) if len(f) else np.nan,
+            "bw_hz": 0.0,
+            "df_hz": np.nan,
+            "grid_uniformity_rel_max": np.nan,
+            "tau_resolution_s": 0.0,
+            "tau_unambiguous_s": np.nan,
+            "delay_resolution_bw_limit_s": np.nan,
+        }
+
+    dfs = np.diff(f)
+    df = float(np.median(dfs))
+    if abs(df) < 1e-30:
+        df = float(dfs[0]) if len(dfs) else np.nan
+    rel = np.abs((dfs - df) / max(abs(df), 1e-30))
+    bw = float(np.max(f) - np.min(f))
+    m = int(nfft or len(f))
+    dt = float(1.0 / (m * df)) if np.isfinite(df) and abs(df) > 0.0 else np.nan
+    tau_u = float(1.0 / df) if np.isfinite(df) and abs(df) > 0.0 else np.nan
+    return {
+        "passband_only": bool(float(np.min(f)) > 0.0),
+        "f_min_hz": float(np.min(f)),
+        "f_max_hz": float(np.max(f)),
+        "bw_hz": bw,
+        "df_hz": float(df),
+        "grid_uniformity_rel_max": float(np.max(rel)) if len(rel) else 0.0,
+        "tau_resolution_s": dt,
+        "tau_unambiguous_s": tau_u,
+        "delay_resolution_bw_limit_s": float(1.0 / bw) if bw > 0.0 else np.nan,
+    }
 
 
 def detect_cir_wrap(

@@ -13,7 +13,7 @@ Example:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import csv
 from pathlib import Path
 from typing import Any
@@ -34,6 +34,7 @@ class MeasurementData:
     frequency_hz: NDArray[np.float64]
     H_f: NDArray[np.complex128]
     source: str = "measurement"
+    meta: dict[str, Any] = field(default_factory=dict)
 
 
 def _norm_key(s: str) -> str:
@@ -172,6 +173,88 @@ def load_measurement_four_csv(
     return MeasurementData(frequency_hz=f, H_f=mats, source=f"{hh_csv},{hv_csv},{vh_csv},{vv_csv}")
 
 
+def load_measurement_dualcp_two_csv(
+    co_csv: str | Path,
+    cross_csv: str | Path,
+    basis: str = "circular",
+    convention: str = "IEEE-RHCP",
+) -> MeasurementData:
+    """Load dual-CP sequential measurement from two CSV traces.
+
+    Mapping:
+      H_f[:,0,0] = RHCP->RHCP (co)
+      H_f[:,1,0] = RHCP->LHCP (cross)
+      others are set to 0.
+    """
+
+    f_co, z_co = _parse_trace_csv(co_csv)
+    f_cross, z_cross = _parse_trace_csv(cross_csv)
+    f = np.asarray(f_co, dtype=float)
+    z_cross_i = _interp_complex(np.asarray(f_cross, dtype=float), np.asarray(z_cross, dtype=np.complex128), f)
+    mats = np.zeros((len(f), 2, 2), dtype=np.complex128)
+    mats[:, 0, 0] = np.asarray(z_co, dtype=np.complex128)
+    mats[:, 1, 0] = z_cross_i
+    return MeasurementData(
+        frequency_hz=f,
+        H_f=mats,
+        source=f"{co_csv},{cross_csv}",
+        meta={
+            "basis": str(basis),
+            "convention": str(convention),
+            "format": "dualcp_two_csv",
+        },
+    )
+
+
+def load_measurement_dualcp_three_csv(
+    co_pre_csv: str | Path,
+    cross_csv: str | Path,
+    co_post_csv: str | Path,
+    basis: str = "circular",
+    convention: str = "IEEE-RHCP",
+) -> MeasurementData:
+    """Load dual-CP sequential measurement with drift check.
+
+    Uses co_pre as the co trace for H_f mapping:
+      H_f[:,0,0] = co_pre
+      H_f[:,1,0] = cross
+    And computes drift from co_post against co_pre:
+      drift_co_db = median(|20log10(|co_post|/|co_pre|)|)
+    """
+
+    f_pre, z_pre = _parse_trace_csv(co_pre_csv)
+    f_cross, z_cross = _parse_trace_csv(cross_csv)
+    f_post, z_post = _parse_trace_csv(co_post_csv)
+    f = np.asarray(f_pre, dtype=float)
+    z_cross_i = _interp_complex(np.asarray(f_cross, dtype=float), np.asarray(z_cross, dtype=np.complex128), f)
+    z_post_i = _interp_complex(np.asarray(f_post, dtype=float), np.asarray(z_post, dtype=np.complex128), f)
+
+    mats = np.zeros((len(f), 2, 2), dtype=np.complex128)
+    mats[:, 0, 0] = np.asarray(z_pre, dtype=np.complex128)
+    mats[:, 1, 0] = z_cross_i
+
+    ratio_db = 20.0 * np.log10((np.abs(z_post_i) + EPS) / (np.abs(z_pre) + EPS))
+    drift_abs = np.abs(np.asarray(ratio_db, dtype=float))
+    drift_med = float(np.median(drift_abs)) if len(drift_abs) else float("nan")
+    drift_p95 = float(np.percentile(drift_abs, 95.0)) if len(drift_abs) else float("nan")
+
+    return MeasurementData(
+        frequency_hz=f,
+        H_f=mats,
+        source=f"{co_pre_csv},{cross_csv},{co_post_csv}",
+        meta={
+            "basis": str(basis),
+            "convention": str(convention),
+            "format": "dualcp_three_csv",
+            "co_pre_csv": str(co_pre_csv),
+            "co_post_csv": str(co_post_csv),
+            "drift_metric": "median_abs_delta_mag_db",
+            "drift_co_db": drift_med,
+            "drift_co_p95_db": drift_p95,
+        },
+    )
+
+
 def _select_case(dataset: dict[str, Any], scenario_id: str | None = None, case_id: str | None = None) -> tuple[str, str, dict[str, Any]]:
     scenarios = dataset.get("scenarios", {})
     if scenario_id is not None:
@@ -215,10 +298,26 @@ def _select_case(dataset: dict[str, Any], scenario_id: str | None = None, case_i
     return best2[1], best2[2], best2[3]
 
 
-def _xpd_over_frequency(H_f: NDArray[np.complex128]) -> NDArray[np.float64]:
-    co = np.abs(H_f[:, 0, 0]) ** 2 + np.abs(H_f[:, 1, 1]) ** 2
-    cr = np.abs(H_f[:, 0, 1]) ** 2 + np.abs(H_f[:, 1, 0]) ** 2
+def _xpd_over_frequency(H_f: NDArray[np.complex128], mode: str = "matrix") -> NDArray[np.float64]:
+    m = str(mode).lower().strip()
+    if m == "dualcp":
+        co = np.abs(H_f[:, 0, 0]) ** 2
+        cr = np.abs(H_f[:, 1, 0]) ** 2
+    else:
+        co = np.abs(H_f[:, 0, 0]) ** 2 + np.abs(H_f[:, 1, 1]) ** 2
+        cr = np.abs(H_f[:, 0, 1]) ** 2 + np.abs(H_f[:, 1, 0]) ** 2
     return 10.0 * np.log10((co + EPS) / (np.maximum(cr, 1e-12) + EPS))
+
+
+def _infer_xpd_mode(meas_meta: dict[str, Any], H_meas_rt: NDArray[np.complex128]) -> str:
+    fmt = str(meas_meta.get("format", "")).lower().strip()
+    if fmt in {"dualcp_two_csv", "dualcp_three_csv"}:
+        return "dualcp"
+    h01 = np.max(np.abs(np.asarray(H_meas_rt[:, 0, 1], dtype=np.complex128))) if len(H_meas_rt) else 0.0
+    h11 = np.max(np.abs(np.asarray(H_meas_rt[:, 1, 1], dtype=np.complex128))) if len(H_meas_rt) else 0.0
+    if h01 <= 1e-12 and h11 <= 1e-12:
+        return "dualcp"
+    return "matrix"
 
 
 def _ecdf(x: NDArray[np.float64]) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
@@ -257,8 +356,9 @@ def compare_measured_to_dataset(
     matrix_source = "A" if str(channel_definition).lower().startswith("emb") else "J"
     rt_basis = str(dataset.get("meta", {}).get("basis", "linear"))
     rt_conv = str(dataset.get("meta", {}).get("convention", "IEEE-RHCP"))
-    meas_basis = str(measurement_basis or rt_basis)
-    meas_conv = str(measurement_convention or rt_conv)
+    meas_meta = measurement.meta if isinstance(measurement.meta, dict) else {}
+    meas_basis = str(measurement_basis or meas_meta.get("basis", rt_basis))
+    meas_conv = str(measurement_convention or meas_meta.get("convention", rt_conv))
     out_basis = str(eval_basis or rt_basis)
     out_conv = str(eval_convention or rt_conv)
 
@@ -293,8 +393,9 @@ def compare_measured_to_dataset(
     mag_me = 20.0 * np.log10(np.abs(H_meas_rt) + 1e-12)
     rmse_mag_db_rt = float(np.sqrt(np.mean((mag_me - mag_rt) ** 2)))
 
-    xpd_me = _xpd_over_frequency(H_meas_rt)
-    xpd_rt = _xpd_over_frequency(H_rt)
+    xpd_mode = _infer_xpd_mode(meas_meta, H_meas_rt)
+    xpd_me = _xpd_over_frequency(H_meas_rt, mode=xpd_mode)
+    xpd_rt = _xpd_over_frequency(H_rt, mode=xpd_mode)
     ks_rt = stats.ks_2samp(xpd_me, xpd_rt, alternative="two-sided", method="auto")
 
     ks_sy_p = np.nan
@@ -303,7 +404,7 @@ def compare_measured_to_dataset(
     if H_sy is not None:
         mag_sy = 20.0 * np.log10(np.abs(H_sy) + 1e-12)
         rmse_mag_db_sy = float(np.sqrt(np.mean((mag_me - mag_sy) ** 2)))
-        xpd_sy = _xpd_over_frequency(H_sy)
+        xpd_sy = _xpd_over_frequency(H_sy, mode=xpd_mode)
         ks_sy = stats.ks_2samp(xpd_me, xpd_sy, alternative="two-sided", method="auto")
         ks_sy_p = float(ks_sy.pvalue)
 
@@ -361,6 +462,7 @@ def compare_measured_to_dataset(
         "eval_convention": out_conv,
         "rmse_mag_db_meas_vs_rt": rmse_mag_db_rt,
         "rmse_mag_db_meas_vs_synth": float(rmse_mag_db_sy) if np.isfinite(rmse_mag_db_sy) else np.nan,
+        "xpd_mode": xpd_mode,
         "xpd_mu_measured_db": float(np.mean(xpd_me)),
         "xpd_mu_rt_db": float(np.mean(xpd_rt)),
         "xpd_mu_synth_db": float(np.mean(xpd_sy)) if len(xpd_sy) else np.nan,
@@ -369,4 +471,3 @@ def compare_measured_to_dataset(
         "has_synth_compare": bool(H_sy is not None),
         "plots": plots,
     }
-
