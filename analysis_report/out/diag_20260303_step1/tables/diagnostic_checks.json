@@ -1,0 +1,586 @@
+{
+  "A1_los_blocked": [
+    {
+      "scenario": "A2",
+      "los_rays": 0,
+      "status": "PASS"
+    },
+    {
+      "scenario": "A3",
+      "los_rays": 0,
+      "status": "PASS"
+    },
+    {
+      "scenario": "A4",
+      "los_rays": 0,
+      "status": "PASS"
+    },
+    {
+      "scenario": "A5",
+      "los_rays": 0,
+      "status": "PASS"
+    }
+  ],
+  "A2_target_bounce": [
+    {
+      "scenario": "A2",
+      "target_n": 1,
+      "hit": 18,
+      "total": 18,
+      "rate": 1.0,
+      "status": "PASS"
+    },
+    {
+      "scenario": "A3",
+      "target_n": 2,
+      "hit": 12,
+      "total": 14,
+      "rate": 0.8571428571428571,
+      "status": "PASS"
+    }
+  ],
+  "A3_coord_sanity": {
+    "status": "WARN",
+    "note": "Coordinate penetration sanity needs scenario geometry file review; not inferable from standard outputs only."
+  },
+  "B_time_resolution": {
+    "freq_source": "link_rows.xpd_floor_freq_hz[C0]",
+    "BW_Hz": 4000000000.0,
+    "df_Hz": 3910068.426197052,
+    "dt_res_s": 2.5e-10,
+    "tau_max_s": 2.5575000000002657e-07,
+    "Te_s": 3.0000000000000004e-09,
+    "Tmax_s": 2.0000000000000002e-07,
+    "W_floor_s": 1.5000000000000002e-09,
+    "W_target_s": 3.0000000000000004e-09,
+    "W_floor_status": "PASS",
+    "W_floor_C_median_db": -237.22403177507283,
+    "A2_target_in_Wearly_rate": 1.0,
+    "A3_target_in_Wearly_rate": 0.6666666666666666,
+    "A2_C_target_median_db": -229.61041767359842,
+    "A3_C_target_median_db": -229.53957289262738,
+    "B2_min_delay_gap_median_s": 5.42523266456174e-10,
+    "B2_status": "PASS",
+    "B3_status": "PASS",
+    "W3_status": "PASS",
+    "W3_best_te_ns": 2.0,
+    "W3_best_S_xpd_early": 1.3344080284770539,
+    "W3_best_S_rho_early_db": 1.334408028477054,
+    "W3_best_S_l_pol": 0.9947263632349453,
+    "W_floor_detail": {
+      "n_cases": 30,
+      "W_floor_s": 1.5000000000000002e-09,
+      "C_floor_median_db": -237.22403177507283,
+      "C_floor_p95_db": -232.7870567827457,
+      "rate_below_m10_db": 1.0,
+      "rate_below_m15_db": 1.0,
+      "status": "PASS"
+    },
+    "W_target_detail": {
+      "A2": {
+        "scenario": "A2",
+        "target_n": 1,
+        "W_target_s": 3.0000000000000004e-09,
+        "target_exists_rate": 1.0,
+        "target_in_Wearly_rate": 1.0,
+        "target_is_first_rate": 1.0,
+        "C_target_median_db": -229.61041767359842,
+        "C_target_p95_db": -227.2765510434973,
+        "target_gap_median_s": NaN,
+        "status": "PASS"
+      },
+      "A3": {
+        "scenario": "A3",
+        "target_n": 2,
+        "W_target_s": 3.0000000000000004e-09,
+        "target_exists_rate": 0.8571428571428571,
+        "target_in_Wearly_rate": 0.6666666666666666,
+        "target_is_first_rate": 0.6666666666666666,
+        "C_target_median_db": -229.53957289262738,
+        "C_target_p95_db": -228.3540760308989,
+        "target_gap_median_s": 3.2948636550539224e-09,
+        "status": "WARN"
+      },
+      "A4": {
+        "scenario": "A4",
+        "target_n": 1,
+        "W_target_s": 3.0000000000000004e-09,
+        "target_exists_rate": 1.0,
+        "target_in_Wearly_rate": 1.0,
+        "target_is_first_rate": 1.0,
+        "C_target_median_db": -220.5864644119584,
+        "C_target_p95_db": -214.2857803735126,
+        "target_gap_median_s": 1.1351827174780629e-08,
+        "status": "PASS"
+      },
+      "A5": {
+        "scenario": "A5",
+        "target_n": 2,
+        "W_target_s": 3.0000000000000004e-09,
+        "target_exists_rate": 1.0,
+        "target_in_Wearly_rate": 0.9666666666666667,
+        "target_is_first_rate": 0.23333333333333334,
+        "C_target_median_db": -0.18571028639461654,
+        "C_target_p95_db": 0.21689617192378394,
+        "target_gap_median_s": 5.457155632733982e-10,
+        "status": "FAIL"
+      }
+    },
+    "W3_te_sweep": {
+      "status": "PASS",
+      "n_links_used": 249,
+      "scores": [
+        {
+          "Te_ns": 2.0,
+          "S_xpd_early": 1.3344080284770539,
+          "S_rho_early_db": 1.334408028477054,
+          "S_l_pol": 0.9947263632349453
+        },
+        {
+          "Te_ns": 3.0,
+          "S_xpd_early": 1.275557571351009,
+          "S_rho_early_db": 1.275557571351009,
+          "S_l_pol": 1.0448047702825418
+        },
+        {
+          "Te_ns": 5.0,
+          "S_xpd_early": 1.1444886843986282,
+          "S_rho_early_db": 1.1444886843986284,
+          "S_l_pol": 1.0751173148605189
+        }
+      ],
+      "best_te_ns": 2.0,
+      "best_S_xpd_early": 1.3344080284770539,
+      "best_S_rho_early_db": 1.334408028477054,
+      "best_S_l_pol": 0.9947263632349453
+    },
+    "A2A3_sign_stability": {
+      "A2": {
+        "expected_sign": "negative",
+        "min_hit_rate": 1.0,
+        "median_hit_rate": 1.0,
+        "per_te": [
+          {
+            "Te_ns": 2.0,
+            "n": 18,
+            "median_xpd_early_ex_db": -32.934837696767445,
+            "expected_sign_hit_rate": 1.0
+          },
+          {
+            "Te_ns": 3.0,
+            "n": 18,
+            "median_xpd_early_ex_db": -32.934837696767445,
+            "expected_sign_hit_rate": 1.0
+          },
+          {
+            "Te_ns": 5.0,
+            "n": 18,
+            "median_xpd_early_ex_db": -32.934837696767445,
+            "expected_sign_hit_rate": 1.0
+          }
+        ],
+        "status": "PASS"
+      },
+      "A3": {
+        "expected_sign": "positive",
+        "min_hit_rate": 0.0,
+        "median_hit_rate": 0.0,
+        "per_te": [
+          {
+            "Te_ns": 2.0,
+            "n": 24,
+            "median_xpd_early_ex_db": -24.93483769676745,
+            "expected_sign_hit_rate": 0.0
+          },
+          {
+            "Te_ns": 3.0,
+            "n": 24,
+            "median_xpd_early_ex_db": -24.93483769676745,
+            "expected_sign_hit_rate": 0.0
+          },
+          {
+            "Te_ns": 5.0,
+            "n": 24,
+            "median_xpd_early_ex_db": -24.93483769676745,
+            "expected_sign_hit_rate": 0.0
+          }
+        ],
+        "status": "FAIL"
+      },
+      "overall_status": "FAIL"
+    },
+    "A2_target_window_sign": {
+      "scenario": "A2",
+      "target_n": 1,
+      "W_target_s": 3.0000000000000004e-09,
+      "expected_sign": "negative",
+      "n_links": 18,
+      "n_eval": 18,
+      "median_xpd_target_ex_db": -32.934837696767445,
+      "p10_xpd_target_ex_db": -32.934837696767445,
+      "p90_xpd_target_ex_db": -32.934837696767445,
+      "expected_sign_hit_rate": 1.0,
+      "status": "PASS"
+    },
+    "A3_target_window_sign": {
+      "scenario": "A3",
+      "target_n": 2,
+      "W_target_s": 3.0000000000000004e-09,
+      "expected_sign": "positive",
+      "n_links": 24,
+      "n_eval": 12,
+      "median_xpd_target_ex_db": -16.93483769676745,
+      "p10_xpd_target_ex_db": -16.93483769676745,
+      "p90_xpd_target_ex_db": -16.934837696767445,
+      "expected_sign_hit_rate": 0.0,
+      "status": "FAIL"
+    },
+    "A3_role": "mechanism",
+    "A3_mechanism_status": "WARN",
+    "A3_system_early_status": "WARN",
+    "A5_role": "stress_response",
+    "A5_target_mode": "contamination_response"
+  },
+  "C_effect_vs_floor": {
+    "floor_delta_db": 0.6107424330369078,
+    "repeat_delta_db": 0.22305050627602038,
+    "delta_ref_db": 0.6107424330369078,
+    "A3_minus_A2_delta_median_db": 7.999999707790597,
+    "ratio_to_floor": 13.098811012705823,
+    "C1_status": "PASS",
+    "A4_material_shift_late_excess_db": 8.145146729919599,
+    "A5_stress_delta_late_excess_db": 0.0,
+    "A5_stress_var_ratio": 169452815837739.53,
+    "C2_status": "PASS",
+    "C2M_primary_metric": "XPD_early_excess_db",
+    "C2M_primary_span_db": 8.189290571385882,
+    "C2M_primary_ratio_to_delta": 13.408746680109903,
+    "C2M_primary_status": "PASS",
+    "C2M_secondary_late_span_db": 8.145146729919599,
+    "C2M_secondary_late_ratio_to_delta": 13.336467697877117,
+    "C2M_secondary_late_status": "PASS",
+    "C2M_secondary_lpol_span_db": 0.43996749845933625,
+    "C2M_secondary_lpol_ratio_to_delta": 0.7203814155692512,
+    "C2M_secondary_lpol_status": "FAIL",
+    "C2M_status": "PASS",
+    "A4_target_C_median_db": -220.5864644119584,
+    "A4_target_exists_rate": 1.0,
+    "A4_target_gate_status": "PASS",
+    "A4_material_medians_early_ex": {
+      "glass": -34.313798250678936,
+      "gypsum": -30.050102644399814,
+      "wood": -26.124507679293053
+    },
+    "A4_material_medians_late_ex": {
+      "glass": -33.07998442668705,
+      "gypsum": -29.081877425426,
+      "wood": -24.93483769676745
+    },
+    "A4_material_medians_lpol": {
+      "glass": -1.3194624882938246,
+      "gypsum": -1.47015156102449,
+      "wood": -1.0301840625651537
+    },
+    "C2S_primary_metric": "L_pol_db",
+    "C2S_delta_lpol_db": -5.852639695953271,
+    "C2S_primary_status": "PASS",
+    "C2S_status": "PASS",
+    "C2S_delta_rho_early_lin": 0.7428283595701298,
+    "C2S_delta_ds_s": 1.4880168779626388e-09,
+    "C2S_delta_late_ex_db": 0.0,
+    "C2S_late_ex_var_ratio": 169452815837739.53,
+    "C2S_gate_delta_p_target_db": 0.0,
+    "C2S_gate_status": "PASS",
+    "C2S_gate_pair_count": 5
+  },
+  "D_identifiability": {
+    "EL_iqr_db": 6.363954146494699,
+    "corr_d_vs_LOS": -0.5531406228999123,
+    "strata_counts": {
+      "LOS0_q1": 42,
+      "LOS0_q2": 10,
+      "LOS0_q3": 9,
+      "LOS1_q1": 42,
+      "LOS1_q2": 73,
+      "LOS1_q3": 73,
+      "LOS0_qNA": 0,
+      "LOS1_qNA": 0
+    },
+    "min_strata_n": 9,
+    "status": "PASS",
+    "D1": {
+      "status": "PASS",
+      "global": {
+        "status": "PASS",
+        "subset": [
+          "A3",
+          "A4",
+          "B1",
+          "B2",
+          "B3"
+        ],
+        "EL_iqr_db": 6.363954146494699,
+        "el_bins_low_mid_high": {
+          "low": 115,
+          "mid": 115,
+          "high": 115
+        },
+        "min_bin_n": 115,
+        "n_rows": 345
+      },
+      "A2_isolation": {
+        "status": "PASS",
+        "n_rows": 18,
+        "EL_std_db": 6.894959784888595e-15,
+        "target": "small EL variation is desired for parity isolation"
+      },
+      "A5_isolation": {
+        "status": "PASS",
+        "role": "stress_response",
+        "n_base": 30,
+        "n_stress": 30,
+        "delta_median_EL_stress_minus_base_db": -2.4888041630474405,
+        "target": "response mode: L_pol decrease is primary, EL shift can be non-zero"
+      }
+    },
+    "D2": {
+      "status": "PASS",
+      "material_x_angle_status": "PASS",
+      "material_x_angle_groups_good": 3,
+      "material_x_angle_groups_total": 3,
+      "material_x_angle_coverage": {
+        "glass": {
+          "low": 2,
+          "mid": 10,
+          "high": 12,
+          "NA": 0
+        },
+        "wood": {
+          "low": 2,
+          "mid": 10,
+          "high": 12,
+          "NA": 0
+        },
+        "gypsum": {
+          "low": 2,
+          "mid": 10,
+          "high": 12,
+          "NA": 0
+        }
+      },
+      "stress_x_angle_status": "PASS",
+      "stress_x_angle_groups_good": 2,
+      "stress_x_angle_groups_total": 2,
+      "stress_x_angle_coverage": {
+        "base": {
+          "low": 25,
+          "mid": 5,
+          "high": 0,
+          "NA": 0
+        },
+        "stress": {
+          "low": 25,
+          "mid": 5,
+          "high": 0,
+          "NA": 0
+        }
+      },
+      "design_status": "PASS",
+      "stage1": {
+        "status": "PASS",
+        "n_rows": 345,
+        "design_rank": 8,
+        "design_cols": 8,
+        "condition_number": 65.44351394139171,
+        "vif_threshold": 5.0,
+        "vif": {
+          "EL_proxy_db": 3.5525494326628624,
+          "d_m": 2.3017739369015304
+        },
+        "vif_warnings": {}
+      },
+      "stage2": {
+        "status": "PASS",
+        "n_rows": 423,
+        "design_rank": 5,
+        "design_cols": 5,
+        "condition_number": 7.89678796024209,
+        "vif_threshold": 5.0,
+        "vif": {},
+        "vif_warnings": {}
+      },
+      "design_rank": 8,
+      "design_cols": 8,
+      "condition_number": 65.44351394139171,
+      "vif_threshold": 5.0,
+      "vif": {
+        "stage1": {
+          "EL_proxy_db": 3.5525494326628624,
+          "d_m": 2.3017739369015304
+        },
+        "stage2": {}
+      },
+      "vif_warnings": {
+        "stage1": {},
+        "stage2": {}
+      }
+    },
+    "D3": {
+      "status": "PASS",
+      "n_rows": 249,
+      "q1_db": 0.3686756997362082,
+      "q2_db": 2.7199659283313338,
+      "all_6_bins": [
+        "LOS0_q1",
+        "LOS0_q2",
+        "LOS0_q3",
+        "LOS1_q1",
+        "LOS1_q2",
+        "LOS1_q3"
+      ],
+      "viable_bins": [
+        "LOS0_q1",
+        "LOS0_q2",
+        "LOS0_q3",
+        "LOS1_q1",
+        "LOS1_q2",
+        "LOS1_q3"
+      ],
+      "min_strata_all_n": 9,
+      "min_strata_viable_n": 9,
+      "qna_total": 0,
+      "strata_counts": {
+        "LOS0_q1": 42,
+        "LOS0_q2": 10,
+        "LOS0_q3": 9,
+        "LOS1_q1": 42,
+        "LOS1_q2": 73,
+        "LOS1_q3": 73,
+        "LOS0_qNA": 0,
+        "LOS1_qNA": 0
+      },
+      "selected_rows_n": 0,
+      "strata_counts_selected": {},
+      "hole_analysis": [
+        {
+          "strata": "LOS0_q1",
+          "pool_n": 42,
+          "selected_n": "",
+          "hole_type": "none",
+          "status": "PASS"
+        },
+        {
+          "strata": "LOS0_q2",
+          "pool_n": 10,
+          "selected_n": "",
+          "hole_type": "none",
+          "status": "PASS"
+        },
+        {
+          "strata": "LOS0_q3",
+          "pool_n": 9,
+          "selected_n": "",
+          "hole_type": "none",
+          "status": "PASS"
+        },
+        {
+          "strata": "LOS1_q1",
+          "pool_n": 42,
+          "selected_n": "",
+          "hole_type": "none",
+          "status": "PASS"
+        },
+        {
+          "strata": "LOS1_q2",
+          "pool_n": 73,
+          "selected_n": "",
+          "hole_type": "none",
+          "status": "PASS"
+        },
+        {
+          "strata": "LOS1_q3",
+          "pool_n": 73,
+          "selected_n": "",
+          "hole_type": "none",
+          "status": "PASS"
+        }
+      ],
+      "per_scenario_summary": [
+        {
+          "scenario_id": "B1",
+          "status": "FAIL",
+          "n_rows": 49,
+          "q1_db": 0.8857587481390067,
+          "q2_db": 2.7239601688116934,
+          "min_strata_all_n": 0,
+          "min_strata_viable_n": 1,
+          "qna_total": 0,
+          "strata_counts": {
+            "LOS0_q1": 1,
+            "LOS0_q2": 0,
+            "LOS0_q3": 0,
+            "LOS1_q1": 15,
+            "LOS1_q2": 17,
+            "LOS1_q3": 16,
+            "LOS0_qNA": 0,
+            "LOS1_qNA": 0
+          }
+        },
+        {
+          "scenario_id": "B2",
+          "status": "PASS",
+          "n_rows": 100,
+          "q1_db": -1.5761926501973234,
+          "q2_db": 2.719965928331334,
+          "min_strata_all_n": 4,
+          "min_strata_viable_n": 4,
+          "qna_total": 0,
+          "strata_counts": {
+            "LOS0_q1": 27,
+            "LOS0_q2": 4,
+            "LOS0_q3": 7,
+            "LOS1_q1": 6,
+            "LOS1_q2": 30,
+            "LOS1_q3": 26,
+            "LOS0_qNA": 0,
+            "LOS1_qNA": 0
+          }
+        },
+        {
+          "scenario_id": "B3",
+          "status": "WARN",
+          "n_rows": 100,
+          "q1_db": 0.604150095911717,
+          "q2_db": 2.7199659283313338,
+          "min_strata_all_n": 2,
+          "min_strata_viable_n": 2,
+          "qna_total": 0,
+          "strata_counts": {
+            "LOS0_q1": 13,
+            "LOS0_q2": 7,
+            "LOS0_q3": 2,
+            "LOS1_q1": 20,
+            "LOS1_q2": 28,
+            "LOS1_q3": 30,
+            "LOS0_qNA": 0,
+            "LOS1_qNA": 0
+          }
+        }
+      ]
+    }
+  },
+  "E_power_based": {
+    "status": "PASS",
+    "used_metrics": [
+      "XPD_early_db",
+      "XPD_late_db",
+      "rho_early_lin",
+      "L_pol_db",
+      "delay_spread_rms_s",
+      "early_energy_fraction",
+      "EL_proxy_db",
+      "LOSflag"
+    ],
+    "note": "No complex-phase fields are used by this report pipeline."
+  }
+}

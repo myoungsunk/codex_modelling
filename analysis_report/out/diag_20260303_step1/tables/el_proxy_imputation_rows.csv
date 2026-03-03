@@ -1,0 +1,17 @@
+EL_proxy_db,case_id,link_id,method,scenario_id
+2.7199659283313338,2,A3_2,scenario_median_EL_proxy_db,A3
+2.7199659283313338,3,A3_3,scenario_median_EL_proxy_db,A3
+2.7199659283313338,4,A3_4,scenario_median_EL_proxy_db,A3
+2.7199659283313338,5,A3_5,scenario_median_EL_proxy_db,A3
+2.7199659283313338,6,A3_6,scenario_median_EL_proxy_db,A3
+2.7199659283313338,7,A3_7,scenario_median_EL_proxy_db,A3
+2.7199659283313338,12,A3_12,scenario_median_EL_proxy_db,A3
+2.7199659283313338,13,A3_13,scenario_median_EL_proxy_db,A3
+2.7199659283313338,14,A3_14,scenario_median_EL_proxy_db,A3
+2.7199659283313338,15,A3_15,scenario_median_EL_proxy_db,A3
+2.719965928331348,13,A5_13,dominant_ray_EL_db,A5
+2.7239601688117006,42,B1_42,dominant_ray_EL_db,B1
+2.7239601688117006,48,B1_48,dominant_ray_EL_db,B1
+1.8043655923516866,67,B3_67,scenario_median_EL_proxy_db,B3
+2.7199659283313338,90,B3_90,dominant_ray_EL_db,B3
+2.7199659283313338,91,B3_91,dominant_ray_EL_db,B3
