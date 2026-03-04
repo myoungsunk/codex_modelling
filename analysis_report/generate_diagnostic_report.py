@@ -587,6 +587,16 @@ def _target_window_stats(
     tol = 0.25 * float(dt_res_s) if np.isfinite(dt_res_s) else 0.0
     for _, cr in by_case.items():
         total += 1
+        # Deduplicate rays within a case by (link_id, ray_index) — needed when multiple
+        # run-groups (e.g. A4_iso and A4_bridge) are merged under the same scenario_id.
+        seen_ray_keys: set[tuple[str, str]] = set()
+        deduped: list[dict[str, Any]] = []
+        for r in cr:
+            rk = (str(r.get("link_id", "")), str(r.get("ray_index", "")))
+            if rk not in seen_ray_keys:
+                seen_ray_keys.add(rk)
+                deduped.append(r)
+        cr = deduped
         cand = [x for x in cr if int(round(_num(x.get("n_bounce", np.nan)))) == int(target_n)]
         if not cand:
             continue

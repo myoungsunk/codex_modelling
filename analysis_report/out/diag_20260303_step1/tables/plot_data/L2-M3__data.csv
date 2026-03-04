@@ -1,4 +1,4 @@
 plot_id,series,scenario_id,case_id,link_id,x,y,data,meta
-L2-M3,var_XPD_early_excess_db,A4,,,glass,0.2945936355180301,0.2945936355180301,
-L2-M3,var_XPD_early_excess_db,A4,,,gypsum,0.28382472851973184,0.28382472851973184,
-L2-M3,var_XPD_early_excess_db,A4,,,wood,0.2696376478568267,0.2696376478568267,
+L2-M3,var_XPD_early_excess_db,A4,,,glass,0.08100820498889062,0.08100820498889062,
+L2-M3,var_XPD_early_excess_db,A4,,,gypsum,0.07452012476795232,0.07452012476795232,
+L2-M3,var_XPD_early_excess_db,A4,,,wood,0.0763571793775007,0.0763571793775007,
