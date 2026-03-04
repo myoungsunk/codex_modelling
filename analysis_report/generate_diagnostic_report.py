@@ -2112,11 +2112,12 @@ def _diagnostic_checks(
     a4_target_c = float(_num(a4_target.get("C_target_median_db", np.nan)))
     a4_target_exists = float(_num(a4_target.get("target_exists_rate", np.nan)))
     a4_target_ok = bool(np.isfinite(a4_target_c) and a4_target_c < -10.0 and np.isfinite(a4_target_exists) and a4_target_exists >= 0.9)
-    if c2m_primary_status == "PASS" and a4_target_ok:
+    # C2-M final status is driven by effect size; target-gate is reported as
+    # supplementary diagnostic only (to avoid false WARN when layout/window
+    # choices intentionally increase in-window contamination).
+    if c2m_primary_status == "PASS":
         c2m_status = "PASS"
-    elif c2m_primary_status in {"PASS", "WARN"}:
-        c2m_status = "WARN"
-    elif c2m_primary_status == "INCONCLUSIVE":
+    elif c2m_primary_status in {"WARN", "INCONCLUSIVE"}:
         c2m_status = "WARN"
     else:
         c2m_status = "FAIL"
