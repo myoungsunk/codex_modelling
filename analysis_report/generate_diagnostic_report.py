@@ -602,7 +602,10 @@ def _target_window_sign_metric(
         return {"scenario": str(scenario_id), "status": "WARN", "reason": "missing run or rows"}
 
     tau_by_link = _dominant_target_tau_by_link(ray_rows, scenario_id=scenario_id, target_n=target_n)
-    vals: list[float] = []
+    # G1/G2 sign is judged on raw target-window dominance (XPD_target_raw),
+    # NOT on excess domain.  Excess is stored separately for L/M/R reporting.
+    raw_vals: list[float] = []
+    ex_vals: list[float] = []
     hits: list[bool] = []
     for r in rows:
         lid = str(r.get("link_id", ""))
@@ -622,18 +625,25 @@ def _target_window_sign_metric(
         m = (tau >= t0) & (tau <= t1)
         sco = float(np.sum(pco[m]))
         scr = float(np.sum(pcr[m]))
-        xpd_target = _db_ratio(sco, scr)
-        xpd_target_ex = float(xpd_target - floor_db) if np.isfinite(floor_db) else float("nan")
-        if not np.isfinite(xpd_target_ex):
+        xpd_target_raw = _db_ratio(sco, scr)
+        if not np.isfinite(xpd_target_raw):
             continue
-        vals.append(float(xpd_target_ex))
-        hits.append(bool(xpd_target_ex < 0.0) if int(expected_sign) < 0 else bool(xpd_target_ex > 0.0))
+        xpd_target_ex = float(xpd_target_raw - floor_db) if np.isfinite(floor_db) else float("nan")
+        raw_vals.append(float(xpd_target_raw))
+        if np.isfinite(xpd_target_ex):
+            ex_vals.append(float(xpd_target_ex))
+        # Sign check uses raw: odd(A2) expects co<cross → raw<0; even(A3) expects co>cross → raw>0
+        hits.append(bool(xpd_target_raw < 0.0) if int(expected_sign) < 0 else bool(xpd_target_raw > 0.0))
 
-    arr = np.asarray(vals, dtype=float)
+    raw_arr = np.asarray(raw_vals, dtype=float)
+    ex_arr = np.asarray(ex_vals, dtype=float)
     hit = float(np.mean(hits)) if hits else float("nan")
-    med = float(np.nanmedian(arr)) if len(arr) else float("nan")
-    p10 = float(np.nanpercentile(arr, 10.0)) if len(arr) else float("nan")
-    p90 = float(np.nanpercentile(arr, 90.0)) if len(arr) else float("nan")
+    med_raw = float(np.nanmedian(raw_arr)) if len(raw_arr) else float("nan")
+    p10_raw = float(np.nanpercentile(raw_arr, 10.0)) if len(raw_arr) else float("nan")
+    p90_raw = float(np.nanpercentile(raw_arr, 90.0)) if len(raw_arr) else float("nan")
+    med_ex = float(np.nanmedian(ex_arr)) if len(ex_arr) else float("nan")
+    p10_ex = float(np.nanpercentile(ex_arr, 10.0)) if len(ex_arr) else float("nan")
+    p90_ex = float(np.nanpercentile(ex_arr, 90.0)) if len(ex_arr) else float("nan")
     if np.isfinite(hit) and hit >= 0.8:
         st = "PASS"
     elif np.isfinite(hit) and hit >= 0.6:
@@ -647,14 +657,95 @@ def _target_window_sign_metric(
         "target_n": int(target_n),
         "W_target_s": float(w_target_s),
         "expected_sign": "negative" if int(expected_sign) < 0 else "positive",
+        "sign_domain": "raw",  # sign judged on XPD_target_raw, not excess
         "n_links": int(len(rows)),
-        "n_eval": int(len(arr)),
-        "median_xpd_target_ex_db": med,
-        "p10_xpd_target_ex_db": p10,
-        "p90_xpd_target_ex_db": p90,
+        "n_eval": int(len(raw_arr)),
+        # Primary: raw target-window dominance (for G1/G2 sign claims)
+        "median_xpd_target_raw_db": med_raw,
+        "p10_xpd_target_raw_db": p10_raw,
+        "p90_xpd_target_raw_db": p90_raw,
         "expected_sign_hit_rate": hit,
         "status": st,
+        # Supplementary: excess domain (for L/M/R reporting)
+        "median_xpd_target_ex_db": med_ex,
+        "p10_xpd_target_ex_db": p10_ex,
+        "p90_xpd_target_ex_db": p90_ex,
     }
+
+
+def _a6_sign_check(
+    *,
+    link_rows: list[dict[str, Any]],
+    runs: list[dict[str, Any]],
+    floor_db: float,
+) -> dict[str, Any]:
+    """Check A6 odd/even parity sign at near-normal incidence (G2 core evidence).
+
+    A6-odd  expected: XPD_early_raw < 0  (cross-dominant)
+    A6-even expected: XPD_early_raw > 0  (co-dominant)
+    Sign is judged on raw early-window XPD, not excess.
+    """
+    run_by_sid = {str(r.get("scenario_id", "")): r for r in runs}
+    results: dict[str, Any] = {}
+    for sid, expected_sign in [("A6_odd", -1), ("A6_even", +1)]:
+        # Accept both "A6_odd"/"A6_even" and plain "A6" with mode field
+        rows_sid = [r for r in link_rows if str(r.get("scenario_id", "")) == sid]
+        if not rows_sid:
+            rows_sid = [
+                r for r in link_rows
+                if str(r.get("scenario_id", "")) == "A6"
+                and str(_provenance(r).get("link_params", {}).get("mode", "")).lower() == sid.split("_", 1)[1]
+            ]
+        run = run_by_sid.get(sid) or run_by_sid.get("A6")
+        if run is None or not rows_sid:
+            results[sid] = {"status": "SKIP", "reason": "no data for scenario"}
+            continue
+        raw_vals: list[float] = []
+        hits: list[bool] = []
+        for r in rows_sid:
+            pdp = io_lib.load_pdp_npz(run, str(r.get("link_id", "")))
+            if pdp is None:
+                continue
+            tau = np.asarray(pdp.get("delay_tau_s", []), dtype=float)
+            pco = np.asarray(pdp.get("P_co", []), dtype=float)
+            pcr = np.asarray(pdp.get("P_cross", []), dtype=float)
+            if len(tau) == 0 or len(pco) != len(tau):
+                continue
+            p_total = pco + pcr
+            i0 = int(np.argmax(p_total)) if len(p_total) else -1
+            if i0 < 0:
+                continue
+            tau0 = float(tau[i0])
+            te_s = 3e-9
+            early = (tau >= tau0) & (tau <= tau0 + te_s)
+            sco = float(np.sum(pco[early]))
+            scr = float(np.sum(pcr[early]))
+            xpd_raw = _db_ratio(sco, scr)
+            if not np.isfinite(xpd_raw):
+                continue
+            raw_vals.append(float(xpd_raw))
+            hits.append(bool(xpd_raw < 0.0) if expected_sign < 0 else bool(xpd_raw > 0.0))
+        if not hits:
+            results[sid] = {"status": "SKIP", "reason": "no valid pdp data"}
+            continue
+        rate = float(np.mean(hits))
+        raw_arr = np.asarray(raw_vals, dtype=float)
+        status = "PASS" if rate >= 0.8 else ("WARN" if rate >= 0.6 else "FAIL")
+        results[sid] = {
+            "n_links": int(len(rows_sid)),
+            "n_eval": int(len(raw_vals)),
+            "expected_sign": "negative" if expected_sign < 0 else "positive",
+            "sign_domain": "raw",
+            "expected_sign_hit_rate": rate,
+            "median_xpd_early_raw_db": float(np.nanmedian(raw_arr)) if len(raw_arr) else float("nan"),
+            "status": status,
+        }
+    # Overall: both odd and even must PASS for G2 claim
+    statuses = [v.get("status", "SKIP") for v in results.values() if v.get("status") not in {"SKIP"}]
+    overall = "PASS" if statuses and all(s == "PASS" for s in statuses) else (
+        "WARN" if any(s in {"PASS", "WARN"} for s in statuses) else "FAIL"
+    )
+    return {"per_mode": results, "overall_status": overall, "floor_db": float(floor_db)}
 
 
 def _impute_missing_el_proxy(
@@ -1015,7 +1106,8 @@ def _target_sign_stability_te_sweep(
             continue
         per_te: list[dict[str, Any]] = []
         for te_ns in te_ns_list:
-            vals: list[float] = []
+            raw_vals: list[float] = []
+            ex_vals: list[float] = []
             hit: list[bool] = []
             for r in rows:
                 pdp = io_lib.load_pdp_npz(run, str(r.get("link_id", "")))
@@ -1038,19 +1130,26 @@ def _target_sign_stability_te_sweep(
                 early = (tau >= tau0) & (tau <= tau0 + te_s)
                 sco = float(np.sum(pco[early]))
                 scr = float(np.sum(pcr[early]))
-                xpd_e = _db_ratio(sco, scr)
-                xpd_ex = float(xpd_e - floor_db) if np.isfinite(floor_db) else float("nan")
-                if not np.isfinite(xpd_ex):
+                xpd_e = _db_ratio(sco, scr)   # raw early-window XPD
+                if not np.isfinite(xpd_e):
                     continue
-                vals.append(float(xpd_ex))
-                hit.append(bool(xpd_ex < 0.0) if expected_sign < 0 else bool(xpd_ex > 0.0))
+                xpd_ex = float(xpd_e - floor_db) if np.isfinite(floor_db) else float("nan")
+                raw_vals.append(float(xpd_e))
+                if np.isfinite(xpd_ex):
+                    ex_vals.append(float(xpd_ex))
+                # Sign check on raw: odd expects raw<0, even expects raw>0
+                hit.append(bool(xpd_e < 0.0) if expected_sign < 0 else bool(xpd_e > 0.0))
             rate = float(np.mean(hit)) if hit else float("nan")
+            raw_arr = np.asarray(raw_vals, dtype=float)
+            ex_arr = np.asarray(ex_vals, dtype=float)
             per_te.append(
                 {
                     "Te_ns": float(te_ns),
-                    "n": int(len(vals)),
-                    "median_xpd_early_ex_db": float(np.median(np.asarray(vals, dtype=float))) if vals else float("nan"),
+                    "n": int(len(raw_vals)),
+                    "median_xpd_early_raw_db": float(np.median(raw_arr)) if len(raw_arr) else float("nan"),
+                    "median_xpd_early_ex_db": float(np.median(ex_arr)) if len(ex_arr) else float("nan"),
                     "expected_sign_hit_rate": rate,
+                    "sign_domain": "raw",
                 }
             )
         rates = np.asarray([_num(x.get("expected_sign_hit_rate", np.nan)) for x in per_te], dtype=float)
@@ -1410,6 +1509,13 @@ def _diagnostic_checks(
     else:
         a5_target_mode = "unknown"
 
+    # A6 sign check: G2 core evidence at near-normal incidence
+    a6_sign = _a6_sign_check(
+        link_rows=link_rows,
+        runs=runs,
+        floor_db=floor_db_used,
+    )
+
     checks["B_time_resolution"] = {
         "freq_source": str(freq_src),
         "BW_Hz": float(bw),
@@ -1445,6 +1551,8 @@ def _diagnostic_checks(
         "A3_system_early_status": a3_early_status,
         "A5_role": a5_role,
         "A5_target_mode": a5_target_mode,
+        # A6: G2 core evidence at near-normal incidence (sign on raw, not excess)
+        "A6_sign_check": a6_sign,
     }
 
     # C effect vs floor (C2-M / C2-S endpoints)

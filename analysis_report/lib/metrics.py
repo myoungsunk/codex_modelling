@@ -98,12 +98,23 @@ def apply_floor_excess(link_rows: list[dict[str, Any]], floor_db: float, delta_d
         # Always recompute excess against the report-selected floor reference.
         # Do not keep pre-existing per-run excess values, which may have been
         # computed with a different floor policy.
-        rr["XPD_early_excess_db"] = float(x_e - floor_db) if np.isfinite(x_e) and np.isfinite(floor_db) else np.nan
-        rr["XPD_late_excess_db"] = float(x_l - floor_db) if np.isfinite(x_l) and np.isfinite(floor_db) else np.nan
+        ex_e = float(x_e - floor_db) if np.isfinite(x_e) and np.isfinite(floor_db) else np.nan
+        ex_l = float(x_l - floor_db) if np.isfinite(x_l) and np.isfinite(floor_db) else np.nan
+        rr["XPD_early_excess_db"] = ex_e
+        rr["XPD_late_excess_db"] = ex_l
         rr["floor_db"] = float(floor_db)
         rr["delta_floor_db"] = float(delta_db)
-        rr["outlier_excess_neg"] = bool(np.isfinite(rr["XPD_early_excess_db"]) and np.isfinite(delta_db) and rr["XPD_early_excess_db"] < -abs(delta_db))
-        rr["outlier_excess_pos"] = bool(np.isfinite(rr["XPD_early_excess_db"]) and np.isfinite(delta_db) and rr["XPD_early_excess_db"] > abs(delta_db))
+        rr["outlier_excess_neg"] = bool(np.isfinite(ex_e) and np.isfinite(delta_db) and ex_e < -abs(delta_db))
+        rr["outlier_excess_pos"] = bool(np.isfinite(ex_e) and np.isfinite(delta_db) and ex_e > abs(delta_db))
+        # claim_caution: excess is within ±delta_ref floor uncertainty band.
+        # Points within this band cannot support calibration-aware excess claims.
+        delta_abs = abs(float(delta_db)) if np.isfinite(delta_db) else float("nan")
+        rr["claim_caution_early"] = bool(
+            np.isfinite(ex_e) and np.isfinite(delta_abs) and abs(ex_e) < delta_abs
+        )
+        rr["claim_caution_late"] = bool(
+            np.isfinite(ex_l) and np.isfinite(delta_abs) and abs(ex_l) < delta_abs
+        )
         out.append(rr)
     return out
 
