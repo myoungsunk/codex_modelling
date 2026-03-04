@@ -466,6 +466,34 @@ def _make_m1_m2_plots(
         plt.close(fig)
         detail_rows.append({"plot_id": "M1-5", "file": out.name, "note": "frequency-dependent floor"})
 
+    # M1-3: XPD_floor vs distance  /  M1-4: XPD_floor vs yaw
+    # Data available from link_rows; no raw PDP required.
+    for plot_id_xy, x_key, x_label, fn in [
+        ("M1-3", "d_m", "Distance (m)", "C0__ALL__xpd_floor_vs_distance.png"),
+        ("M1-4", "yaw_deg", "Yaw (deg)", "C0__ALL__xpd_floor_vs_yaw.png"),
+    ]:
+        xs = np.asarray([_to_float(r.get(x_key)) for r in c0], dtype=float)
+        ys = np.asarray([_to_float(r.get("XPD_early_db")) for r in c0], dtype=float)
+        mask = np.isfinite(xs) & np.isfinite(ys)
+        if np.sum(mask) >= 2:
+            out = _prep_fig(fig_dir / fn)
+            fig, ax = plt.subplots(figsize=(7.2, 4.6))
+            ax.scatter(xs[mask], ys[mask], s=36, alpha=0.75, color="#1f77b4")
+            p = np.polyfit(xs[mask], ys[mask], 1)
+            xl = np.linspace(xs[mask].min(), xs[mask].max(), 100)
+            ax.plot(xl, np.polyval(p, xl), lw=1.4, color="#ff7f0e", ls="--",
+                    label=f"fit: {p[0]:.2f}x+{p[1]:.1f}")
+            ax.set_xlabel(x_label)
+            ax.set_ylabel("XPD_floor (dB)")
+            ax.set_title(f"{plot_id_xy} XPD_floor vs {x_key}")
+            _style_db_axis(ax)
+            ax.grid(True, alpha=0.3)
+            ax.legend(fontsize=8)
+            fig.tight_layout()
+            fig.savefig(out, dpi=140)
+            plt.close(fig)
+            detail_rows.append({"plot_id": plot_id_xy, "file": out.name, "note": f"{x_key} dependence"})
+
     # M1-6: repeatability strip + box
     conds: dict[str, list[float]] = {}
     for r in c0:

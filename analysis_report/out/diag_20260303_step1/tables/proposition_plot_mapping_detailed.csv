@@ -1,8 +1,8 @@
 plot_id,proposition,scenario,needed_data,plot_desc,pass_rule,proposition_status,plot_ready,expected_file,data_csv,notes
 M1-1,M1,C0,"co/cross PDP, W_floor","C0 normalized co/cross + tap-contrast facet(d,yaw)",LOS-only contamination low,PASS,MISSING,M1-1__C0_raw_pdp_overlay_grid.png,tables/plot_data/M1-1__data.csv,
 M1-2,M1,C0,rays(C_floor),C_floor boxplot,C_floor below -10/-15 dB,PASS,READY,M1-2__C_floor_box_by_yaw.png,tables/plot_data/M1-2__data.csv,C_floor threshold lines
-M1-3,M1,C0,"XPD_floor,d",XPD_floor vs distance,weak distance dependence,PASS,MISSING,C0__ALL__xpd_floor_vs_distance.png,tables/plot_data/M1-3__data.csv,
-M1-4,M1,C0,"XPD_floor,yaw",XPD_floor vs yaw,yaw-driven spread,PASS,MISSING,C0__ALL__xpd_floor_vs_yaw.png,tables/plot_data/M1-4__data.csv,
+M1-3,M1,C0,"XPD_floor,d",XPD_floor vs distance,weak distance dependence,PASS,READY,C0__ALL__xpd_floor_vs_distance.png,tables/plot_data/M1-3__data.csv,d_m dependence
+M1-4,M1,C0,"XPD_floor,yaw",XPD_floor vs yaw,yaw-driven spread,PASS,READY,C0__ALL__xpd_floor_vs_yaw.png,tables/plot_data/M1-4__data.csv,yaw_deg dependence
 M1-5,M1,C0,"xpd_floor_curve,freq",XPD_floor vs subband/frequency,frequency baseline decision,PASS,READY,M1-5__xpd_floor_vs_frequency.png,tables/plot_data/M1-5__data.csv,frequency-dependent floor
 M1-6,M1,C0,repeat_id,repeatability strip+box,Delta_repeat estimation,PASS,READY,M1-6__repeatability_strip_box.png,tables/plot_data/M1-6__data.csv,repeat strip+box
 M1-7,M1,C0,"Delta_floor,Delta_repeat",uncertainty budget summary,Delta_ref=max(),PASS,READY,M1-7__uncertainty_budget_summary.png,tables/plot_data/M1-7__data.csv,"Delta_ref=max(Delta_floor,Delta_repeat)"
