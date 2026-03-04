@@ -1,3 +1,3 @@
 W_target_s,expected_sign,expected_sign_hit_rate,expected_sign_hit_rate_ex,expected_sign_hit_rate_raw,median_xpd_target_ex_db,median_xpd_target_raw_db,n_eval,n_links,p10_xpd_target_ex_db,p10_xpd_target_raw_db,p90_xpd_target_ex_db,p90_xpd_target_raw_db,scenario,sign_metric_for_status,status,target_n
 3.0000000000000004e-09,negative,1.0,1.0,1.0,-32.934837696767445,-8.0,18,18,-32.934837696767445,-8.0,-32.934837696767445,-8.0,A2,excess,PASS,1
-3.0000000000000004e-09,positive,1.0,0.0,1.0,-16.93483769676745,8.0,12,24,-16.93483769676745,8.0,-16.934837696767445,8.000000000000002,A3,raw,PASS,2
+6.000000000000001e-09,positive,1.0,0.0,1.0,-16.93483769676745,8.0,12,24,-16.93483769676745,8.0,-16.934837696767445,8.000000000000002,A3,raw,PASS,2

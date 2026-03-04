@@ -807,9 +807,17 @@ def _make_g_plots(
             if str(r.get("scenario", "")) == "A2":
                 a2 = r
         if a3:
-            out = _prep_fig(fig_dir / "G2-2__A3_xpd_target_ex_summary.png")
             metric = str(a3.get("sign_metric_for_status", "excess")).lower()
             use_raw = metric == "raw"
+            out_name = "G2-2__A3_xpd_target_raw_summary.png" if use_raw else "G2-2__A3_xpd_target_ex_summary.png"
+            stale_name = "G2-2__A3_xpd_target_ex_summary.png" if use_raw else "G2-2__A3_xpd_target_raw_summary.png"
+            stale_path = fig_dir / stale_name
+            if stale_path.exists():
+                try:
+                    stale_path.unlink()
+                except Exception:
+                    pass
+            out = _prep_fig(fig_dir / out_name)
             p10 = _to_float(a3.get("p10_xpd_target_raw_db")) if use_raw else _to_float(a3.get("p10_xpd_target_ex_db"))
             p50 = _to_float(a3.get("median_xpd_target_raw_db")) if use_raw else _to_float(a3.get("median_xpd_target_ex_db"))
             p90 = _to_float(a3.get("p90_xpd_target_raw_db")) if use_raw else _to_float(a3.get("p90_xpd_target_ex_db"))
@@ -1699,7 +1707,7 @@ def _specs() -> list[PlotSpec]:
         PlotSpec("G1-2", "G1", "A2", "XPD_early_ex", "A2 XPD distribution by case", "sign stability", "G1-2__A2_xpd_early_ex_by_case.png"),
         PlotSpec("G1-3", "G1", "A2", "rho_early(linear) + incidence", "rho(linear) vs angle", "odd supports rho increase", "G1-3__A2_rho_vs_incidence.png"),
         PlotSpec("G2-1", "G2", "A3", "PDP + target window", "A3 target-window PDP", "even mechanism visibility", "G2-1__A3_pdp_overlay_target_early.png"),
-        PlotSpec("G2-2", "G2", "A3", "target-window summary", "A3 XPD_target(raw/ex) summary", "co-dominant tendency", "G2-2__A3_xpd_target_ex_summary.png"),
+        PlotSpec("G2-2", "G2", "A3", "target-window summary", "A3 XPD_target(raw/ex) summary", "co-dominant tendency", "G2-2__A3_xpd_target_raw_summary.png"),
         PlotSpec("G2-3", "G2", "A2/A3", "target-window summary", "A2 vs A3 target(raw/ex) compare", "sign reversal", "G2-3__A2_vs_A3_target_window_compare.png"),
         PlotSpec("G2-4", "G2", "A3", "target_in_early/first rates", "A3 system-early suitability", "role split", "G2-4__A3_target_inearly_first_rate.png"),
         PlotSpec("G3-1", "G3", "A2/A3", "XPD_ex", "A2/A3 variance violin", "not perfectly separable", "G3-1__A2_A3_xpd_ex_violin.png"),
