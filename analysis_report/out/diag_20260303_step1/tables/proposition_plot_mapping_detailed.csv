@@ -10,7 +10,7 @@ M2-1,M2,A2/A3/A4/A5/B,"XPD_early_ex, XPD_late_ex",scenario-wise excess box,beyon
 M2-2,M2,A2/A3/A4/A5/B,"XPD_ex,Delta_ref",exceedance rate,channel-claim fraction,PASS,READY,M2-2__exceedance_rate_bar.png,tables/plot_data/M2-2__data.csv,early/late exceedance
 M2-3,M2,C0 + indoor,floor vs indoor distributions,CDF overlay,separable distributions,PASS,READY,M2-3__cdf_floor_vs_indoor_overlay.png,tables/plot_data/M2-3__data.csv,C0 floor vs indoor excess
 G1-1,G1,A2,"PDP, W_target/W_early",A2 PDP overlay,odd cross-dominant trend,PASS,READY,G1-1__A2_pdp_overlay_target_early.png,tables/plot_data/G1-1__data.csv,W_target/W_early shown
-G1-2,G1,A2,XPD_early_ex,A2 XPD distribution by case,sign stability,PASS,READY,G1-2__A2_xpd_early_ex_by_case.png,tables/plot_data/G1-2__data.csv,case-wise early excess
+G1-2,G1,A2,XPD_early_ex,A2 XPD distribution by case,sign stability,PASS,READY,G1-2__A2_xpd_early_ex_by_case.png,tables/plot_data/G1-2__data.csv,A2 zoom + A3/A4 contrast
 G1-3,G1,A2,rho_early + incidence,rho vs angle,odd supports rho increase,PASS,READY,G1-3__A2_rho_vs_incidence.png,tables/plot_data/G1-3__data.csv,dominant-incidence proxy
 G2-1,G2,A3,PDP + target window,A3 target-window PDP,even mechanism visibility,PASS,READY,G2-1__A3_pdp_overlay_target_early.png,tables/plot_data/G2-1__data.csv,A3 mechanism view
 G2-2,G2,A3,target-window summary,A3 XPD_target_ex summary,co-dominant tendency,PASS,READY,G2-2__A3_xpd_target_ex_summary.png,tables/plot_data/G2-2__data.csv,from A3_target_window_sign.csv
