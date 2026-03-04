@@ -29,6 +29,33 @@ def main() -> None:
     checks = evaluate_success_criteria(rows)
     plots = generate_standard_plots_from_rows(rows, out_dir=args.plots_dir)
 
+    def _sem(r: dict) -> str:
+        s = str(r.get("stress_semantics", "")).strip().lower()
+        if s in {"off", "response", "polarization_only"}:
+            return s
+        sp = r.get("stress_path_structure_active", "")
+        sm = r.get("stress_polarization_mixer_active", "")
+        try:
+            if float(sp) == 1.0:
+                return "response"
+            if float(sm) == 1.0:
+                return "polarization_only"
+        except Exception:
+            pass
+        mode = str(r.get("stress_mode", "")).strip().lower()
+        if mode in {"geometry", "hybrid"}:
+            return "response"
+        if mode == "synthetic":
+            return "polarization_only"
+        return "off"
+
+    a5 = [r for r in rows if str(r.get("scenario_id", "")).upper() == "A5"]
+    a5_stress = [r for r in a5 if int(float(r.get("roughness_flag", 0) or 0)) == 1 or int(float(r.get("human_flag", 0) or 0)) == 1]
+    cnt = {"response": 0, "polarization_only": 0, "off": 0, "unknown": 0}
+    for r in a5_stress:
+        k = _sem(r)
+        cnt[k if k in cnt else "unknown"] += 1
+
     lines = ["# Success Report", ""]
     lines.append(f"- link_metrics_csv: {csv_paths}")
     lines.append(f"- n_links: {len(rows)}")
@@ -87,6 +114,14 @@ def main() -> None:
     lines.append(f"- p10_xpd_early_base: {br.get('p10_xpd_early_base')}")
     lines.append(f"- p10_xpd_early_stress: {br.get('p10_xpd_early_stress')}")
     lines.append(f"- pass_breaking_trend: {br.get('pass_breaking_trend')}")
+    lines.append("")
+    lines.append("### A5 Stress Semantics")
+    lines.append("")
+    lines.append(f"- n_A5_stress_rows: {len(a5_stress)}")
+    lines.append(f"- n_response: {cnt.get('response', 0)}")
+    lines.append(f"- n_polarization_only: {cnt.get('polarization_only', 0)}")
+    lines.append(f"- contamination_response_ready: {cnt.get('response', 0) > 0}")
+    lines.append("- note: synthetic-only는 편파축 stress이며, delay/path contamination-response 해석은 geometry/hybrid(response)에서만 유효")
     lines.append("")
 
     b = checks.get("B_space", {})

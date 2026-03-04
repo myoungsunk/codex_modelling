@@ -48,7 +48,23 @@ def build_link_U_from_scenario(
     human = int(mm.get("human_flag", 0))
     obst = int(mm.get("obstacle_flag", 0))
     extras: dict[str, Any] = {}
-    for k in ["rx_x", "rx_y", "rx_z", "scenario_id", "case_id", "yaw_deg", "pitch_deg", "basis", "los_block_method", "stress_mode", "rep_id", "rep_outer"]:
+    for k in [
+        "rx_x",
+        "rx_y",
+        "rx_z",
+        "scenario_id",
+        "case_id",
+        "yaw_deg",
+        "pitch_deg",
+        "basis",
+        "los_block_method",
+        "stress_mode",
+        "stress_semantics",
+        "stress_path_structure_active",
+        "stress_polarization_mixer_active",
+        "rep_id",
+        "rep_outer",
+    ]:
         if k in mm:
             extras[k] = mm.get(k)
     tau_lim = None

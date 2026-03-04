@@ -12,7 +12,7 @@ _SCENARIO_MEANING: dict[str, str] = {
     "A2": "LOS-blocked single-bounce(odd) control to probe early cross-leakage increase.",
     "A3": "LOS-blocked double-bounce(even) control to test co-dominant recovery trend.",
     "A4": "LOS-blocked material/angle sweep to isolate material-conditional leakage statistics.",
-    "A5": "LOS-blocked depolarization-stress scenario (roughness/human/scatter) for tail-risk.",
+    "A5": "LOS-blocked stress scenario: geometric/hybrid => delay-path response, synthetic => polarization-only stress.",
     "B1": "Room grid baseline (mostly LOS) for spatial Z/U trend mapping.",
     "B2": "Room grid with partition obstacle to induce partial NLOS/blocked regions.",
     "B3": "Room grid with corner obstacles for stronger NLOS and multipath complexity.",

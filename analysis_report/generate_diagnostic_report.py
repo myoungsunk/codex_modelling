@@ -161,6 +161,71 @@ def _a5_pair_key(row: dict[str, Any]) -> tuple[Any, ...]:
     )
 
 
+def _a5_row_semantics(row: dict[str, Any]) -> str:
+    s = str(row.get("stress_semantics", "")).strip().lower()
+    if s in {"off", "response", "polarization_only"}:
+        return s
+    sp = _num(row.get("stress_path_structure_active", np.nan))
+    sm = _num(row.get("stress_polarization_mixer_active", np.nan))
+    if np.isfinite(sp) or np.isfinite(sm):
+        if int(round(sp)) == 1:
+            return "response"
+        if int(round(sm)) == 1:
+            return "polarization_only"
+        return "off"
+    mode = str(row.get("stress_mode", "")).strip().lower()
+    stress_on = int(_num(row.get("roughness_flag", 0))) == 1 or int(_num(row.get("human_flag", 0))) == 1
+    if not stress_on:
+        return "off"
+    if mode in {"geometry", "hybrid"}:
+        return "response"
+    if mode == "synthetic":
+        return "polarization_only"
+    if mode == "none":
+        return "off"
+    return "unknown"
+
+
+def _a5_semantics_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    a5_rows = [r for r in rows if str(r.get("scenario_id", "")).upper() == "A5"]
+    stress_rows = [r for r in a5_rows if int(_num(r.get("roughness_flag", 0))) == 1 or int(_num(r.get("human_flag", 0))) == 1]
+    cnt = {"response": 0, "polarization_only": 0, "off": 0, "unknown": 0}
+    for r in stress_rows:
+        sem = _a5_row_semantics(r)
+        cnt[sem] = int(cnt.get(sem, 0) + 1)
+    total = int(len(stress_rows))
+    dominant = "none"
+    if total > 0:
+        dominant = max(["response", "polarization_only", "off", "unknown"], key=lambda k: int(cnt.get(k, 0)))
+    if total == 0:
+        status = "INCONCLUSIVE"
+        note = "A5 stress rows not found."
+    elif int(cnt.get("response", 0)) > 0 and int(cnt.get("polarization_only", 0)) == 0:
+        status = "PASS"
+        note = "Geometric path-structure stress is active; delay/path contamination-response interpretation is valid."
+    elif int(cnt.get("response", 0)) > 0 and int(cnt.get("polarization_only", 0)) > 0:
+        status = "WARN"
+        note = "Mixed A5 semantics detected (response + polarization_only); interpret delay-structure claims only on response subset."
+    elif int(cnt.get("response", 0)) == 0 and int(cnt.get("polarization_only", 0)) > 0:
+        status = "WARN"
+        note = "Synthetic depol only: polarization-axis stress is active, but delay/path-structure stress is not active."
+    else:
+        status = "WARN"
+        note = "A5 stress semantics could not be resolved reliably."
+    return {
+        "status": str(status),
+        "n_a5_rows": int(len(a5_rows)),
+        "n_stress_rows": int(total),
+        "n_response": int(cnt.get("response", 0)),
+        "n_polarization_only": int(cnt.get("polarization_only", 0)),
+        "n_off": int(cnt.get("off", 0)),
+        "n_unknown": int(cnt.get("unknown", 0)),
+        "dominant_semantics": str(dominant),
+        "contamination_response_ready": bool(int(cnt.get("response", 0)) > 0),
+        "note": str(note),
+    }
+
+
 def _inc_bin(v: float) -> str:
     if not np.isfinite(v):
         return "NA"
@@ -1256,7 +1321,18 @@ def _diagnostic_checks(
     scenario_rows = metrics_lib.split_by_scenario(link_rows)
     scenario_roles = dict(cfg.get("scenario_roles", {}))
     a3_role = str(scenario_roles.get("A3", "mechanism")).strip().lower()
-    a5_role = str(scenario_roles.get("A5", "stress_response")).strip().lower()
+    a5_semantics = _a5_semantics_summary(link_rows)
+    a5_role_cfg = scenario_roles.get("A5", None)
+    if a5_role_cfg is None:
+        dom = str(a5_semantics.get("dominant_semantics", "none")).strip().lower()
+        if dom == "polarization_only":
+            a5_role = "stress_polarization_only"
+        elif dom == "response":
+            a5_role = "stress_response"
+        else:
+            a5_role = "stress_response"
+    else:
+        a5_role = str(a5_role_cfg).strip().lower()
 
     # A1 LOS blocked
     a1 = []
@@ -1296,6 +1372,7 @@ def _diagnostic_checks(
         "status": "WARN",
         "note": "Coordinate penetration sanity needs scenario geometry file review; not inferable from standard outputs only.",
     }
+    checks["A5_stress_semantics"] = dict(a5_semantics)
 
     # B: time-resolution checks with purpose-specific windows
     ws = dict(cfg.get("windows", {}))
@@ -1445,6 +1522,9 @@ def _diagnostic_checks(
         "A3_system_early_status": a3_early_status,
         "A5_role": a5_role,
         "A5_target_mode": a5_target_mode,
+        "A5_stress_semantics": str(a5_semantics.get("dominant_semantics", "none")),
+        "A5_contamination_response_ready": bool(a5_semantics.get("contamination_response_ready", False)),
+        "A5_semantics_note": str(a5_semantics.get("note", "")),
     }
 
     # C effect vs floor (C2-M / C2-S endpoints)
@@ -1575,6 +1655,13 @@ def _diagnostic_checks(
     else:
         c2s_status = "FAIL"
 
+    c2s_semantics_gate = "PASS"
+    if bool(a5_semantics.get("n_stress_rows", 0)) and not bool(a5_semantics.get("contamination_response_ready", False)):
+        # Synthetic-only stress cannot support delay/path-structure contamination-response claims.
+        c2s_semantics_gate = "WARN"
+        if c2s_status == "PASS":
+            c2s_status = "WARN"
+
     if c2m_status == "PASS" and c2s_status == "PASS":
         c2_status = "PASS"
     elif c2m_status == "FAIL" and c2s_status == "FAIL":
@@ -1623,6 +1710,9 @@ def _diagnostic_checks(
         "C2S_late_ex_var_ratio": float(var_ratio),
         "C2S_gate_delta_p_target_db": float(gate_dp_target_db),
         "C2S_gate_status": str(gate_status),
+        "C2S_semantics_gate_status": str(c2s_semantics_gate),
+        "C2S_semantics": str(a5_semantics.get("dominant_semantics", "none")),
+        "C2S_semantics_note": str(a5_semantics.get("note", "")),
         "C2S_gate_pair_count": int(len(dp_target_vals)),
     }
 
@@ -1945,6 +2035,9 @@ def _diagnostic_checks(
             "LOSflag",
         ],
         "note": "No complex-phase fields are used by this report pipeline.",
+        "a5_stress_semantics": str(a5_semantics.get("dominant_semantics", "none")),
+        "a5_contamination_response_ready": bool(a5_semantics.get("contamination_response_ready", False)),
+        "a5_semantics_note": str(a5_semantics.get("note", "")),
     }
     return checks
 
@@ -2108,6 +2201,35 @@ def _build_markdown(
     a3c = checks.get("A3_coord_sanity", {})
     lines.append(f"- A3 coordinate sanity: **{a3c.get('status', 'WARN')}** ({a3c.get('note', '')})")
     lines.append("")
+    a5s = checks.get("A5_stress_semantics", {})
+    if isinstance(a5s, dict):
+        lines.append("- A5 stress semantics (path-structure vs polarization-only)")
+        lines.append("")
+        lines.append(
+            report_md.md_table(
+                [
+                    {
+                        "status": a5s.get("status", ""),
+                        "dominant_semantics": a5s.get("dominant_semantics", ""),
+                        "n_stress_rows": a5s.get("n_stress_rows", 0),
+                        "n_response": a5s.get("n_response", 0),
+                        "n_polarization_only": a5s.get("n_polarization_only", 0),
+                        "contamination_response_ready": a5s.get("contamination_response_ready", False),
+                        "note": a5s.get("note", ""),
+                    }
+                ],
+                [
+                    "status",
+                    "dominant_semantics",
+                    "n_stress_rows",
+                    "n_response",
+                    "n_polarization_only",
+                    "contamination_response_ready",
+                    "note",
+                ],
+            )
+        )
+        lines.append("")
     if a3_review_rows:
         lines.append("- A3 geometry manual review (ray-path visualization required before experiment)")
         lines.append("")
@@ -2167,6 +2289,8 @@ def _build_markdown(
                     "A3_mechanism_status": b.get("A3_mechanism_status", ""),
                     "A3_system_early_status": b.get("A3_system_early_status", ""),
                     "A5_target_mode": b.get("A5_target_mode", ""),
+                    "A5_stress_semantics": b.get("A5_stress_semantics", ""),
+                    "A5_contamination_response_ready": b.get("A5_contamination_response_ready", False),
                     "min_delay_gap_median_s": b.get("B2_min_delay_gap_median_s", np.nan),
                     "B2_status": b.get("B2_status", ""),
                     "B3_status": b.get("B3_status", ""),
@@ -2194,6 +2318,8 @@ def _build_markdown(
                 "A3_mechanism_status",
                 "A3_system_early_status",
                 "A5_target_mode",
+                "A5_stress_semantics",
+                "A5_contamination_response_ready",
                 "min_delay_gap_median_s",
                 "B2_status",
                 "B3_status",
@@ -2204,6 +2330,9 @@ def _build_markdown(
         )
     )
     lines.append("")
+    if str(b.get("A5_semantics_note", "")).strip():
+        lines.append(f"- A5 semantics note: {b.get('A5_semantics_note', '')}")
+        lines.append("")
     wfloor = b.get("W_floor_detail", {})
     if isinstance(wfloor, dict):
         lines.append("- W_floor(C0) contamination summary")
@@ -2356,6 +2485,8 @@ def _build_markdown(
                     "C2S_primary_status": c.get("C2S_primary_status", ""),
                     "C2S_gate_delta_p_target_db": c.get("C2S_gate_delta_p_target_db", np.nan),
                     "C2S_gate_status": c.get("C2S_gate_status", ""),
+                    "C2S_semantics_gate_status": c.get("C2S_semantics_gate_status", ""),
+                    "C2S_semantics": c.get("C2S_semantics", ""),
                     "C2S_status": c.get("C2S_status", ""),
                     "C2_status": c.get("C2_status", ""),
                 }
@@ -2376,12 +2507,17 @@ def _build_markdown(
                 "C2S_primary_status",
                 "C2S_gate_delta_p_target_db",
                 "C2S_gate_status",
+                "C2S_semantics_gate_status",
+                "C2S_semantics",
                 "C2S_status",
                 "C2_status",
             ],
         )
     )
     lines.append("")
+    if str(c.get("C2S_semantics_note", "")).strip():
+        lines.append(f"- C2-S semantics note: {c.get('C2S_semantics_note', '')}")
+        lines.append("")
 
     # D
     d = checks.get("D_identifiability", {})
@@ -2590,6 +2726,10 @@ def _build_markdown(
     used = e.get("used_metrics", [])
     if isinstance(used, list):
         lines.append("- Used metrics: " + ", ".join(str(x) for x in used))
+    lines.append(f"- A5 stress semantics: `{e.get('a5_stress_semantics', 'none')}`")
+    lines.append(f"- A5 contamination-response ready: `{e.get('a5_contamination_response_ready', False)}`")
+    if str(e.get("a5_semantics_note", "")).strip():
+        lines.append(f"- A5 semantics note: {e.get('a5_semantics_note', '')}")
     lines.append("")
 
     lines.append("## Scenario Sections")
@@ -2598,6 +2738,16 @@ def _build_markdown(
         lines.append(f"### {s}")
         lines.append("")
         lines.append(f"- 의미: {report_md.scenario_meaning(s)}")
+        if s == "A5":
+            a5s2 = checks.get("A5_stress_semantics", {})
+            if isinstance(a5s2, dict):
+                lines.append(
+                    f"- stress_semantics: `{a5s2.get('dominant_semantics', 'none')}` "
+                    f"(response={a5s2.get('n_response', 0)}, polarization_only={a5s2.get('n_polarization_only', 0)})"
+                )
+                lines.append(f"- contamination-response ready: `{a5s2.get('contamination_response_ready', False)}`")
+                if str(a5s2.get("note", "")).strip():
+                    lines.append(f"- note: {a5s2.get('note', '')}")
         lines.append("")
         scene_png = scenario_scene[s]
         scene_rel = report_md.relpath(scene_png, out_root)

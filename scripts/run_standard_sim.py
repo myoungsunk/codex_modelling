@@ -1114,7 +1114,7 @@ def main() -> None:
     parser.add_argument("--a4-include-late-panel", type=str, default="true")
     parser.add_argument("--a4-late-offset-m", type=float, default=2.4)
     parser.add_argument("--los-block-mode", type=str, default="occluder", choices=["synthetic", "occluder"])
-    parser.add_argument("--a5-stress-mode", type=str, default="hybrid", choices=["none", "synthetic", "geometry", "hybrid"])
+    parser.add_argument("--a5-stress-mode", type=str, default="geometry", choices=["none", "synthetic", "geometry", "hybrid"])
     parser.add_argument("--a5-scatterer-count", type=int, default=3)
     parser.add_argument("--allow-a5-synthetic-only", action="store_true")
     parser.add_argument("--a5-max-cases", type=int, default=0)

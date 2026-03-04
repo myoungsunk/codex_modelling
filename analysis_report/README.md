@@ -58,6 +58,9 @@ python analysis_report/generate_proposition_plot_mapping_detailed.py --run-group
 - 진단 C는 endpoint를 분리합니다.
   - `C2-M`(material): primary=`XPD_early_excess`, secondary=`XPD_late_excess`/`L_pol`
   - `C2-S`(stress): primary=`L_pol`, secondary=`rho_early`/`DS`/`XPD_late_excess`, gate=`ΔP_target,total`
+- A5 stress 해석 규칙:
+  - `stress_semantics=response`(geometry/hybrid): delay/path contamination-response 해석 가능
+  - `stress_semantics=polarization_only`(synthetic): 편파축 stress만 의미하며 delay/path 구조 변화 주장 금지
 - 최종 보고서 산출물:
   - `analysis_report/out/<run_group>/final_diagnostic_decision.md`
   - `analysis_report/out/<run_group>/scenario_space_plots.md`

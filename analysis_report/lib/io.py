@@ -170,6 +170,8 @@ _NUMERIC_KEYS = {
     "roughness_flag",
     "human_flag",
     "obstacle_flag",
+    "stress_path_structure_active",
+    "stress_polarization_mixer_active",
     "yaw_deg",
     "pitch_deg",
 }
