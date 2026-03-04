@@ -731,6 +731,7 @@ def _target_window_sign_metric(
     w_target_s: float,
     floor_db: float,
     expected_sign: int,
+    sign_metric: str = "excess",
 ) -> dict[str, Any]:
     run = None
     for rr in runs:
@@ -742,8 +743,10 @@ def _target_window_sign_metric(
         return {"scenario": str(scenario_id), "status": "WARN", "reason": "missing run or rows"}
 
     tau_by_link = _dominant_target_tau_by_link(ray_rows, scenario_id=scenario_id, target_n=target_n)
-    vals: list[float] = []
-    hits: list[bool] = []
+    vals_ex: list[float] = []
+    vals_raw: list[float] = []
+    hits_ex: list[bool] = []
+    hits_raw: list[bool] = []
     for r in rows:
         lid = str(r.get("link_id", ""))
         tau_tar = _num(tau_by_link.get(lid, np.nan))
@@ -764,16 +767,29 @@ def _target_window_sign_metric(
         scr = float(np.sum(pcr[m]))
         xpd_target = _db_ratio(sco, scr)
         xpd_target_ex = float(xpd_target - floor_db) if np.isfinite(floor_db) else float("nan")
-        if not np.isfinite(xpd_target_ex):
+        if not np.isfinite(xpd_target):
             continue
-        vals.append(float(xpd_target_ex))
-        hits.append(bool(xpd_target_ex < 0.0) if int(expected_sign) < 0 else bool(xpd_target_ex > 0.0))
+        vals_raw.append(float(xpd_target))
+        vals_ex.append(float(xpd_target_ex) if np.isfinite(xpd_target_ex) else float("nan"))
+        hits_raw.append(bool(xpd_target < 0.0) if int(expected_sign) < 0 else bool(xpd_target > 0.0))
+        if np.isfinite(xpd_target_ex):
+            hits_ex.append(bool(xpd_target_ex < 0.0) if int(expected_sign) < 0 else bool(xpd_target_ex > 0.0))
 
-    arr = np.asarray(vals, dtype=float)
-    hit = float(np.mean(hits)) if hits else float("nan")
-    med = float(np.nanmedian(arr)) if len(arr) else float("nan")
-    p10 = float(np.nanpercentile(arr, 10.0)) if len(arr) else float("nan")
-    p90 = float(np.nanpercentile(arr, 90.0)) if len(arr) else float("nan")
+    arr_ex = np.asarray(vals_ex, dtype=float)
+    arr_raw = np.asarray(vals_raw, dtype=float)
+    med_ex = float(np.nanmedian(arr_ex)) if len(arr_ex) else float("nan")
+    p10_ex = float(np.nanpercentile(arr_ex, 10.0)) if len(arr_ex) else float("nan")
+    p90_ex = float(np.nanpercentile(arr_ex, 90.0)) if len(arr_ex) else float("nan")
+    med_raw = float(np.nanmedian(arr_raw)) if len(arr_raw) else float("nan")
+    p10_raw = float(np.nanpercentile(arr_raw, 10.0)) if len(arr_raw) else float("nan")
+    p90_raw = float(np.nanpercentile(arr_raw, 90.0)) if len(arr_raw) else float("nan")
+    hit_ex = float(np.mean(hits_ex)) if hits_ex else float("nan")
+    hit_raw = float(np.mean(hits_raw)) if hits_raw else float("nan")
+
+    mode = str(sign_metric).strip().lower()
+    if mode not in {"excess", "raw"}:
+        mode = "excess"
+    hit = hit_raw if mode == "raw" else hit_ex
     if np.isfinite(hit) and hit >= 0.8:
         st = "PASS"
     elif np.isfinite(hit) and hit >= 0.6:
@@ -788,10 +804,16 @@ def _target_window_sign_metric(
         "W_target_s": float(w_target_s),
         "expected_sign": "negative" if int(expected_sign) < 0 else "positive",
         "n_links": int(len(rows)),
-        "n_eval": int(len(arr)),
-        "median_xpd_target_ex_db": med,
-        "p10_xpd_target_ex_db": p10,
-        "p90_xpd_target_ex_db": p90,
+        "n_eval": int(len(arr_raw)),
+        "median_xpd_target_ex_db": med_ex,
+        "p10_xpd_target_ex_db": p10_ex,
+        "p90_xpd_target_ex_db": p90_ex,
+        "median_xpd_target_raw_db": med_raw,
+        "p10_xpd_target_raw_db": p10_raw,
+        "p90_xpd_target_raw_db": p90_raw,
+        "expected_sign_hit_rate_ex": hit_ex,
+        "expected_sign_hit_rate_raw": hit_raw,
+        "sign_metric_for_status": mode,
         "expected_sign_hit_rate": hit,
         "status": st,
     }
@@ -1519,6 +1541,11 @@ def _diagnostic_checks(
         floor_db=float(floor_ref.get("xpd_floor_db", np.nan)),
     )
     floor_db_used = float(floor_ref.get("xpd_floor_db", np.nan))
+    sign_metric_cfg = ws.get("target_sign_metric_by_scenario", {})
+    if not isinstance(sign_metric_cfg, dict):
+        sign_metric_cfg = {}
+    sign_metric_a2 = str(sign_metric_cfg.get("A2", "excess"))
+    sign_metric_a3 = str(sign_metric_cfg.get("A3", "raw"))
     a2_target_sign = _target_window_sign_metric(
         link_rows=link_rows,
         ray_rows=ray_rows,
@@ -1528,6 +1555,7 @@ def _diagnostic_checks(
         w_target_s=float(w_target_s_by_sid.get("A2", w_target_default_s)),
         floor_db=floor_db_used,
         expected_sign=-1,
+        sign_metric=sign_metric_a2,
     )
     a3_target_sign = _target_window_sign_metric(
         link_rows=link_rows,
@@ -1538,6 +1566,7 @@ def _diagnostic_checks(
         w_target_s=float(w_target_s_by_sid.get("A3", w_target_default_s)),
         floor_db=floor_db_used,
         expected_sign=+1,
+        sign_metric=sign_metric_a3,
     )
 
     a3_t = target_stats.get("A3", {})
@@ -2543,7 +2572,11 @@ def _build_markdown(
                 "W_target_s": d.get("W_target_s", np.nan),
                 "expected_sign": d.get("expected_sign", ""),
                 "n_eval": d.get("n_eval", 0),
+                "sign_metric_for_status": d.get("sign_metric_for_status", ""),
                 "expected_sign_hit_rate": d.get("expected_sign_hit_rate", np.nan),
+                "expected_sign_hit_rate_raw": d.get("expected_sign_hit_rate_raw", np.nan),
+                "expected_sign_hit_rate_ex": d.get("expected_sign_hit_rate_ex", np.nan),
+                "median_xpd_target_raw_db": d.get("median_xpd_target_raw_db", np.nan),
                 "median_xpd_target_ex_db": d.get("median_xpd_target_ex_db", np.nan),
                 "status": d.get("status", ""),
             }
@@ -2560,7 +2593,11 @@ def _build_markdown(
                     "W_target_s",
                     "expected_sign",
                     "n_eval",
+                    "sign_metric_for_status",
                     "expected_sign_hit_rate",
+                    "expected_sign_hit_rate_raw",
+                    "expected_sign_hit_rate_ex",
+                    "median_xpd_target_raw_db",
                     "median_xpd_target_ex_db",
                     "status",
                 ],

@@ -748,34 +748,40 @@ def _make_g_plots(
                 a2 = r
         if a3:
             out = _prep_fig(fig_dir / "G2-2__A3_xpd_target_ex_summary.png")
-            p10 = _to_float(a3.get("p10_xpd_target_ex_db"))
-            p50 = _to_float(a3.get("median_xpd_target_ex_db"))
-            p90 = _to_float(a3.get("p90_xpd_target_ex_db"))
+            metric = str(a3.get("sign_metric_for_status", "excess")).lower()
+            use_raw = metric == "raw"
+            p10 = _to_float(a3.get("p10_xpd_target_raw_db")) if use_raw else _to_float(a3.get("p10_xpd_target_ex_db"))
+            p50 = _to_float(a3.get("median_xpd_target_raw_db")) if use_raw else _to_float(a3.get("median_xpd_target_ex_db"))
+            p90 = _to_float(a3.get("p90_xpd_target_raw_db")) if use_raw else _to_float(a3.get("p90_xpd_target_ex_db"))
             fig, ax = plt.subplots(figsize=(5.6, 4.2))
             ax.bar(["p10", "median", "p90"], [p10, p50, p90], color=_scenario_color("A3"))
             ax.axhline(0.0, color="#666", lw=0.9)
-            ax.set_ylabel("XPD_target_ex (dB)")
-            ax.set_title("G2-2 A3 target-window summary")
+            ax.set_ylabel("XPD_target_raw (dB)" if use_raw else "XPD_target_ex (dB)")
+            ax.set_title(f"G2-2 A3 target-window summary ({metric})")
             _style_db_axis(ax)
             ax.grid(True, axis="y", alpha=0.3)
             fig.tight_layout()
             fig.savefig(out, dpi=140)
             plt.close(fig)
-            detail_rows.append({"plot_id": "G2-2", "file": out.name, "note": "from A3_target_window_sign.csv"})
+            detail_rows.append({"plot_id": "G2-2", "file": out.name, "note": f"from A3_target_window_sign.csv ({metric})"})
         if a2 and a3:
             out = _prep_fig(fig_dir / "G2-3__A2_vs_A3_target_window_compare.png")
-            vals = [_to_float(a2.get("median_xpd_target_ex_db")), _to_float(a3.get("median_xpd_target_ex_db"))]
+            metric2 = str(a3.get("sign_metric_for_status", "excess")).lower()
+            use_raw2 = metric2 == "raw"
+            a2v = _to_float(a2.get("median_xpd_target_raw_db")) if use_raw2 else _to_float(a2.get("median_xpd_target_ex_db"))
+            a3v = _to_float(a3.get("median_xpd_target_raw_db")) if use_raw2 else _to_float(a3.get("median_xpd_target_ex_db"))
+            vals = [a2v, a3v]
             fig, ax = plt.subplots(figsize=(5.8, 4.2))
             ax.bar(["A2", "A3"], vals, color=[_scenario_color("A2"), _scenario_color("A3")])
             ax.axhline(0.0, color="#666", lw=0.9)
-            ax.set_ylabel("median XPD_target_ex (dB)")
-            ax.set_title("G2-3 A2 vs A3 target-window comparison")
+            ax.set_ylabel("median XPD_target_raw (dB)" if use_raw2 else "median XPD_target_ex (dB)")
+            ax.set_title(f"G2-3 A2 vs A3 target-window comparison ({metric2})")
             _style_db_axis(ax)
             ax.grid(True, axis="y", alpha=0.3)
             fig.tight_layout()
             fig.savefig(out, dpi=140)
             plt.close(fig)
-            detail_rows.append({"plot_id": "G2-3", "file": out.name, "note": "target-window median compare"})
+            detail_rows.append({"plot_id": "G2-3", "file": out.name, "note": f"target-window median compare ({metric2})"})
 
     # G2-4: target_in_Wearly / first-rate bars from diagnostics
     if bt:
@@ -1588,8 +1594,8 @@ def _specs() -> list[PlotSpec]:
         PlotSpec("G1-2", "G1", "A2", "XPD_early_ex", "A2 XPD distribution by case", "sign stability", "G1-2__A2_xpd_early_ex_by_case.png"),
         PlotSpec("G1-3", "G1", "A2", "rho_early + incidence", "rho vs angle", "odd supports rho increase", "G1-3__A2_rho_vs_incidence.png"),
         PlotSpec("G2-1", "G2", "A3", "PDP + target window", "A3 target-window PDP", "even mechanism visibility", "G2-1__A3_pdp_overlay_target_early.png"),
-        PlotSpec("G2-2", "G2", "A3", "target-window summary", "A3 XPD_target_ex summary", "co-dominant tendency", "G2-2__A3_xpd_target_ex_summary.png"),
-        PlotSpec("G2-3", "G2", "A2/A3", "target-window summary", "A2 vs A3 target compare", "sign reversal", "G2-3__A2_vs_A3_target_window_compare.png"),
+        PlotSpec("G2-2", "G2", "A3", "target-window summary", "A3 XPD_target(raw/ex) summary", "co-dominant tendency", "G2-2__A3_xpd_target_ex_summary.png"),
+        PlotSpec("G2-3", "G2", "A2/A3", "target-window summary", "A2 vs A3 target(raw/ex) compare", "sign reversal", "G2-3__A2_vs_A3_target_window_compare.png"),
         PlotSpec("G2-4", "G2", "A3", "target_in_early/first rates", "A3 system-early suitability", "role split", "G2-4__A3_target_inearly_first_rate.png"),
         PlotSpec("G3-1", "G3", "A2/A3", "XPD_ex", "A2/A3 variance violin", "not perfectly separable", "G3-1__A2_A3_xpd_ex_violin.png"),
         PlotSpec("G3-2", "G3", "A2/A3/A4/A5", "|XPD_ex| + U", "|XPD_ex| vs EL", "conditional variation", "G3-2__abs_xpd_ex_vs_el_scatter.png"),
@@ -1910,9 +1916,20 @@ def _build_plot_data_rows(
                 sc = str(r.get("scenario", ""))
                 if plot_id == "G2-2" and sc != "A3":
                     continue
-                y = _to_float(r.get("median_xpd_target_ex_db"))
+                metric = str(r.get("sign_metric_for_status", "excess")).lower()
+                if metric == "raw":
+                    y = _to_float(r.get("median_xpd_target_raw_db"))
+                else:
+                    y = _to_float(r.get("median_xpd_target_ex_db"))
                 hit = _to_float(r.get("expected_sign_hit_rate"))
-                add_row("median_xpd_target_ex_db", sc, y, y, scenario_id=sc, meta=f"expected_sign_hit_rate={hit:.4f}")
+                add_row(
+                    "median_xpd_target_raw_db" if metric == "raw" else "median_xpd_target_ex_db",
+                    sc,
+                    y,
+                    y,
+                    scenario_id=sc,
+                    meta=f"sign_metric={metric};expected_sign_hit_rate={hit:.4f}",
+                )
         return rows
 
     if plot_id == "G2-4":

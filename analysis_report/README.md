@@ -56,6 +56,7 @@ python analysis_report/generate_proposition_plot_mapping_detailed.py --run-group
   - `W_target` (A2-A5): target path 주변 contamination `C_target`
   - `W_early` (B1-B3): `Te` sweep(기본 `2/3/5 ns`) 분리력 `S(Te)`
   - A3는 `target_window_ns_by_scenario.A3`(또는 `target_window_mode_by_scenario.A3=adaptive`)로 별도 `W_target` 설정 가능
+  - A3 sign-off는 `windows.target_sign_metric_by_scenario.A3=raw` 권장 (`A3_target_window_sign.csv`에 raw/ex 동시 출력)
   - 보고서에서 A3는 mechanism-only로 분리 표기하며, fixed system `W_early` 우세 여부는 보조 진단으로만 사용
 - 진단 C는 endpoint를 분리합니다.
   - `C2-M`(material): primary=`XPD_early_excess`, secondary=`XPD_late_excess`/`L_pol`

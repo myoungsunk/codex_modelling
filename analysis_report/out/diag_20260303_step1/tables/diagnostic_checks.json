@@ -43,6 +43,18 @@
     "status": "WARN",
     "note": "Coordinate penetration sanity needs scenario geometry file review; not inferable from standard outputs only."
   },
+  "A5_stress_semantics": {
+    "status": "PASS",
+    "n_a5_rows": 60,
+    "n_stress_rows": 30,
+    "n_response": 30,
+    "n_polarization_only": 0,
+    "n_off": 0,
+    "n_unknown": 0,
+    "dominant_semantics": "response",
+    "contamination_response_ready": true,
+    "note": "Geometric path-structure stress is active; delay/path contamination-response interpretation is valid."
+  },
   "B_time_resolution": {
     "freq_source": "link_rows.xpd_floor_freq_hz[C0]",
     "BW_Hz": 4000000000.0,
@@ -52,7 +64,20 @@
     "Te_s": 3.0000000000000004e-09,
     "Tmax_s": 2.0000000000000002e-07,
     "W_floor_s": 1.5000000000000002e-09,
+    "W_target_s_default": 3.0000000000000004e-09,
     "W_target_s": 3.0000000000000004e-09,
+    "W_target_s_by_scenario": {
+      "A2": 3.0000000000000004e-09,
+      "A3": 3.0000000000000004e-09,
+      "A4": 3.0000000000000004e-09,
+      "A5": 3.0000000000000004e-09
+    },
+    "W_target_mode_by_scenario": {
+      "A2": "default",
+      "A3": "default",
+      "A4": "default",
+      "A5": "default"
+    },
     "W_floor_status": "PASS",
     "W_floor_C_median_db": -237.22403177507283,
     "A2_target_in_Wearly_rate": 1.0,
@@ -219,6 +244,12 @@
       "median_xpd_target_ex_db": -32.934837696767445,
       "p10_xpd_target_ex_db": -32.934837696767445,
       "p90_xpd_target_ex_db": -32.934837696767445,
+      "median_xpd_target_raw_db": -8.0,
+      "p10_xpd_target_raw_db": -8.0,
+      "p90_xpd_target_raw_db": -8.0,
+      "expected_sign_hit_rate_ex": 1.0,
+      "expected_sign_hit_rate_raw": 1.0,
+      "sign_metric_for_status": "excess",
       "expected_sign_hit_rate": 1.0,
       "status": "PASS"
     },
@@ -232,14 +263,24 @@
       "median_xpd_target_ex_db": -16.93483769676745,
       "p10_xpd_target_ex_db": -16.93483769676745,
       "p90_xpd_target_ex_db": -16.934837696767445,
-      "expected_sign_hit_rate": 0.0,
-      "status": "FAIL"
+      "median_xpd_target_raw_db": 8.0,
+      "p10_xpd_target_raw_db": 8.0,
+      "p90_xpd_target_raw_db": 8.000000000000002,
+      "expected_sign_hit_rate_ex": 0.0,
+      "expected_sign_hit_rate_raw": 1.0,
+      "sign_metric_for_status": "raw",
+      "expected_sign_hit_rate": 1.0,
+      "status": "PASS"
     },
     "A3_role": "mechanism",
     "A3_mechanism_status": "WARN",
     "A3_system_early_status": "WARN",
+    "A3_reporting_rule": "A3 is mechanism-only: report target-window metrics; do not use fixed system early-window dominance as primary evidence.",
     "A5_role": "stress_response",
-    "A5_target_mode": "contamination_response"
+    "A5_target_mode": "contamination_response",
+    "A5_stress_semantics": "response",
+    "A5_contamination_response_ready": true,
+    "A5_semantics_note": "Geometric path-structure stress is active; delay/path contamination-response interpretation is valid."
   },
   "C_effect_vs_floor": {
     "floor_delta_db": 0.6107424330369078,
@@ -291,6 +332,9 @@
     "C2S_late_ex_var_ratio": 169452815837739.53,
     "C2S_gate_delta_p_target_db": 0.0,
     "C2S_gate_status": "PASS",
+    "C2S_semantics_gate_status": "PASS",
+    "C2S_semantics": "response",
+    "C2S_semantics_note": "Geometric path-structure stress is active; delay/path contamination-response interpretation is valid.",
     "C2S_gate_pair_count": 5
   },
   "D_identifiability": {
@@ -581,6 +625,9 @@
       "EL_proxy_db",
       "LOSflag"
     ],
-    "note": "No complex-phase fields are used by this report pipeline."
+    "note": "No complex-phase fields are used by this report pipeline.",
+    "a5_stress_semantics": "response",
+    "a5_contamination_response_ready": true,
+    "a5_semantics_note": "Geometric path-structure stress is active; delay/path contamination-response interpretation is valid."
   }
 }

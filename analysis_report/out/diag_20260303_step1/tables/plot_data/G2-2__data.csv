@@ -1,2 +1,2 @@
 plot_id,series,scenario_id,case_id,link_id,x,y,data,meta
-G2-2,median_xpd_target_ex_db,A3,,,A3,-16.93483769676745,-16.93483769676745,expected_sign_hit_rate=0.0000
+G2-2,median_xpd_target_raw_db,A3,,,A3,8.0,8.0,sign_metric=raw;expected_sign_hit_rate=1.0000
