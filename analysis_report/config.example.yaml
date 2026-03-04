@@ -20,6 +20,8 @@ windows:
     A2: excess                # excess | raw
     A3: raw                   # G2 sign-off는 raw 권장
   te_sweep_ns: [2.0, 3.0, 5.0] # W_early (room): 분리력 S(Te) 스윕
+  noise_tail_sweep_ns: [30.0, 50.0, 80.0]   # sensitivity_level.csv export
+  threshold_sweep_db: [4.0, 6.0, 8.0]       # sensitivity_level.csv export
   tau0_method: "threshold"
   noise_tail_ns: 50.0
   threshold_margin_db: 6.0

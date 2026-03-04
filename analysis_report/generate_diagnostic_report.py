@@ -22,6 +22,8 @@ from analysis_report.lib import plots as plot_lib
 from analysis_report.lib import report_md
 from analysis_report.lib import scene as scene_lib
 from analysis_report.lib import stats as stats_lib
+from analysis import link_metrics as link_metrics_lib
+from analysis import windowing as windowing_lib
 
 
 def _write_rows_csv(path: Path, rows: list[dict[str, Any]]) -> None:
@@ -33,6 +35,22 @@ def _write_rows_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         for r in rows:
             out = {}
             for k in keys:
+                v = r.get(k, "")
+                if isinstance(v, (dict, list, tuple)):
+                    out[k] = json.dumps(v)
+                else:
+                    out[k] = v
+            w.writerow(out)
+
+
+def _write_rows_csv_with_columns(path: Path, rows: list[dict[str, Any]], columns: list[str]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=list(columns))
+        w.writeheader()
+        for r in rows:
+            out = {}
+            for k in columns:
                 v = r.get(k, "")
                 if isinstance(v, (dict, list, tuple)):
                     out[k] = json.dumps(v)
@@ -452,6 +470,18 @@ def _db_ratio(num: float, den: float, eps: float = 1e-30) -> float:
     return float(10.0 * np.log10(n / d))
 
 
+def _as_float_list(v: Any, default: list[float]) -> list[float]:
+    if isinstance(v, list):
+        out: list[float] = []
+        for x in v:
+            vv = _num(x)
+            if np.isfinite(vv):
+                out.append(float(vv))
+        if out:
+            return out
+    return [float(x) for x in default]
+
+
 def _estimate_freq_grid(link_rows: list[dict[str, Any]], cfg: dict[str, Any]) -> tuple[float, float, str]:
     # Prefer frequency axis embedded in link rows (actual run output),
     # with C0 rows prioritized for calibration consistency.
@@ -817,6 +847,250 @@ def _target_window_sign_metric(
         "expected_sign_hit_rate": hit,
         "status": st,
     }
+
+
+def _stress_flag_row(r: dict[str, Any]) -> int:
+    mode = str(r.get("stress_mode", "")).strip().lower()
+    rf = int(round(_num(r.get("roughness_flag", 0)))) if np.isfinite(_num(r.get("roughness_flag", np.nan))) else 0
+    hf = int(round(_num(r.get("human_flag", 0)))) if np.isfinite(_num(r.get("human_flag", np.nan))) else 0
+    if rf == 1 or hf == 1:
+        return 1
+    if mode in {"geometry", "hybrid", "synthetic", "stress", "on"}:
+        return 1
+    return 0
+
+
+def _build_case_level_rows(link_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for r in link_rows:
+        rows.append(
+            {
+                "scenario_id": str(r.get("scenario_id", "")),
+                "case_id": str(r.get("case_id", "")),
+                "link_id": str(r.get("link_id", "")),
+                "xpd_early_ex_db": _num(r.get("XPD_early_excess_db", np.nan)),
+                "xpd_late_ex_db": _num(r.get("XPD_late_excess_db", np.nan)),
+                "l_pol_db": _num(r.get("L_pol_db", np.nan)),
+                "rho_early_linear": _num(r.get("rho_early_lin", np.nan)),
+                "rho_early_db": _num(r.get("rho_early_db", np.nan)),
+                "ds_ns": _num(r.get("delay_spread_rms_s", np.nan)) * 1e9,
+                "early_energy_fraction": _num(r.get("early_energy_fraction", np.nan)),
+                "EL_proxy_db": _num(r.get("EL_proxy_db", np.nan)),
+                "LOSflag": int(round(_num(r.get("LOSflag", np.nan)))) if np.isfinite(_num(r.get("LOSflag", np.nan))) else "",
+                "material": str(r.get("material_class", "")),
+                "stress_flag": int(_stress_flag_row(r)),
+                "claim_caution_early": int(round(_num(r.get("claim_caution_early", 0)))) if np.isfinite(_num(r.get("claim_caution_early", np.nan))) else 0,
+                "claim_caution_late": int(round(_num(r.get("claim_caution_late", 0)))) if np.isfinite(_num(r.get("claim_caution_late", np.nan))) else 0,
+            }
+        )
+    return rows
+
+
+def _build_target_level_rows(
+    *,
+    link_rows: list[dict[str, Any]],
+    ray_rows: list[dict[str, Any]],
+    runs: list[dict[str, Any]],
+    floor_db: float,
+    te_default_s: float,
+    dt_res_s: float,
+    w_target_s_by_sid: dict[str, float],
+    target_map: dict[str, int],
+) -> list[dict[str, Any]]:
+    run_by_sid = {str(r.get("scenario_id", "")): r for r in runs}
+    rays_by_link: dict[str, list[dict[str, Any]]] = {}
+    for rr in ray_rows:
+        lid = str(rr.get("link_id", ""))
+        if lid:
+            rays_by_link.setdefault(lid, []).append(rr)
+
+    tol = 0.25 * float(dt_res_s) if np.isfinite(dt_res_s) and dt_res_s > 0 else 0.0
+    out: list[dict[str, Any]] = []
+    for r in link_rows:
+        sid = str(r.get("scenario_id", ""))
+        if sid not in target_map:
+            continue
+        lid = str(r.get("link_id", ""))
+        run = run_by_sid.get(sid)
+        rr = rays_by_link.get(lid, [])
+        target_n = int(target_map[sid])
+        cand = [x for x in rr if int(round(_num(x.get("n_bounce", np.nan)))) == target_n and _num(x.get("P_lin", np.nan)) > 0]
+        if not cand:
+            continue
+        m_tar = sorted(cand, key=lambda x: _num(x.get("P_lin", np.nan)), reverse=True)[0]
+        tau_tar = _num(m_tar.get("tau_s", np.nan))
+        p_tar = _num(m_tar.get("P_lin", np.nan))
+        inc_deg = _num(m_tar.get("incidence_deg", np.nan))
+        nb = int(round(_num(m_tar.get("n_bounce", np.nan)))) if np.isfinite(_num(m_tar.get("n_bounce", np.nan))) else target_n
+        parity = "even" if (int(nb) % 2 == 0) else "odd"
+
+        all_tau = np.asarray([_num(x.get("tau_s", np.nan)) for x in rr], dtype=float)
+        all_tau = all_tau[np.isfinite(all_tau)]
+        tau_first = float(np.min(all_tau)) if len(all_tau) else float("nan")
+        target_rank = float("nan")
+        if np.isfinite(tau_tar) and len(all_tau):
+            taus = np.sort(np.unique(all_tau))
+            target_rank = float(int(np.argmin(np.abs(taus - float(tau_tar)))) + 1)
+
+        w = _window_dict(r)
+        tau0 = _num(w.get("tau0_s", np.nan))
+        te_s = _num(w.get("Te_s", np.nan))
+        if not np.isfinite(te_s):
+            te_s = float(te_default_s)
+        if not np.isfinite(tau0):
+            tau0 = tau_first
+        in_early = int(np.isfinite(tau_tar) and np.isfinite(tau0) and (float(tau_tar) - float(tau0) <= float(te_s)))
+        is_first = int(np.isfinite(tau_tar) and np.isfinite(tau_first) and abs(float(tau_tar) - float(tau_first)) <= float(tol))
+
+        w_target_s = float(w_target_s_by_sid.get(sid, max(2e-9, 0.8 * float(te_default_s))))
+        pco_t = float("nan")
+        pcx_t = float("nan")
+        xpd_raw = float("nan")
+        xpd_ex = float("nan")
+        if run is not None and np.isfinite(tau_tar):
+            pdp = io_lib.load_pdp_npz(run, lid)
+            if pdp is not None:
+                tau = np.asarray(pdp.get("delay_tau_s", []), dtype=float)
+                pco = np.asarray(pdp.get("P_co", []), dtype=float)
+                pcx = np.asarray(pdp.get("P_cross", []), dtype=float)
+                if len(tau) and len(pco) == len(tau) and len(pcx) == len(tau):
+                    t0 = float(tau_tar - 0.5 * w_target_s)
+                    t1 = float(tau_tar + 0.5 * w_target_s)
+                    m = (tau >= t0) & (tau <= t1)
+                    pco_t = float(np.sum(pco[m]))
+                    pcx_t = float(np.sum(pcx[m]))
+                    xpd_raw = _db_ratio(pco_t, pcx_t)
+                    xpd_ex = float(xpd_raw - floor_db) if np.isfinite(floor_db) else float("nan")
+
+        c_target = float("nan")
+        if np.isfinite(tau_tar) and np.isfinite(p_tar) and p_tar > 0:
+            t0 = float(tau_tar - 0.5 * w_target_s)
+            t1 = float(tau_tar + 0.5 * w_target_s)
+            p_other = 0.0
+            for x in rr:
+                if x is m_tar:
+                    continue
+                tau_x = _num(x.get("tau_s", np.nan))
+                p_x = _num(x.get("P_lin", np.nan))
+                if np.isfinite(tau_x) and np.isfinite(p_x) and p_x > 0 and (t0 <= tau_x <= t1):
+                    p_other += float(p_x)
+            c_target = _db_ratio(p_other, p_tar)
+
+        out.append(
+            {
+                "scenario_id": sid,
+                "case_id": str(r.get("case_id", "")),
+                "link_id": lid,
+                "target_tau_ns": float(tau_tar) * 1e9 if np.isfinite(tau_tar) else float("nan"),
+                "target_rank": target_rank,
+                "target_in_Wearly": int(in_early),
+                "target_is_first": int(is_first),
+                "bounce_count": int(nb),
+                "parity": parity,
+                "incidence_angle_deg": float(inc_deg) if np.isfinite(inc_deg) else float("nan"),
+                "Pco_target": pco_t,
+                "Pcross_target": pcx_t,
+                "xpd_target_raw_db": xpd_raw,
+                "xpd_target_ex_db": xpd_ex,
+                "C_target_db": c_target,
+            }
+        )
+    return out
+
+
+def _build_sensitivity_level_rows(
+    *,
+    link_rows: list[dict[str, Any]],
+    runs: list[dict[str, Any]],
+    floor_db: float,
+    te_ns_list: list[float],
+    noise_tail_ns_list: list[float],
+    threshold_db_list: list[float],
+    tmax_s: float,
+) -> list[dict[str, Any]]:
+    run_by_sid = {str(r.get("scenario_id", "")): r for r in runs}
+    out: list[dict[str, Any]] = []
+    for r in link_rows:
+        sid = str(r.get("scenario_id", ""))
+        run = run_by_sid.get(sid)
+        if run is None:
+            continue
+        lid = str(r.get("link_id", ""))
+        pdp = io_lib.load_pdp_npz(run, lid)
+        if pdp is None:
+            continue
+        tau = np.asarray(pdp.get("delay_tau_s", []), dtype=float)
+        pco = np.asarray(pdp.get("P_co", []), dtype=float)
+        pcx = np.asarray(pdp.get("P_cross", []), dtype=float)
+        if len(tau) == 0 or len(pco) != len(tau) or len(pcx) != len(tau):
+            continue
+
+        base_xpd_e_ex = _num(r.get("XPD_early_excess_db", np.nan))
+        base_xpd_l_ex = _num(r.get("XPD_late_excess_db", np.nan))
+        base_lpol = _num(r.get("L_pol_db", np.nan))
+        base_rho_db = _num(r.get("rho_early_db", np.nan))
+        base_ds_ns = _num(r.get("delay_spread_rms_s", np.nan)) * 1e9
+        base_ef = _num(r.get("early_energy_fraction", np.nan))
+
+        p_total = pco + pcx
+        for te_ns in te_ns_list:
+            for noise_ns in noise_tail_ns_list:
+                for thr_db in threshold_db_list:
+                    det = windowing_lib.estimate_tau0(
+                        tau,
+                        p_total,
+                        method="threshold",
+                        noise_tail_s=float(noise_ns) * 1e-9,
+                        margin_db=float(thr_db),
+                    )
+                    tau0 = float(det.get("tau0_s", 0.0))
+                    early, late = windowing_lib.make_early_late_masks(
+                        tau,
+                        tau0_s=tau0,
+                        Te_s=float(te_ns) * 1e-9,
+                        Tmax_s=float(tmax_s),
+                    )
+                    met = link_metrics_lib.compute_link_metrics(
+                        {"P_co": pco, "P_cross": pcx},
+                        tau,
+                        (early, late),
+                        ds_reference="total",
+                        window_params={
+                            "tau0_s": tau0,
+                            "Te_s": float(te_ns) * 1e-9,
+                            "Tmax_s": float(tmax_s),
+                            "noise_tail_ns": float(noise_ns),
+                            "threshold_db": float(thr_db),
+                            "method": "threshold",
+                        },
+                    )
+                    xpd_e_ex = float(met.XPD_early_db - floor_db) if np.isfinite(floor_db) else float("nan")
+                    xpd_l_ex = float(met.XPD_late_db - floor_db) if np.isfinite(floor_db) else float("nan")
+                    ds_ns = float(met.delay_spread_rms_s) * 1e9 if np.isfinite(_num(met.delay_spread_rms_s)) else float("nan")
+                    out.append(
+                        {
+                            "scenario_id": sid,
+                            "case_id": str(r.get("case_id", "")),
+                            "link_id": lid,
+                            "Te_ns": float(te_ns),
+                            "noise_tail_ns": float(noise_ns),
+                            "threshold_db": float(thr_db),
+                            "xpd_early_ex_db": xpd_e_ex,
+                            "xpd_late_ex_db": xpd_l_ex,
+                            "l_pol_db": float(met.L_pol_db),
+                            "rho_early_linear": float(met.rho_early_lin),
+                            "rho_early_db": float(met.rho_early_db),
+                            "ds_ns": ds_ns,
+                            "early_energy_fraction": float(met.early_energy_fraction),
+                            "delta_xpd_early_ex_db": float(xpd_e_ex - base_xpd_e_ex) if np.isfinite(xpd_e_ex) and np.isfinite(base_xpd_e_ex) else float("nan"),
+                            "delta_xpd_late_ex_db": float(xpd_l_ex - base_xpd_l_ex) if np.isfinite(xpd_l_ex) and np.isfinite(base_xpd_l_ex) else float("nan"),
+                            "delta_l_pol_db": float(met.L_pol_db - base_lpol) if np.isfinite(_num(met.L_pol_db)) and np.isfinite(base_lpol) else float("nan"),
+                            "delta_rho_early_db": float(met.rho_early_db - base_rho_db) if np.isfinite(_num(met.rho_early_db)) and np.isfinite(base_rho_db) else float("nan"),
+                            "delta_ds_ns": float(ds_ns - base_ds_ns) if np.isfinite(ds_ns) and np.isfinite(base_ds_ns) else float("nan"),
+                            "delta_early_energy_fraction": float(met.early_energy_fraction - base_ef) if np.isfinite(_num(met.early_energy_fraction)) and np.isfinite(base_ef) else float("nan"),
+                        }
+                    )
+    return out
 
 
 def _impute_missing_el_proxy(
@@ -3013,9 +3287,120 @@ def main() -> None:
         selected_rows=selected_rows,
     )
 
+    # requested analysis tables (target/case/sensitivity levels)
+    bt = dict(checks.get("B_time_resolution", {}))
+    ws_cfg = dict(cfg.get("windows", {})) if isinstance(cfg.get("windows", {}), dict) else {}
+    te_default_s = _num(bt.get("Te_s", np.nan))
+    if not np.isfinite(te_default_s):
+        te_default_s = float(_num(ws_cfg.get("Te_ns", 10.0))) * 1e-9
+    dt_res_s = _num(bt.get("dt_res_s", np.nan))
+    tmax_s = _num(bt.get("Tmax_s", np.nan))
+    if not np.isfinite(tmax_s):
+        tmax_s = float(_num(ws_cfg.get("Tmax_ns", 200.0))) * 1e-9
+    floor_db = _num(floor_ref.get("xpd_floor_db", np.nan))
+    w_target_s_by_sid_raw = bt.get("W_target_s_by_scenario", {})
+    w_target_s_by_sid: dict[str, float] = {}
+    if isinstance(w_target_s_by_sid_raw, dict):
+        for k, v in w_target_s_by_sid_raw.items():
+            vv = _num(v)
+            if np.isfinite(vv) and vv > 0:
+                w_target_s_by_sid[str(k)] = float(vv)
+    target_map = {"A2": 1, "A3": 2, "A4": 1, "A5": 2}
+    target_level_rows = _build_target_level_rows(
+        link_rows=link_rows,
+        ray_rows=ray_rows,
+        runs=runs,
+        floor_db=float(floor_db),
+        te_default_s=float(te_default_s),
+        dt_res_s=float(dt_res_s),
+        w_target_s_by_sid=w_target_s_by_sid,
+        target_map=target_map,
+    )
+    case_level_rows = _build_case_level_rows(link_rows)
+    te_sweep_ns = _as_float_list(ws_cfg.get("te_sweep_ns", None), [2.0, 3.0, 5.0])
+    noise_tail_sweep_ns = _as_float_list(ws_cfg.get("noise_tail_sweep_ns", None), [30.0, 50.0, 80.0])
+    threshold_sweep_db = _as_float_list(ws_cfg.get("threshold_sweep_db", None), [4.0, 6.0, 8.0])
+    sensitivity_level_rows = _build_sensitivity_level_rows(
+        link_rows=link_rows,
+        runs=runs,
+        floor_db=float(floor_db),
+        te_ns_list=te_sweep_ns,
+        noise_tail_ns_list=noise_tail_sweep_ns,
+        threshold_db_list=threshold_sweep_db,
+        tmax_s=float(tmax_s),
+    )
+
     # save tables/json
     _write_rows_csv(tab_dir / "diagnostic_link_rows.csv", link_rows)
     _write_rows_csv(tab_dir / "diagnostic_ray_rows.csv", ray_rows)
+    _write_rows_csv_with_columns(
+        tab_dir / "target_level.csv",
+        target_level_rows,
+        [
+            "scenario_id",
+            "case_id",
+            "link_id",
+            "target_tau_ns",
+            "target_rank",
+            "target_in_Wearly",
+            "target_is_first",
+            "bounce_count",
+            "parity",
+            "incidence_angle_deg",
+            "Pco_target",
+            "Pcross_target",
+            "xpd_target_raw_db",
+            "xpd_target_ex_db",
+            "C_target_db",
+        ],
+    )
+    _write_rows_csv_with_columns(
+        tab_dir / "case_level.csv",
+        case_level_rows,
+        [
+            "scenario_id",
+            "case_id",
+            "link_id",
+            "xpd_early_ex_db",
+            "xpd_late_ex_db",
+            "l_pol_db",
+            "rho_early_linear",
+            "rho_early_db",
+            "ds_ns",
+            "early_energy_fraction",
+            "EL_proxy_db",
+            "LOSflag",
+            "material",
+            "stress_flag",
+            "claim_caution_early",
+            "claim_caution_late",
+        ],
+    )
+    _write_rows_csv_with_columns(
+        tab_dir / "sensitivity_level.csv",
+        sensitivity_level_rows,
+        [
+            "scenario_id",
+            "case_id",
+            "link_id",
+            "Te_ns",
+            "noise_tail_ns",
+            "threshold_db",
+            "xpd_early_ex_db",
+            "xpd_late_ex_db",
+            "l_pol_db",
+            "rho_early_linear",
+            "rho_early_db",
+            "ds_ns",
+            "early_energy_fraction",
+            "delta_xpd_early_ex_db",
+            "delta_xpd_late_ex_db",
+            "delta_l_pol_db",
+            "delta_rho_early_db",
+            "delta_ds_ns",
+            "delta_early_energy_fraction",
+        ],
+    )
     _write_rows_csv(tab_dir / "el_proxy_imputation_rows.csv", list(el_impute_info.get("rows", [])))
     _write_rows_csv(tab_dir / "A3_geometry_manual_review.csv", a3_review_rows)
     report_md.write_json(tab_dir / "diagnostic_checks.json", checks)
