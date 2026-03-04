@@ -59,6 +59,54 @@ def _status_data(n: int, min_n: int = 8) -> str:
     return "INCONCLUSIVE" if int(n) < int(min_n) else "OK"
 
 
+def _a5_row_semantics(row: dict[str, Any]) -> str:
+    s = str(row.get("stress_semantics", "")).strip().lower()
+    if s in {"off", "response", "polarization_only"}:
+        return s
+    sp = _num(row.get("stress_path_structure_active", np.nan))
+    sm = _num(row.get("stress_polarization_mixer_active", np.nan))
+    if np.isfinite(sp) or np.isfinite(sm):
+        if int(round(sp)) == 1:
+            return "response"
+        if int(round(sm)) == 1:
+            return "polarization_only"
+        return "off"
+    mode = str(row.get("stress_mode", "")).strip().lower()
+    stress_on = int(_num(row.get("roughness_flag", 0))) == 1 or int(_num(row.get("human_flag", 0))) == 1
+    if not stress_on:
+        return "off"
+    if mode in {"geometry", "hybrid"}:
+        return "response"
+    if mode == "synthetic":
+        return "polarization_only"
+    if mode == "none":
+        return "off"
+    return "unknown"
+
+
+def _a5_semantics_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    a5 = [r for r in rows if str(r.get("scenario_id", "")).upper() == "A5"]
+    stress = [r for r in a5 if int(_num(r.get("roughness_flag", 0))) == 1 or int(_num(r.get("human_flag", 0))) == 1]
+    cnt = {"response": 0, "polarization_only": 0, "off": 0, "unknown": 0}
+    for r in stress:
+        sem = _a5_row_semantics(r)
+        cnt[sem] = int(cnt.get(sem, 0) + 1)
+    total = int(len(stress))
+    dom = "none"
+    if total > 0:
+        dom = max(["response", "polarization_only", "off", "unknown"], key=lambda k: int(cnt.get(k, 0)))
+    return {
+        "n_a5_rows": int(len(a5)),
+        "n_stress_rows": int(total),
+        "n_response": int(cnt.get("response", 0)),
+        "n_polarization_only": int(cnt.get("polarization_only", 0)),
+        "n_off": int(cnt.get("off", 0)),
+        "n_unknown": int(cnt.get("unknown", 0)),
+        "dominant_semantics": str(dom),
+        "contamination_response_ready": bool(int(cnt.get("response", 0)) > 0),
+    }
+
+
 def _ensure_scene_plots(
     out_fig_dir: Path,
     scene_map: dict[tuple[str, str], dict[str, Any]],
@@ -359,6 +407,15 @@ def main() -> None:
     out_root.mkdir(parents=True, exist_ok=True)
     fig_dir.mkdir(parents=True, exist_ok=True)
     tab_dir.mkdir(parents=True, exist_ok=True)
+    diag_checks_path = tab_dir / "diagnostic_checks.json"
+    diag_checks: dict[str, Any] = {}
+    if diag_checks_path.exists():
+        try:
+            obj = json.loads(diag_checks_path.read_text(encoding="utf-8"))
+            if isinstance(obj, dict):
+                diag_checks = obj
+        except Exception:
+            diag_checks = {}
 
     payload = io_lib.collect_all(cfg)
     runs = payload["runs"]
@@ -423,6 +480,7 @@ def main() -> None:
 
     a2 = by_s.get("A2", [])
     a3 = by_s.get("A3", [])
+    a6 = by_s.get("A6", [])
     fig_paths["G1G2_xpd_early_ex_cdf"] = plot_lib.plot_multi_cdf(
         {
             "A2": [_num(r.get("XPD_early_excess_db", np.nan)) for r in a2],
@@ -512,6 +570,7 @@ def main() -> None:
     a5 = by_s.get("A5", [])
     base = [r for r in a5 if int(_num(r.get("roughness_flag", 0))) == 0 and int(_num(r.get("human_flag", 0))) == 0]
     stress = [r for r in a5 if int(_num(r.get("roughness_flag", 0))) == 1 or int(_num(r.get("human_flag", 0))) == 1]
+    a5_semantics = _a5_semantics_summary(link_rows)
     if a5:
         fig_paths["L2_a5_stress_cdf"] = plot_lib.plot_multi_cdf(
             {
@@ -569,13 +628,44 @@ def main() -> None:
 
     g2_shift = float(dmed_a3 - dmed_a2) if np.isfinite(dmed_a3) and np.isfinite(dmed_a2) else np.nan
     ks_a3_a2 = stats_lib.ks_wasserstein(_arr(a3, "XPD_early_excess_db"), _arr(a2, "XPD_early_excess_db"))
-    g2_ok = bool(np.isfinite(g2_shift) and g2_shift > 0)
-    props["G2"] = {
-        "definition": "A3 even-bounce recovery vs A2",
-        "delta_median_db": g2_shift,
-        "ks_wasserstein": ks_a3_a2,
-        "status": _status_support(g2_ok, cond_partial=bool(np.isfinite(g2_shift))),
-    }
+    b_diag = dict(diag_checks.get("B_time_resolution", {}))
+    a6_bench = dict(b_diag.get("A6_parity_benchmark", {}))
+    a6_available = bool(a6_bench.get("available", False))
+    g2_primary_source = str(b_diag.get("G2_primary_evidence_source", "A3_target_window_supplementary_only"))
+    g2_primary_status = str(b_diag.get("G2_primary_evidence_status", "INCONCLUSIVE"))
+    if a6_available:
+        odd_hit = _num(a6_bench.get("hit_rate_odd", np.nan))
+        even_hit = _num(a6_bench.get("hit_rate_even", np.nan))
+        if g2_primary_status == "PASS":
+            g2_status = "SUPPORTED"
+        elif g2_primary_status == "WARN":
+            g2_status = "PARTIAL"
+        elif g2_primary_status == "FAIL":
+            g2_status = "UNSUPPORTED"
+        else:
+            g2_status = "INCONCLUSIVE"
+        props["G2"] = {
+            "definition": "A6 near-normal parity benchmark as primary G2 evidence; A3 kept as mechanism-only supplementary evidence.",
+            "primary_source": g2_primary_source,
+            "primary_status": g2_primary_status,
+            "A6_hit_rate_odd": odd_hit,
+            "A6_hit_rate_even": even_hit,
+            "A6_n_eval_total": int(_num(a6_bench.get("n_eval_total", np.nan))) if np.isfinite(_num(a6_bench.get("n_eval_total", np.nan))) else 0,
+            "A3_delta_median_db_supplementary": g2_shift,
+            "A3_ks_wasserstein_supplementary": ks_a3_a2,
+            "status": g2_status,
+        }
+    else:
+        g2_ok = bool(np.isfinite(g2_shift) and g2_shift > 0)
+        g2_status = "PARTIAL" if g2_ok else ("INCONCLUSIVE" if np.isfinite(g2_shift) else "INCONCLUSIVE")
+        props["G2"] = {
+            "definition": "A3 even-bounce recovery vs A2 (supplementary only when A6 is absent)",
+            "primary_source": g2_primary_source,
+            "primary_status": g2_primary_status,
+            "delta_median_db": g2_shift,
+            "ks_wasserstein": ks_a3_a2,
+            "status": g2_status,
+        }
 
     # L1/L2/L3
     early_med = _median(all_non_c0, "XPD_early_excess_db")
@@ -594,13 +684,18 @@ def main() -> None:
     l2_delta = float(stress_stats.get("mean", np.nan) - base_stats.get("mean", np.nan))
     l2_var_ratio = float(stress_stats.get("std", np.nan) / base_stats.get("std", np.nan)) if np.isfinite(base_stats.get("std", np.nan)) and base_stats.get("std", np.nan) > 0 else np.nan
     l2_ok = bool(np.isfinite(l2_delta) and np.isfinite(l2_var_ratio) and (abs(l2_delta) > 0.5 or l2_var_ratio > 1.2))
+    if bool(a5_semantics.get("n_stress_rows", 0)) and not bool(a5_semantics.get("contamination_response_ready", False)):
+        l2_status = _status_support(l2_ok, cond_partial=True)
+    else:
+        l2_status = _status_support(l2_ok, cond_partial=bool(a5))
     props["L2"] = {
-        "definition": "A5 stress impact on center/tails",
+        "definition": "A5 stress impact on center/tails (response-mode requires geometric path perturbation)",
         "base": base_stats,
         "stress": stress_stats,
         "delta_mean_db": l2_delta,
         "var_ratio": l2_var_ratio,
-        "status": _status_support(l2_ok, cond_partial=bool(a5)),
+        "stress_semantics": a5_semantics,
+        "status": l2_status,
     }
 
     sp = stats_lib.spearman_with_bootstrap(
@@ -695,6 +790,21 @@ def main() -> None:
         )
     _write_rows_csv(tab_dir / "intermediate_proposition_status.csv", prop_rows)
     report_md.write_json(tab_dir / "intermediate_proposition_details.json", props)
+    _write_rows_csv(
+        tab_dir / "intermediate_a5_stress_semantics.csv",
+        [
+            {
+                "n_a5_rows": int(a5_semantics.get("n_a5_rows", 0)),
+                "n_stress_rows": int(a5_semantics.get("n_stress_rows", 0)),
+                "n_response": int(a5_semantics.get("n_response", 0)),
+                "n_polarization_only": int(a5_semantics.get("n_polarization_only", 0)),
+                "n_off": int(a5_semantics.get("n_off", 0)),
+                "n_unknown": int(a5_semantics.get("n_unknown", 0)),
+                "dominant_semantics": str(a5_semantics.get("dominant_semantics", "none")),
+                "contamination_response_ready": bool(a5_semantics.get("contamination_response_ready", False)),
+            }
+        ],
+    )
 
     # Update index with report refs + key plots
     run_by_s = {str(r.get("scenario_id", "")): r for r in runs}
@@ -732,9 +842,39 @@ def main() -> None:
     lines: list[str] = []
     lines.append(f"# Intermediate Report ({run_group})")
     lines.append("")
+    lines.append("## Final Scenario Structure (Agreed)")
+    lines.append("")
+    lines.append(report_md.md_table(report_md.final_structure_rows(), ["unit", "role", "notes"]))
+    lines.append("")
     lines.append("## Proposition Status")
     lines.append("")
     lines.append(report_md.md_table(prop_rows, ["proposition", "status", "data_status", "definition"]))
+    lines.append("")
+    lines.append("## A5 Stress Semantics")
+    lines.append("")
+    lines.append(
+        report_md.md_table(
+            [
+                {
+                    "n_stress_rows": a5_semantics.get("n_stress_rows", 0),
+                    "n_response": a5_semantics.get("n_response", 0),
+                    "n_polarization_only": a5_semantics.get("n_polarization_only", 0),
+                    "dominant_semantics": a5_semantics.get("dominant_semantics", "none"),
+                    "contamination_response_ready": a5_semantics.get("contamination_response_ready", False),
+                }
+            ],
+            [
+                "n_stress_rows",
+                "n_response",
+                "n_polarization_only",
+                "dominant_semantics",
+                "contamination_response_ready",
+            ],
+        )
+    )
+    lines.append("")
+    lines.append("- 해석 규칙: `synthetic`(polarization_only)는 편파축 stress만 의미하며 delay/path 구조 변화는 주장하지 않음.")
+    lines.append("- delay/path contamination-response 해석은 `geometry`/`hybrid`(`response`) 샘플에서만 사용.")
     lines.append("")
 
     for k in ["M1", "M2", "G1", "G2", "L1", "L2", "L3", "R1", "R2", "P1", "P2"]:
@@ -753,6 +893,12 @@ def main() -> None:
         lines.append(f"### {sid}")
         lines.append("")
         lines.append(f"- 의미: {report_md.scenario_meaning(sid)}")
+        if sid == "A3":
+            lines.append("- 보고 규칙: A3는 mechanism-only 시나리오로 `target-window` 지표를 1차로 사용하고 fixed system `W_early` 우세는 보조 진단으로만 사용.")
+            if bool(dict(diag_checks.get("B_time_resolution", {})).get("A6_parity_benchmark", {}).get("available", False)):
+                lines.append("- G2 본증거는 A6 near-normal parity benchmark를 사용하고, A3는 보조 메커니즘 증거로만 사용.")
+        if sid == "A6":
+            lines.append("- 보고 규칙: A6는 near-normal parity benchmark로 G2의 primary sign evidence에 사용.")
         lines.append("")
         img = scene_global.get(sid, "")
         if not img:

@@ -19,8 +19,8 @@
   },
   "M2": {
     "definition": "Fraction inside/outside floor uncertainty band",
-    "inside_ratio": 0.060133630289532294,
-    "outside_ratio": 0.9398663697104677,
+    "inside_ratio": 0.057815845824411134,
+    "outside_ratio": 0.9421841541755889,
     "status": "SUPPORTED"
   },
   "G1": {
@@ -34,24 +34,26 @@
     "status": "SUPPORTED"
   },
   "G2": {
-    "definition": "A3 even-bounce recovery vs A2",
+    "definition": "A3 even-bounce recovery vs A2 (supplementary only when A6 is absent)",
+    "primary_source": "A3_target_window_supplementary_only",
+    "primary_status": "WARN",
     "delta_median_db": 7.999999707790597,
     "ks_wasserstein": {
       "ks_stat": 0.75,
       "ks_p": 3.914609188476457e-06,
       "wasserstein": 8.66666630234144
     },
-    "status": "SUPPORTED"
+    "status": "PARTIAL"
   },
   "L1": {
     "definition": "Early/Late leakage separation via XPD_early_ex/XPD_late_ex/L_pol",
-    "median_early_ex_db": -30.987888152800977,
-    "median_late_ex_db": -22.478978141867536,
-    "median_lpol_db": -7.999999707790595,
+    "median_early_ex_db": -30.842421676989762,
+    "median_late_ex_db": -22.681312850808222,
+    "median_lpol_db": -7.999999589782957,
     "status": "SUPPORTED"
   },
   "L2": {
-    "definition": "A5 stress impact on center/tails",
+    "definition": "A5 stress impact on center/tails (response-mode requires geometric path perturbation)",
     "base": {
       "n": 30,
       "mean": -19.032027097874245,
@@ -72,16 +74,26 @@
     },
     "delta_mean_db": -6.022436489595936,
     "var_ratio": 1.872531202928443,
+    "stress_semantics": {
+      "n_a5_rows": 60,
+      "n_stress_rows": 30,
+      "n_response": 30,
+      "n_polarization_only": 0,
+      "n_off": 0,
+      "n_unknown": 0,
+      "dominant_semantics": "response",
+      "contamination_response_ready": true
+    },
     "status": "SUPPORTED"
   },
   "L3": {
     "definition": "Correlation between leakage excess and -EL_proxy",
     "spearman": {
-      "rho": 0.23462256818550353,
-      "p": 1.703593433342827e-06,
-      "ci_lo": 0.15009807881704668,
-      "ci_hi": 0.3211421210881754,
-      "n": 407
+      "rho": 0.20297594646113906,
+      "p": 2.4856385197225615e-05,
+      "ci_lo": 0.11124148309080256,
+      "ci_hi": 0.2931885855674576,
+      "n": 425
     },
     "status": "PARTIAL"
   },
@@ -100,31 +112,31 @@
   "R2": {
     "definition": "DS/early-fraction relation with leakage",
     "spearman_ds_vs_xpd": {
-      "rho": -0.2997615020983784,
-      "p": 5.202450588941146e-06,
-      "ci_lo": -0.4243735203289342,
-      "ci_hi": -0.17232055878935454,
-      "n": 223
+      "rho": -0.2424733051464708,
+      "p": 0.0001438154449761836,
+      "ci_lo": -0.3652630637438067,
+      "ci_hi": -0.11453872045438718,
+      "n": 241
     },
     "status": "SUPPORTED"
   },
   "P1": {
     "definition": "Two-stage model (EL first, then mechanism effects) vs constant baseline",
     "cv_two_stage": {
-      "n_stage1": 330,
-      "n_stage2": 407,
-      "b1_el": -0.21956249183813226,
-      "rmse_const": 4.629079701675321,
-      "rmse_lin": 3.552995573847114,
-      "nll_const": 2.950695259321774,
-      "nll_lin": 2.6821811766166404
+      "n_stage1": 348,
+      "n_stage2": 425,
+      "b1_el": -0.18580768177174034,
+      "rmse_const": 4.58542143315577,
+      "rmse_lin": 3.0942178470671813,
+      "nll_const": 2.939147110546196,
+      "nll_lin": 2.5469908050539924
     },
     "cv_one_shot_reference": {
-      "n": 407,
-      "rmse_const": 4.804024288575973,
-      "rmse_lin": 3.8421040506377517,
-      "nll_const": 2.9880683243407327,
-      "nll_lin": 2.763088536630405
+      "n": 425,
+      "rmse_const": 4.75513693700746,
+      "rmse_lin": 3.792720898627111,
+      "nll_const": 2.9759668824322425,
+      "nll_lin": 2.7485445140646427
     },
     "status": "SUPPORTED"
   },
@@ -138,7 +150,7 @@
       "B3"
     ],
     "stability": {
-      "n": 330,
+      "n": 348,
       "base_sign": -1.0,
       "sign_keep_rate": 1.0
     },

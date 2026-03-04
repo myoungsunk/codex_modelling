@@ -1,0 +1,70 @@
+run_group: "diag_20260303_step1"
+input_runs:
+  - "outputs/step1_diag/C0"
+  - "outputs/step1_diag/A2"
+  - "outputs/step1_diag/A3"
+  - "outputs/step1_diag/A4_iso"
+  - "outputs/step1_diag/A4_bridge"
+  - "outputs/step1_diag/A5_base"
+  - "outputs/step1_diag/A5_stress"
+  - "outputs/step1_diag/B1"
+  - "outputs/step1_diag/B2_tuned"
+  - "outputs/step1_diag/B3_tuned"
+scenario_map:
+  "A4_iso": "A4"
+  "A4_bridge": "A4"
+  "A5_base": "A5"
+  "A5_stress": "A5"
+  "B2_tuned": "B2"
+  "B3_tuned": "B3"
+scenario_roles:
+  C0: calibration_only
+  A2: odd_isolation
+  A3: mechanism_supplementary
+  A4: material_effect
+  A5: stress_response_proxy
+  A6: g2_primary_benchmark
+  B1: realspace_los
+  B2: realspace_partition_nlos
+  B3: realspace_corner_nlos
+floor_policy:
+  mode: "from_C0"
+  calibration_json: ""
+  delta_method: "p5_p95"
+windows:
+  Te_ns: 3.0
+  Tmax_ns: 200.0
+  floor_window_ns: 1.5
+  target_window_ns: 3.0
+  target_window_ns_by_scenario:
+    A3: 6.0
+    A6: 3.0
+  target_window_mode_by_scenario:
+    A3: fixed
+  target_sign_metric_by_scenario:
+    A2: excess
+    A3: raw
+    A6: raw
+  te_sweep_ns: [2.0, 3.0, 5.0]
+  noise_tail_sweep_ns: [30.0, 50.0, 80.0]
+  threshold_sweep_db: [4.0, 6.0, 8.0]
+  tau0_method: "threshold"
+  noise_tail_ns: 50.0
+  threshold_margin_db: 6.0
+measurement_sweep:
+  BW_Hz: 4.0e9
+  df_Hz: 1.0e6
+plots:
+  max_links_for_pdp_examples: 3
+  pdp_example_selection: "highest_energy"
+stats:
+  alpha: 0.05
+  bootstrap_n: 1000
+scene_plots:
+  enabled: true
+  source: "scene_debug_json"
+  debug_rays_k: 20
+  ray_selection: "top_power"
+  max_cases_per_scenario: 9999
+  figure_size: [10, 6]
+  save_format: "png"

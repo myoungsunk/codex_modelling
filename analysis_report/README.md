@@ -47,17 +47,36 @@ python analysis_report/generate_proposition_plot_mapping_detailed.py --run-group
 - `/Users/kimmyoungsun/Documents/codex/analysis_report/out/<run_group>/proposition_plot_mapping_detailed_report.md`
 - `/Users/kimmyoungsun/Documents/codex/analysis_report/out/<run_group>/tables/proposition_plot_mapping_detailed.csv`
 - `/Users/kimmyoungsun/Documents/codex/analysis_report/out/<run_group>/tables/plot_data/<plot_id>__data.csv` (`x,y,data` 포함)
+- `/Users/kimmyoungsun/Documents/codex/analysis_report/out/<run_group>/tables/target_level.csv`
+- `/Users/kimmyoungsun/Documents/codex/analysis_report/out/<run_group>/tables/case_level.csv`
+- `/Users/kimmyoungsun/Documents/codex/analysis_report/out/<run_group>/tables/sensitivity_level.csv`
 
 ## Notes
 - 기본 구현은 **power 기반 지표(Z/U)**만 사용합니다.
+- 최종 시나리오 구조(합의):
+  - `C0`: calibration only
+  - `A2_off`: G1 primary evidence
+  - `A6`: G2 primary evidence (near-normal PEC, incidence <= 15 deg)
+  - `A3_corner`: supplementary mechanism only
+  - `A4_iso`: L2-M primary (`late_panel=false`, `dispersion=off`)
+  - `A4_bridge`: L2-M secondary (`late_panel=true`, `dispersion=on`)
+  - `A5_pair`: L2-S proxy stress response (synthetic primary, geometric sensitivity)
+  - `A2_on/A4_on`: LOS-on observability bridge set
+  - `B1/B2/B3`: R1/R2 real-space leverage (support count mandatory)
 - `scene_debug.json`이 없으면 해당 케이스 scene plot은 WARN으로 보고서에 기록됩니다.
 - 진단 B는 목적별 3-window를 분리해 계산합니다.
   - `W_floor` (C0): LOS peak 주변 contamination `C_floor`
   - `W_target` (A2-A5): target path 주변 contamination `C_target`
   - `W_early` (B1-B3): `Te` sweep(기본 `2/3/5 ns`) 분리력 `S(Te)`
+  - A3는 `target_window_ns_by_scenario.A3`(또는 `target_window_mode_by_scenario.A3=adaptive`)로 별도 `W_target` 설정 가능
+  - A3 sign-off는 `windows.target_sign_metric_by_scenario.A3=raw` 권장 (`A3_target_window_sign.csv`에 raw/ex 동시 출력)
+  - 보고서에서 A3는 mechanism-only로 분리 표기하며, fixed system `W_early` 우세 여부는 보조 진단으로만 사용
 - 진단 C는 endpoint를 분리합니다.
   - `C2-M`(material): primary=`XPD_early_excess`, secondary=`XPD_late_excess`/`L_pol`
   - `C2-S`(stress): primary=`L_pol`, secondary=`rho_early`/`DS`/`XPD_late_excess`, gate=`ΔP_target,total`
+- A5 stress 해석 규칙:
+  - `stress_semantics=response`(geometry/hybrid): delay/path contamination-response 해석 가능
+  - `stress_semantics=polarization_only`(synthetic): 편파축 stress만 의미하며 delay/path 구조 변화 주장 금지
 - 최종 보고서 산출물:
   - `analysis_report/out/<run_group>/final_diagnostic_decision.md`
   - `analysis_report/out/<run_group>/scenario_space_plots.md`

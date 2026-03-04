@@ -70,6 +70,26 @@ def _parse_bool(raw: Any, default: bool = False) -> bool:
     return bool(default)
 
 
+def _build_antenna_config_from_args(args: argparse.Namespace) -> dict[str, Any]:
+    return {
+        "tx_cross_pol_leakage_db": float(args.tx_cross_pol_leakage_db),
+        "rx_cross_pol_leakage_db": float(args.rx_cross_pol_leakage_db),
+        "tx_axial_ratio_db": float(args.tx_axial_ratio_db),
+        "rx_axial_ratio_db": float(args.rx_axial_ratio_db),
+        "enable_coupling": bool(_parse_bool(args.enable_antenna_coupling, default=True)),
+        "tx_coupling_ref_freq_hz": float(args.tx_coupling_ref_freq_hz),
+        "rx_coupling_ref_freq_hz": float(args.rx_coupling_ref_freq_hz),
+        "tx_cross_pol_leakage_db_slope_per_ghz": float(args.tx_cross_pol_leakage_db_slope_per_ghz),
+        "rx_cross_pol_leakage_db_slope_per_ghz": float(args.rx_cross_pol_leakage_db_slope_per_ghz),
+        "tx_axial_ratio_db_slope_per_ghz": float(args.tx_axial_ratio_db_slope_per_ghz),
+        "rx_axial_ratio_db_slope_per_ghz": float(args.rx_axial_ratio_db_slope_per_ghz),
+        "tx_cross_coupling_phase_deg": float(args.tx_cross_coupling_phase_deg),
+        "rx_cross_coupling_phase_deg": float(args.rx_cross_coupling_phase_deg),
+        "tx_cross_coupling_phase_slope_deg_per_ghz": float(args.tx_cross_coupling_phase_slope_deg_per_ghz),
+        "rx_cross_coupling_phase_slope_deg_per_ghz": float(args.rx_cross_coupling_phase_slope_deg_per_ghz),
+    }
+
+
 def _sanitize_token(s: Any) -> str:
     out = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(s))
     out = out.strip("._")
@@ -450,6 +470,8 @@ def _case_label(scenario_id: str, params: dict[str, Any]) -> str:
     if s == "A4":
         return (
             f"mat={_sanitize_token(p.get('material', 'na'))}"
+            f"_mode={_sanitize_token(p.get('a4_layout_mode', 'na'))}"
+            f"_disp={_sanitize_token(p.get('a4_dispersion_mode', p.get('material_dispersion', 'na')))}"
             f"_y={float(p.get('y_plane', np.nan)):.2f}"
             f"_d={float(p.get('distance_m', np.nan)):.2f}"
             f"_rep={int(p.get('rep_id', 0))}"
@@ -697,12 +719,14 @@ def _build_scene_snapshot(
     params: dict[str, Any],
     *,
     basis: str,
+    convention: str,
+    antenna_config: dict[str, Any] | None,
     los_block_mode: str,
     a5_stress_mode: str,
     a5_scatterer_count: int,
 ) -> tuple[np.ndarray, np.ndarray, list[Plane]]:
     s = str(scenario_id).upper()
-    tx, rx = default_antennas(basis=basis)
+    tx, rx = default_antennas(basis=basis, convention=convention, **dict(antenna_config or {}))
     scene: list[Plane] = []
     los_blocker = str(los_block_mode).lower().strip() == "occluder"
 
@@ -732,6 +756,8 @@ def _build_scene_snapshot(
             y_plane=float(params.get("y_plane", 2.0)),
             y_late_offset=float(params.get("y_late_offset", 2.4)),
             include_late_panel=bool(params.get("include_late_panel", True)),
+            materials_db=(str(params.get("materials_db", "")).strip() or None),
+            material_dispersion=str(params.get("a4_dispersion_mode", params.get("material_dispersion", "off"))),
         )
         if los_blocker:
             scene.append(
@@ -784,6 +810,10 @@ def _export_scene_debug_for_case(
     *,
     out_dir: Path,
     basis: str,
+    convention: str,
+    matrix_source: str,
+    force_cp_swap_on_odd_reflection: bool,
+    antenna_config: dict[str, Any] | None,
     los_block_mode: str,
     a5_stress_mode: str,
     a5_scatterer_count: int,
@@ -800,6 +830,8 @@ def _export_scene_debug_for_case(
         scenario_id,
         params,
         basis=basis,
+        convention=convention,
+        antenna_config=antenna_config,
         los_block_mode=los_block_mode,
         a5_stress_mode=a5_stress_mode,
         a5_scatterer_count=int(a5_scatterer_count),
@@ -823,6 +855,12 @@ def _export_scene_debug_for_case(
             "git_hash": str(git_hash),
             "cmd": str(cmdline),
             "seed": int(seed),
+            "basis": str(basis),
+            "convention": str(convention),
+            "matrix_source": str(matrix_source),
+            "force_cp_swap_on_odd_reflection": bool(force_cp_swap_on_odd_reflection),
+            "case_params": dict(params),
+            "antenna_config": dict(antenna_config or {}),
         },
     }
     fname = f"{_sanitize_token(scenario_id)}__{_sanitize_token(case_id)}__scene_debug.json"
@@ -831,18 +869,43 @@ def _export_scene_debug_for_case(
     return out_path
 
 
-def _run_room_case(kind: str, rx_x: float, rx_y: float, f_hz: np.ndarray, basis: str = "circular") -> list[dict[str, Any]]:
-    tx, rx = default_antennas(basis=basis)
+def _run_room_case(
+    kind: str,
+    rx_x: float,
+    rx_y: float,
+    f_hz: np.ndarray,
+    basis: str = "circular",
+    convention: str = "IEEE-RHCP",
+    antenna_config: dict[str, Any] | None = None,
+    force_cp_swap_on_odd_reflection: bool = False,
+) -> list[dict[str, Any]]:
+    tx, rx = default_antennas(basis=basis, convention=convention, **dict(antenna_config or {}))
     tx = tx.with_position([2.0, 0.0, 1.5])
     rx = rx.with_position([rx_x, rx_y, 1.5])
     scene = _build_room_scene(kind)
-    paths = trace_paths(scene, tx, rx, f_hz, max_bounce=2, los_enabled=True)
+    paths = trace_paths(
+        scene,
+        tx,
+        rx,
+        f_hz,
+        max_bounce=2,
+        los_enabled=True,
+        force_cp_swap_on_odd_reflection=bool(force_cp_swap_on_odd_reflection),
+    )
     return paths_to_records(paths)
 
 
-def _build_case_records(args: argparse.Namespace, f_hz: np.ndarray) -> list[dict[str, Any]]:
+def _build_case_records(
+    args: argparse.Namespace,
+    f_hz: np.ndarray,
+    *,
+    antenna_config: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
     s = str(args.scenario).upper()
     basis = str(args.basis)
+    convention = str(args.convention)
+    matrix_source = str(args.matrix_source)
+    force_cp_swap = bool(_parse_bool(args.force_cp_swap_on_odd_reflection, default=False))
     n_rep = max(1, int(args.n_rep))
     los_block_mode = str(args.los_block_mode).lower().strip()
     los_blocker = bool(los_block_mode == "occluder")
@@ -856,7 +919,13 @@ def _build_case_records(args: argparse.Namespace, f_hz: np.ndarray) -> list[dict
             for yaw in yaw_list:
                 for pit in pitch_list:
                     for rep_id in range(n_rep):
-                        paths = C0_free_space.run_case({"distance_m": d, "yaw_deg": yaw, "pitch_deg": pit}, f_hz, basis=basis)
+                        paths = C0_free_space.run_case(
+                            {"distance_m": d, "yaw_deg": yaw, "pitch_deg": pit},
+                            f_hz,
+                            basis=basis,
+                            antenna_config=dict(antenna_config or {}),
+                            force_cp_swap_on_odd_reflection=bool(force_cp_swap),
+                        )
                         out.append(
                             {
                                 "case_id": str(cid),
@@ -871,6 +940,13 @@ def _build_case_records(args: argparse.Namespace, f_hz: np.ndarray) -> list[dict
                                     "rep_id": int(rep_id),
                                     "material_class": "free_space",
                                     "basis": basis,
+                                    "convention": convention,
+                                    "matrix_source": matrix_source,
+                                    "force_cp_swap_on_odd_reflection": int(bool(force_cp_swap)),
+                                    "tx_cross_pol_leakage_db": float((antenna_config or {}).get("tx_cross_pol_leakage_db", np.nan)),
+                                    "rx_cross_pol_leakage_db": float((antenna_config or {}).get("rx_cross_pol_leakage_db", np.nan)),
+                                    "tx_cross_pol_leakage_db_slope_per_ghz": float((antenna_config or {}).get("tx_cross_pol_leakage_db_slope_per_ghz", np.nan)),
+                                    "rx_cross_pol_leakage_db_slope_per_ghz": float((antenna_config or {}).get("rx_cross_pol_leakage_db_slope_per_ghz", np.nan)),
                                 },
                             }
                         )
@@ -889,6 +965,8 @@ def _build_case_records(args: argparse.Namespace, f_hz: np.ndarray) -> list[dict
                         p,
                         f_hz,
                         basis=basis,
+                        antenna_config=dict(antenna_config or {}),
+                        force_cp_swap_on_odd_reflection=bool(force_cp_swap),
                         los_blocker=bool(los_blocker),
                     )
                     out.append(
@@ -905,6 +983,9 @@ def _build_case_records(args: argparse.Namespace, f_hz: np.ndarray) -> list[dict
                                 "rep_id": int(rep_id),
                                 "los_block_method": "physical_occluder" if bool(los_blocker) else "synthetic_los_off",
                                 "basis": basis,
+                                "convention": convention,
+                                "matrix_source": matrix_source,
+                                "force_cp_swap_on_odd_reflection": int(bool(force_cp_swap)),
                             },
                         }
                     )
@@ -922,6 +1003,8 @@ def _build_case_records(args: argparse.Namespace, f_hz: np.ndarray) -> list[dict
                     p,
                     f_hz,
                     basis=basis,
+                    antenna_config=dict(antenna_config or {}),
+                    force_cp_swap_on_odd_reflection=bool(force_cp_swap),
                     los_blocker=bool(los_blocker),
                 )
                 d = float(np.linalg.norm(np.asarray([p["rx_x"], p["rx_y"], 1.5]) - np.asarray([0.0, 0.0, 1.5])))
@@ -939,6 +1022,9 @@ def _build_case_records(args: argparse.Namespace, f_hz: np.ndarray) -> list[dict
                             "rep_id": int(rep_id),
                             "los_block_method": "physical_occluder" if bool(los_blocker) else "synthetic_los_off",
                             "basis": basis,
+                            "convention": convention,
+                            "matrix_source": matrix_source,
+                            "force_cp_swap_on_odd_reflection": int(bool(force_cp_swap)),
                         },
                     }
                 )
@@ -949,47 +1035,79 @@ def _build_case_records(args: argparse.Namespace, f_hz: np.ndarray) -> list[dict
         mats = [m.strip() for m in str(args.material_list).split(",") if m.strip()] or list(DEFAULT_MATERIAL_SPECS.keys())
         yvals = _parse_float_list(args.a4_y_list, [1.5, 2.0, 2.5])
         dvals = _parse_float_list(args.dist_list, [6.0])
-        include_late_panel = _parse_bool(args.a4_include_late_panel, default=True)
+        layout_modes = [x.strip().lower() for x in str(args.a4_layout_modes).split(",") if x.strip()]
+        if not layout_modes:
+            layout_modes = ["iso", "bridge"]
+        layout_modes = [x for x in layout_modes if x in {"iso", "bridge"}] or ["iso", "bridge"]
+        dispersion_modes = [x.strip().lower() for x in str(args.a4_dispersion_modes).split(",") if x.strip()]
+        if not dispersion_modes:
+            dispersion_modes = ["off", "on"]
+        valid_disp = {"off", "on", "debye"}
+        dispersion_modes = [x for x in dispersion_modes if x in valid_disp] or ["off", "on"]
+        include_late_panel_default = _parse_bool(args.a4_include_late_panel, default=True)
         late_offset_m = float(args.a4_late_offset_m)
+        materials_db = str(args.materials_db).strip() if str(args.materials_db).strip() else None
         cid = 0
         for m in mats:
-            for y in yvals:
-                for d in dvals:
-                    for rep_id in range(n_rep):
-                        p = {
-                            "material": m,
-                            "y_plane": float(y),
-                            "distance_m": float(d),
-                            "rep_id": int(rep_id),
-                            "include_late_panel": bool(include_late_panel),
-                            "y_late_offset": late_offset_m,
-                        }
-                        paths = A4_dielectric_plane.run_case(
-                            p,
-                            f_hz,
-                            basis=basis,
-                            los_blocker=bool(los_blocker),
-                            include_late_panel=bool(include_late_panel),
-                            y_late_offset=late_offset_m,
-                        )
-                        out.append(
-                            {
-                                "case_id": str(cid),
-                                "scenario_id": "A4",
-                                "link_id": f"A4_{cid}",
-                                "params": p,
-                                "paths": paths_to_records(paths),
-                                "meta": {
-                                    "d_m": float(d),
-                                    "material_class": m,
-                                    "obstacle_flag": 1,
+            for layout_mode in layout_modes:
+                include_late_panel = bool(layout_mode == "bridge")
+                # Optional legacy override for single-mode sweeps.
+                if len(layout_modes) == 1:
+                    include_late_panel = bool(include_late_panel_default)
+                for disp_mode in dispersion_modes:
+                    for y in yvals:
+                        for d in dvals:
+                            for rep_id in range(n_rep):
+                                p = {
+                                    "material": m,
+                                    "y_plane": float(y),
+                                    "distance_m": float(d),
                                     "rep_id": int(rep_id),
-                                    "los_block_method": "physical_occluder" if bool(los_blocker) else "synthetic_los_off",
-                                    "basis": basis,
-                                },
-                            }
-                        )
-                        cid += 1
+                                    "a4_layout_mode": str(layout_mode),
+                                    "a4_dispersion_mode": str(disp_mode),
+                                    "material_dispersion": str(disp_mode),
+                                    "materials_db": str(materials_db or ""),
+                                    "include_late_panel": bool(include_late_panel),
+                                    "y_late_offset": late_offset_m,
+                                }
+                                paths = A4_dielectric_plane.run_case(
+                                    p,
+                                    f_hz,
+                                    basis=basis,
+                                    antenna_config=dict(antenna_config or {}),
+                                    force_cp_swap_on_odd_reflection=bool(force_cp_swap),
+                                    los_blocker=bool(los_blocker),
+                                    include_late_panel=bool(include_late_panel),
+                                    y_late_offset=late_offset_m,
+                                    materials_db=materials_db,
+                                    material_dispersion=str(disp_mode),
+                                )
+                                out.append(
+                                    {
+                                        "case_id": str(cid),
+                                        "scenario_id": "A4",
+                                        "link_id": f"A4_{cid}",
+                                        "params": p,
+                                        "paths": paths_to_records(paths),
+                                        "meta": {
+                                            "d_m": float(d),
+                                            "material_class": m,
+                                            "a4_layout_mode": str(layout_mode),
+                                            "a4_dispersion_mode": str(disp_mode),
+                                            "material_dispersion": str(disp_mode),
+                                            "include_late_panel": int(bool(include_late_panel)),
+                                            "materials_db": str(materials_db or ""),
+                                            "obstacle_flag": 1,
+                                            "rep_id": int(rep_id),
+                                            "los_block_method": "physical_occluder" if bool(los_blocker) else "synthetic_los_off",
+                                            "basis": basis,
+                                            "convention": convention,
+                                            "matrix_source": matrix_source,
+                                            "force_cp_swap_on_odd_reflection": int(bool(force_cp_swap)),
+                                        },
+                                    }
+                                )
+                                cid += 1
         return out
 
     if s == "A5":
@@ -999,6 +1117,32 @@ def _build_case_records(args: argparse.Namespace, f_hz: np.ndarray) -> list[dict
             params = params[: int(args.a5_max_cases)]
         stress_on = bool(args.stress_flag)
         stress_mode = str(args.a5_stress_mode) if stress_on else "none"
+        stress_mode_norm = str(stress_mode).lower().strip()
+        if stress_on and stress_mode_norm == "synthetic" and not bool(getattr(args, "allow_a5_synthetic_only", False)):
+            raise SystemExit(
+                "A5 synthetic-only stress mode is disabled by default because it keeps delay/path topology fixed. "
+                "Use --a5-stress-mode hybrid|geometry for stress-response, or pass --allow-a5-synthetic-only to override."
+            )
+        if stress_on and stress_mode_norm in {"geometry", "hybrid"} and int(args.a5_scatterer_count) <= 0:
+            raise SystemExit(
+                "A5 stress-response mode requires --a5-scatterer-count > 0 "
+                "(otherwise geometry/delay structure is unchanged)."
+            )
+        stress_path_structure_active = int(stress_on and stress_mode_norm in {"geometry", "hybrid"} and int(args.a5_scatterer_count) > 0)
+        stress_pol_mixer_active = int(stress_on and stress_mode_norm in {"synthetic", "hybrid"})
+        a5_diffuse_enabled = bool(_parse_bool(args.a5_diffuse_enabled, default=False))
+        a5_diffuse_config = {
+            "diffuse_enabled": bool(a5_diffuse_enabled),
+            "diffuse_factor": float(args.a5_diffuse_factor),
+            "diffuse_lobe_alpha": float(args.a5_diffuse_lobe_alpha),
+            "diffuse_rays_per_hit": int(args.a5_diffuse_rays_per_hit),
+        }
+        if not stress_on or stress_mode_norm == "none":
+            stress_semantics = "off"
+        elif stress_path_structure_active == 1:
+            stress_semantics = "response"
+        else:
+            stress_semantics = "polarization_only"
         for rep_outer in range(n_rep):
             for p0 in params:
                 p = dict(p0)
@@ -1008,8 +1152,11 @@ def _build_case_records(args: argparse.Namespace, f_hz: np.ndarray) -> list[dict
                     p,
                     f_hz,
                     basis=basis,
+                    antenna_config=dict(antenna_config or {}),
+                    force_cp_swap_on_odd_reflection=bool(force_cp_swap),
                     stress_mode=stress_mode,
                     scatterer_count=int(args.a5_scatterer_count) if stress_on else 0,
+                    diffuse_config=dict(a5_diffuse_config),
                     los_blocker=bool(los_blocker),
                 )
                 d = float(np.linalg.norm(np.asarray([p["rx_x"], p["rx_y"], 1.5]) - np.asarray([0.0, 0.0, 1.5])))
@@ -1027,8 +1174,19 @@ def _build_case_records(args: argparse.Namespace, f_hz: np.ndarray) -> list[dict
                             "human_flag": int(stress_on),
                             "obstacle_flag": 1,
                             "stress_mode": str(stress_mode),
+                            "scatterer_count": int(args.a5_scatterer_count) if stress_on else 0,
+                            "diffuse_enabled": int(bool(a5_diffuse_enabled)),
+                            "diffuse_factor": float(args.a5_diffuse_factor),
+                            "diffuse_lobe_alpha": float(args.a5_diffuse_lobe_alpha),
+                            "diffuse_rays_per_hit": int(args.a5_diffuse_rays_per_hit),
+                            "stress_path_structure_active": int(stress_path_structure_active),
+                            "stress_polarization_mixer_active": int(stress_pol_mixer_active),
+                            "stress_semantics": str(stress_semantics),
                             "los_block_method": "physical_occluder" if bool(los_blocker) else "synthetic_los_off",
                             "basis": basis,
+                            "convention": convention,
+                            "matrix_source": matrix_source,
+                            "force_cp_swap_on_odd_reflection": int(bool(force_cp_swap)),
                         },
                     }
                 )
@@ -1042,7 +1200,16 @@ def _build_case_records(args: argparse.Namespace, f_hz: np.ndarray) -> list[dict
     cid = 0
     for x in x_vals:
         for y in y_vals:
-            paths = _run_room_case(kind=kind, rx_x=float(x), rx_y=float(y), f_hz=f_hz, basis=basis)
+            paths = _run_room_case(
+                kind=kind,
+                rx_x=float(x),
+                rx_y=float(y),
+                f_hz=f_hz,
+                basis=basis,
+                convention=convention,
+                antenna_config=dict(antenna_config or {}),
+                force_cp_swap_on_odd_reflection=bool(force_cp_swap),
+            )
             out.append(
                 {
                     "case_id": str(cid),
@@ -1057,6 +1224,9 @@ def _build_case_records(args: argparse.Namespace, f_hz: np.ndarray) -> list[dict
                         "rx_x": float(x),
                         "rx_y": float(y),
                         "basis": basis,
+                        "convention": convention,
+                        "matrix_source": matrix_source,
+                        "force_cp_swap_on_odd_reflection": int(bool(force_cp_swap)),
                     },
                 }
             )
@@ -1068,6 +1238,24 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--scenario", required=True, choices=["C0", "A2", "A3", "A4", "A5", "B1", "B2", "B3"])
     parser.add_argument("--basis", type=str, default="circular", choices=["circular", "linear"])
+    parser.add_argument("--convention", type=str, default="IEEE-RHCP")
+    parser.add_argument("--matrix-source", type=str, default="A", choices=["A", "J", "a", "j"])
+    parser.add_argument("--force-cp-swap-on-odd-reflection", type=str, default="false")
+    parser.add_argument("--enable-antenna-coupling", type=str, default="true")
+    parser.add_argument("--tx-cross-pol-leakage-db", type=float, default=35.0)
+    parser.add_argument("--rx-cross-pol-leakage-db", type=float, default=35.0)
+    parser.add_argument("--tx-axial-ratio-db", type=float, default=0.0)
+    parser.add_argument("--rx-axial-ratio-db", type=float, default=0.0)
+    parser.add_argument("--tx-coupling-ref-freq-hz", type=float, default=8.0e9)
+    parser.add_argument("--rx-coupling-ref-freq-hz", type=float, default=8.0e9)
+    parser.add_argument("--tx-cross-pol-leakage-db-slope-per-ghz", type=float, default=0.0)
+    parser.add_argument("--rx-cross-pol-leakage-db-slope-per-ghz", type=float, default=0.0)
+    parser.add_argument("--tx-axial-ratio-db-slope-per-ghz", type=float, default=0.0)
+    parser.add_argument("--rx-axial-ratio-db-slope-per-ghz", type=float, default=0.0)
+    parser.add_argument("--tx-cross-coupling-phase-deg", type=float, default=0.0)
+    parser.add_argument("--rx-cross-coupling-phase-deg", type=float, default=0.0)
+    parser.add_argument("--tx-cross-coupling-phase-slope-deg-per-ghz", type=float, default=0.0)
+    parser.add_argument("--rx-cross-coupling-phase-slope-deg-per-ghz", type=float, default=0.0)
     parser.add_argument("--out-h5", type=str, required=True)
     parser.add_argument("--out-dir", type=str, default="outputs/standard")
     parser.add_argument("--run-id", type=str, default=None)
@@ -1089,11 +1277,19 @@ def main() -> None:
     parser.add_argument("--n-rep", type=int, default=5)
     parser.add_argument("--a2-y-list", type=str, default="1.5,2.0,2.5")
     parser.add_argument("--a4-y-list", type=str, default="1.5,2.0,2.5")
+    parser.add_argument("--a4-layout-modes", type=str, default="iso,bridge")
+    parser.add_argument("--a4-dispersion-modes", type=str, default="off,on")
     parser.add_argument("--a4-include-late-panel", type=str, default="true")
     parser.add_argument("--a4-late-offset-m", type=float, default=2.4)
+    parser.add_argument("--materials-db", type=str, default="")
     parser.add_argument("--los-block-mode", type=str, default="occluder", choices=["synthetic", "occluder"])
-    parser.add_argument("--a5-stress-mode", type=str, default="hybrid", choices=["none", "synthetic", "geometry", "hybrid"])
+    parser.add_argument("--a5-stress-mode", type=str, default="geometry", choices=["none", "synthetic", "geometry", "hybrid"])
     parser.add_argument("--a5-scatterer-count", type=int, default=3)
+    parser.add_argument("--a5-diffuse-enabled", type=str, default="false")
+    parser.add_argument("--a5-diffuse-factor", type=float, default=0.0)
+    parser.add_argument("--a5-diffuse-lobe-alpha", type=float, default=0.15)
+    parser.add_argument("--a5-diffuse-rays-per-hit", type=int, default=0)
+    parser.add_argument("--allow-a5-synthetic-only", action="store_true")
     parser.add_argument("--a5-max-cases", type=int, default=0)
     parser.add_argument("--material-list", type=str, default="")
     parser.add_argument("--stress-flag", action="store_true")
@@ -1117,6 +1313,7 @@ def main() -> None:
     rng = np.random.default_rng(int(args.seed))
     commit, branch = _git_meta()
     run_id = str(args.run_id or f"{args.scenario}_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}")
+    antenna_config = _build_antenna_config_from_args(args)
     f_hz = uwb_frequency(nf=int(args.nf))
     xpr_cfg = _load_json(args.xpr_model_config)
     floor_cfg = _load_json(args.floor_model_config)
@@ -1124,7 +1321,7 @@ def main() -> None:
     xpr_model = _make_xpr_model(str(args.scenario), xpr_cfg)
     floor_model = _make_floor_model(floor_cfg)
 
-    case_records = _build_case_records(args, f_hz=f_hz)
+    case_records = _build_case_records(args, f_hz=f_hz, antenna_config=antenna_config)
     if int(args.max_links) > 0:
         case_records = case_records[: int(args.max_links)]
 
@@ -1138,6 +1335,10 @@ def main() -> None:
                 c,
                 out_dir=scene_debug_dir,
                 basis=str(args.basis),
+                convention=str(args.convention),
+                matrix_source=str(args.matrix_source),
+                force_cp_swap_on_odd_reflection=bool(_parse_bool(args.force_cp_swap_on_odd_reflection, default=False)),
+                antenna_config=antenna_config,
                 los_block_mode=str(args.los_block_mode),
                 a5_stress_mode=str(args.a5_stress_mode) if bool(args.stress_flag) else "none",
                 a5_scatterer_count=int(args.a5_scatterer_count) if bool(args.stress_flag) else 0,
@@ -1155,7 +1356,12 @@ def main() -> None:
         link_id = str(c["link_id"])
         case_id = str(c["case_id"])
         paths = list(c.get("paths", []))
-        ray_rows = build_ray_table_from_rt(paths, matrix_source="A", include_material=True, include_angles=True)
+        ray_rows = build_ray_table_from_rt(
+            paths,
+            matrix_source=str(args.matrix_source).upper(),
+            include_material=True,
+            include_angles=True,
+        )
         ray_rows = add_el_db(ray_rows, f_center_hz=float(args.f_center_hz), method="fspl")
 
         los_link = int(any(int(r.get("los_flag_ray", 0)) == 1 for r in ray_rows))
@@ -1168,6 +1374,9 @@ def main() -> None:
         synth_U = {
             "scenario_id": scenario_id,
             "basis": str(args.basis),
+            "convention": str(args.convention),
+            "matrix_source": str(args.matrix_source).upper(),
+            "force_cp_swap_on_odd_reflection": int(bool(_parse_bool(args.force_cp_swap_on_odd_reflection, default=False))),
             "f_center_hz": float(args.f_center_hz),
             "yaw_deg": float(c.get("meta", {}).get("yaw_deg", 0.0)),
             "pitch_deg": float(c.get("meta", {}).get("pitch_deg", 0.0)),
@@ -1175,6 +1384,10 @@ def main() -> None:
             "human_flag": int(c.get("meta", {}).get("human_flag", 0)),
             "material_class": str(c.get("meta", {}).get("material_class", "NA")),
             "EL_proxy_db": float(np.nanmedian(np.asarray([r.get("EL_db", np.nan) for r in ray_rows], dtype=float))),
+            "tx_cross_pol_leakage_db": float(antenna_config.get("tx_cross_pol_leakage_db", np.nan)),
+            "rx_cross_pol_leakage_db": float(antenna_config.get("rx_cross_pol_leakage_db", np.nan)),
+            "tx_cross_pol_leakage_db_slope_per_ghz": float(antenna_config.get("tx_cross_pol_leakage_db_slope_per_ghz", np.nan)),
+            "rx_cross_pol_leakage_db_slope_per_ghz": float(antenna_config.get("rx_cross_pol_leakage_db_slope_per_ghz", np.nan)),
         }
         pdp_obj = synthesize_dualcp_pdp(
             ray_rows,
@@ -1253,6 +1466,11 @@ def main() -> None:
                 "timestamp_utc": datetime.now(timezone.utc).isoformat(),
                 "scenario_id": scenario_id,
                 "case_id": case_id,
+                "basis": str(args.basis),
+                "convention": str(args.convention),
+                "matrix_source": str(args.matrix_source).upper(),
+                "force_cp_swap_on_odd_reflection": bool(_parse_bool(args.force_cp_swap_on_odd_reflection, default=False)),
+                "antenna_config": dict(antenna_config),
                 "link_params": c.get("params", {}),
                 "cmdline": " ".join(shlex.quote(x) for x in sys.argv),
             },
@@ -1350,6 +1568,11 @@ def main() -> None:
         "run_id": run_id,
         "scenario_id": str(args.scenario),
         "basis": str(args.basis),
+        "convention": str(args.convention),
+        "matrix_source": str(args.matrix_source).upper(),
+        "xpd_matrix_source": str(args.matrix_source).upper(),
+        "force_cp_swap_on_odd_reflection": bool(_parse_bool(args.force_cp_swap_on_odd_reflection, default=False)),
+        "antenna_config": dict(antenna_config),
         "seed": int(args.seed),
         "n_rep": int(max(1, args.n_rep)),
         "nf": int(args.nf),
@@ -1370,6 +1593,10 @@ def main() -> None:
         "out_h5": str(args.out_h5),
         "out_dir": str(args.out_dir),
         "basis": str(args.basis),
+        "convention": str(args.convention),
+        "matrix_source": str(args.matrix_source).upper(),
+        "force_cp_swap_on_odd_reflection": bool(_parse_bool(args.force_cp_swap_on_odd_reflection, default=False)),
+        "antenna_config": dict(antenna_config),
         "n_links": len(bundles),
         "link_metrics_csv": csv_out["link_metrics_csv"],
         "rays_csv": csv_out["rays_csv"],

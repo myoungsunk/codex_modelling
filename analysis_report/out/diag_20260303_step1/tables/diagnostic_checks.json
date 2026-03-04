@@ -43,6 +43,18 @@
     "status": "WARN",
     "note": "Coordinate penetration sanity needs scenario geometry file review; not inferable from standard outputs only."
   },
+  "A5_stress_semantics": {
+    "status": "PASS",
+    "n_a5_rows": 60,
+    "n_stress_rows": 30,
+    "n_response": 30,
+    "n_polarization_only": 0,
+    "n_off": 0,
+    "n_unknown": 0,
+    "dominant_semantics": "response",
+    "contamination_response_ready": true,
+    "note": "Geometric path-structure stress is active; delay/path contamination-response interpretation is valid."
+  },
   "B_time_resolution": {
     "freq_source": "link_rows.xpd_floor_freq_hz[C0]",
     "BW_Hz": 4000000000.0,
@@ -52,14 +64,27 @@
     "Te_s": 3.0000000000000004e-09,
     "Tmax_s": 2.0000000000000002e-07,
     "W_floor_s": 1.5000000000000002e-09,
+    "W_target_s_default": 3.0000000000000004e-09,
     "W_target_s": 3.0000000000000004e-09,
+    "W_target_s_by_scenario": {
+      "A2": 3.0000000000000004e-09,
+      "A3": 6.000000000000001e-09,
+      "A4": 3.0000000000000004e-09,
+      "A5": 3.0000000000000004e-09
+    },
+    "W_target_mode_by_scenario": {
+      "A2": "default",
+      "A3": "fixed",
+      "A4": "default",
+      "A5": "default"
+    },
     "W_floor_status": "PASS",
     "W_floor_C_median_db": -237.22403177507283,
     "A2_target_in_Wearly_rate": 1.0,
     "A3_target_in_Wearly_rate": 0.6666666666666666,
     "A2_C_target_median_db": -229.61041767359842,
     "A3_C_target_median_db": -229.53957289262738,
-    "B2_min_delay_gap_median_s": 5.42523266456174e-10,
+    "B2_min_delay_gap_median_s": 4.699063483559845e-10,
     "B2_status": "PASS",
     "B3_status": "PASS",
     "W3_status": "PASS",
@@ -92,7 +117,7 @@
       "A3": {
         "scenario": "A3",
         "target_n": 2,
-        "W_target_s": 3.0000000000000004e-09,
+        "W_target_s": 6.000000000000001e-09,
         "target_exists_rate": 0.8571428571428571,
         "target_in_Wearly_rate": 0.6666666666666666,
         "target_is_first_rate": 0.6666666666666666,
@@ -108,10 +133,10 @@
         "target_exists_rate": 1.0,
         "target_in_Wearly_rate": 1.0,
         "target_is_first_rate": 1.0,
-        "C_target_median_db": -220.5864644119584,
-        "C_target_p95_db": -214.2857803735126,
-        "target_gap_median_s": 1.1351827174780629e-08,
-        "status": "PASS"
+        "C_target_median_db": 0.0,
+        "C_target_p95_db": 0.0,
+        "target_gap_median_s": 0.0,
+        "status": "FAIL"
       },
       "A5": {
         "scenario": "A5",
@@ -219,27 +244,69 @@
       "median_xpd_target_ex_db": -32.934837696767445,
       "p10_xpd_target_ex_db": -32.934837696767445,
       "p90_xpd_target_ex_db": -32.934837696767445,
+      "median_xpd_target_raw_db": -8.0,
+      "p10_xpd_target_raw_db": -8.0,
+      "p90_xpd_target_raw_db": -8.0,
+      "expected_sign_hit_rate_ex": 1.0,
+      "expected_sign_hit_rate_raw": 1.0,
+      "sign_metric_for_status": "excess",
       "expected_sign_hit_rate": 1.0,
       "status": "PASS"
     },
     "A3_target_window_sign": {
       "scenario": "A3",
       "target_n": 2,
-      "W_target_s": 3.0000000000000004e-09,
+      "W_target_s": 6.000000000000001e-09,
       "expected_sign": "positive",
       "n_links": 24,
       "n_eval": 12,
       "median_xpd_target_ex_db": -16.93483769676745,
       "p10_xpd_target_ex_db": -16.93483769676745,
       "p90_xpd_target_ex_db": -16.934837696767445,
-      "expected_sign_hit_rate": 0.0,
-      "status": "FAIL"
+      "median_xpd_target_raw_db": 8.0,
+      "p10_xpd_target_raw_db": 8.0,
+      "p90_xpd_target_raw_db": 8.000000000000002,
+      "expected_sign_hit_rate_ex": 0.0,
+      "expected_sign_hit_rate_raw": 1.0,
+      "sign_metric_for_status": "raw",
+      "expected_sign_hit_rate": 1.0,
+      "status": "PASS"
     },
-    "A3_role": "mechanism",
+    "A3_target_window_sign_reporting_status": "PASS",
+    "A6_parity_benchmark": {
+      "available": false,
+      "status": "INCONCLUSIVE",
+      "sign_metric_for_status": "raw",
+      "n_eval_total": 0,
+      "n_eval_odd": 0,
+      "n_eval_even": 0,
+      "hit_rate_odd": NaN,
+      "hit_rate_even": NaN,
+      "hit_rate_min": NaN,
+      "odd": {
+        "scenario": "A6",
+        "status": "WARN",
+        "reason": "missing run or rows"
+      },
+      "even": {
+        "scenario": "A6",
+        "status": "WARN",
+        "reason": "missing run or rows"
+      },
+      "note": "A6 is near-normal parity benchmark; use as primary G2 evidence when available."
+    },
+    "A3_role": "mechanism_supplementary",
+    "A3_evidence_tier": "primary_if_no_A6",
+    "G2_primary_evidence_source": "A3_target_window_supplementary_only",
+    "G2_primary_evidence_status": "WARN",
     "A3_mechanism_status": "WARN",
     "A3_system_early_status": "WARN",
-    "A5_role": "stress_response",
-    "A5_target_mode": "contamination_response"
+    "A3_reporting_rule": "A3 is mechanism-only/supplementary: use target-window metrics for mechanism context; fixed system early-window dominance is not primary evidence. If A6 is present, use A6 as primary G2 sign evidence.",
+    "A5_role": "stress_response_proxy",
+    "A5_target_mode": "contamination_response",
+    "A5_stress_semantics": "response",
+    "A5_contamination_response_ready": true,
+    "A5_semantics_note": "Geometric path-structure stress is active; delay/path contamination-response interpretation is valid."
   },
   "C_effect_vs_floor": {
     "floor_delta_db": 0.6107424330369078,
@@ -248,38 +315,38 @@
     "A3_minus_A2_delta_median_db": 7.999999707790597,
     "ratio_to_floor": 13.098811012705823,
     "C1_status": "PASS",
-    "A4_material_shift_late_excess_db": 8.145146729919599,
+    "A4_material_shift_late_excess_db": 4.132099962681675,
     "A5_stress_delta_late_excess_db": 0.0,
     "A5_stress_var_ratio": 169452815837739.53,
-    "C2_status": "PASS",
+    "C2_status": "WARN",
     "C2M_primary_metric": "XPD_early_excess_db",
-    "C2M_primary_span_db": 8.189290571385882,
-    "C2M_primary_ratio_to_delta": 13.408746680109903,
+    "C2M_primary_span_db": 8.019827748426433,
+    "C2M_primary_ratio_to_delta": 13.131276483521797,
     "C2M_primary_status": "PASS",
-    "C2M_secondary_late_span_db": 8.145146729919599,
-    "C2M_secondary_late_ratio_to_delta": 13.336467697877117,
+    "C2M_secondary_late_span_db": 4.132099962681675,
+    "C2M_secondary_late_ratio_to_delta": 6.765699809222144,
     "C2M_secondary_late_status": "PASS",
-    "C2M_secondary_lpol_span_db": 0.43996749845933625,
-    "C2M_secondary_lpol_ratio_to_delta": 0.7203814155692512,
-    "C2M_secondary_lpol_status": "FAIL",
-    "C2M_status": "PASS",
-    "A4_target_C_median_db": -220.5864644119584,
+    "C2M_secondary_lpol_span_db": 3.9500716943387064,
+    "C2M_secondary_lpol_ratio_to_delta": 6.467655562586397,
+    "C2M_secondary_lpol_status": "PASS",
+    "C2M_status": "WARN",
+    "A4_target_C_median_db": 0.0,
     "A4_target_exists_rate": 1.0,
-    "A4_target_gate_status": "PASS",
+    "A4_target_gate_status": "WARN",
     "A4_material_medians_early_ex": {
-      "glass": -34.313798250678936,
-      "gypsum": -30.050102644399814,
-      "wood": -26.124507679293053
+      "glass": -34.27631209164216,
+      "gypsum": -30.30060481473733,
+      "wood": -26.256484343215728
     },
     "A4_material_medians_late_ex": {
-      "glass": -33.07998442668705,
-      "gypsum": -29.081877425426,
-      "wood": -24.93483769676745
+      "glass": -29.16540867736022,
+      "gypsum": -27.059866475991043,
+      "wood": -25.033308714678544
     },
     "A4_material_medians_lpol": {
-      "glass": -1.3194624882938246,
-      "gypsum": -1.47015156102449,
-      "wood": -1.0301840625651537
+      "glass": -4.827896187951825,
+      "gypsum": -3.1350578499871027,
+      "wood": -0.8778244936131183
     },
     "C2S_primary_metric": "L_pol_db",
     "C2S_delta_lpol_db": -5.852639695953271,
@@ -291,11 +358,14 @@
     "C2S_late_ex_var_ratio": 169452815837739.53,
     "C2S_gate_delta_p_target_db": 0.0,
     "C2S_gate_status": "PASS",
+    "C2S_semantics_gate_status": "PASS",
+    "C2S_semantics": "response",
+    "C2S_semantics_note": "Geometric path-structure stress is active; delay/path contamination-response interpretation is valid.",
     "C2S_gate_pair_count": 5
   },
   "D_identifiability": {
-    "EL_iqr_db": 6.363954146494699,
-    "corr_d_vs_LOS": -0.5531406228999123,
+    "EL_iqr_db": 8.972481554550932,
+    "corr_d_vs_LOS": -0.6705535647259849,
     "strata_counts": {
       "LOS0_q1": 42,
       "LOS0_q2": 10,
@@ -307,7 +377,7 @@
       "LOS1_qNA": 0
     },
     "min_strata_n": 9,
-    "status": "PASS",
+    "status": "WARN",
     "D1": {
       "status": "PASS",
       "global": {
@@ -319,14 +389,14 @@
           "B2",
           "B3"
         ],
-        "EL_iqr_db": 6.363954146494699,
+        "EL_iqr_db": 8.972481554550932,
         "el_bins_low_mid_high": {
-          "low": 115,
-          "mid": 115,
-          "high": 115
+          "low": 121,
+          "mid": 121,
+          "high": 121
         },
-        "min_bin_n": 115,
-        "n_rows": 345
+        "min_bin_n": 121,
+        "n_rows": 363
       },
       "A2_isolation": {
         "status": "PASS",
@@ -336,7 +406,7 @@
       },
       "A5_isolation": {
         "status": "PASS",
-        "role": "stress_response",
+        "role": "stress_response_proxy",
         "n_base": 30,
         "n_stress": 30,
         "delta_median_EL_stress_minus_base_db": -2.4888041630474405,
@@ -344,27 +414,27 @@
       }
     },
     "D2": {
-      "status": "PASS",
+      "status": "WARN",
       "material_x_angle_status": "PASS",
       "material_x_angle_groups_good": 3,
       "material_x_angle_groups_total": 3,
       "material_x_angle_coverage": {
         "glass": {
-          "low": 2,
-          "mid": 10,
-          "high": 12,
+          "low": 0,
+          "mid": 20,
+          "high": 10,
           "NA": 0
         },
         "wood": {
-          "low": 2,
-          "mid": 10,
-          "high": 12,
+          "low": 0,
+          "mid": 20,
+          "high": 10,
           "NA": 0
         },
         "gypsum": {
-          "low": 2,
-          "mid": 10,
-          "high": 12,
+          "low": 0,
+          "mid": 20,
+          "high": 10,
           "NA": 0
         }
       },
@@ -385,43 +455,47 @@
           "NA": 0
         }
       },
-      "design_status": "PASS",
+      "design_status": "WARN",
       "stage1": {
-        "status": "PASS",
-        "n_rows": 345,
+        "status": "WARN",
+        "n_rows": 363,
         "design_rank": 8,
         "design_cols": 8,
-        "condition_number": 65.44351394139171,
+        "condition_number": 93.3961427788242,
         "vif_threshold": 5.0,
         "vif": {
-          "EL_proxy_db": 3.5525494326628624,
-          "d_m": 2.3017739369015304
+          "EL_proxy_db": 5.73532842904619,
+          "d_m": 3.3015536050544303
         },
-        "vif_warnings": {}
+        "vif_warnings": {
+          "EL_proxy_db": 5.73532842904619
+        }
       },
       "stage2": {
         "status": "PASS",
-        "n_rows": 423,
+        "n_rows": 441,
         "design_rank": 5,
         "design_cols": 5,
-        "condition_number": 7.89678796024209,
+        "condition_number": 8.705903709645803,
         "vif_threshold": 5.0,
         "vif": {},
         "vif_warnings": {}
       },
       "design_rank": 8,
       "design_cols": 8,
-      "condition_number": 65.44351394139171,
+      "condition_number": 93.3961427788242,
       "vif_threshold": 5.0,
       "vif": {
         "stage1": {
-          "EL_proxy_db": 3.5525494326628624,
-          "d_m": 2.3017739369015304
+          "EL_proxy_db": 5.73532842904619,
+          "d_m": 3.3015536050544303
         },
         "stage2": {}
       },
       "vif_warnings": {
-        "stage1": {},
+        "stage1": {
+          "EL_proxy_db": 5.73532842904619
+        },
         "stage2": {}
       }
     },
@@ -581,6 +655,30 @@
       "EL_proxy_db",
       "LOSflag"
     ],
-    "note": "No complex-phase fields are used by this report pipeline."
+    "basis_values": [
+      "circular"
+    ],
+    "convention_values": [
+      "IEEE-RHCP"
+    ],
+    "matrix_source_values": [
+      "A"
+    ],
+    "force_cp_swap_any_true": false,
+    "matrix_source_rule": "Use circular basis for CP interpretation and keep matrix_source fixed (A_f for antenna-embedded, J_f for de-embedded).",
+    "main_result_rule": "force_cp_swap_on_odd_reflection must be false for main-result evidence.",
+    "coupling_floor_check": {
+      "status": "WARN",
+      "c0_xpd_floor_median_db": 24.93483769676745,
+      "tx_cross_pol_leakage_median_db": 35.0,
+      "rx_cross_pol_leakage_median_db": 35.0,
+      "coupling_floor_nominal_db": 35.0,
+      "delta_c0_minus_nominal_db": -10.065162303232551,
+      "note": "Heuristic sanity check only; measured C0 floor should be reviewed against configured antenna coupling/leakage model."
+    },
+    "note": "No complex-phase fields are used by this report pipeline.",
+    "a5_stress_semantics": "response",
+    "a5_contamination_response_ready": true,
+    "a5_semantics_note": "Geometric path-structure stress is active; delay/path contamination-response interpretation is valid."
   }
 }

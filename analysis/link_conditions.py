@@ -48,7 +48,39 @@ def build_link_U_from_scenario(
     human = int(mm.get("human_flag", 0))
     obst = int(mm.get("obstacle_flag", 0))
     extras: dict[str, Any] = {}
-    for k in ["rx_x", "rx_y", "rx_z", "scenario_id", "case_id", "yaw_deg", "pitch_deg", "basis", "los_block_method", "stress_mode", "rep_id", "rep_outer"]:
+    for k in [
+        "rx_x",
+        "rx_y",
+        "rx_z",
+        "scenario_id",
+        "case_id",
+        "yaw_deg",
+        "pitch_deg",
+        "basis",
+        "convention",
+        "matrix_source",
+        "force_cp_swap_on_odd_reflection",
+        "los_block_method",
+        "tx_cross_pol_leakage_db",
+        "rx_cross_pol_leakage_db",
+        "tx_cross_pol_leakage_db_slope_per_ghz",
+        "rx_cross_pol_leakage_db_slope_per_ghz",
+        "stress_mode",
+        "stress_semantics",
+        "scatterer_count",
+        "diffuse_enabled",
+        "diffuse_factor",
+        "diffuse_lobe_alpha",
+        "diffuse_rays_per_hit",
+        "stress_path_structure_active",
+        "stress_polarization_mixer_active",
+        "a4_layout_mode",
+        "a4_dispersion_mode",
+        "material_dispersion",
+        "include_late_panel",
+        "rep_id",
+        "rep_outer",
+    ]:
         if k in mm:
             extras[k] = mm.get(k)
     tau_lim = None

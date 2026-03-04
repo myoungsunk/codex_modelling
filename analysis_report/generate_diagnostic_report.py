@@ -22,6 +22,8 @@ from analysis_report.lib import plots as plot_lib
 from analysis_report.lib import report_md
 from analysis_report.lib import scene as scene_lib
 from analysis_report.lib import stats as stats_lib
+from analysis import link_metrics as link_metrics_lib
+from analysis import windowing as windowing_lib
 
 
 def _write_rows_csv(path: Path, rows: list[dict[str, Any]]) -> None:
@@ -33,6 +35,22 @@ def _write_rows_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         for r in rows:
             out = {}
             for k in keys:
+                v = r.get(k, "")
+                if isinstance(v, (dict, list, tuple)):
+                    out[k] = json.dumps(v)
+                else:
+                    out[k] = v
+            w.writerow(out)
+
+
+def _write_rows_csv_with_columns(path: Path, rows: list[dict[str, Any]], columns: list[str]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=list(columns))
+        w.writeheader()
+        for r in rows:
+            out = {}
+            for k in columns:
                 v = r.get(k, "")
                 if isinstance(v, (dict, list, tuple)):
                     out[k] = json.dumps(v)
@@ -159,6 +177,71 @@ def _a5_pair_key(row: dict[str, Any]) -> tuple[Any, ...]:
         _norm(lp.get("rx_x", np.nan), nd=4),
         _norm(lp.get("rx_y", np.nan), nd=4),
     )
+
+
+def _a5_row_semantics(row: dict[str, Any]) -> str:
+    s = str(row.get("stress_semantics", "")).strip().lower()
+    if s in {"off", "response", "polarization_only"}:
+        return s
+    sp = _num(row.get("stress_path_structure_active", np.nan))
+    sm = _num(row.get("stress_polarization_mixer_active", np.nan))
+    if np.isfinite(sp) or np.isfinite(sm):
+        if int(round(sp)) == 1:
+            return "response"
+        if int(round(sm)) == 1:
+            return "polarization_only"
+        return "off"
+    mode = str(row.get("stress_mode", "")).strip().lower()
+    stress_on = int(_num(row.get("roughness_flag", 0))) == 1 or int(_num(row.get("human_flag", 0))) == 1
+    if not stress_on:
+        return "off"
+    if mode in {"geometry", "hybrid"}:
+        return "response"
+    if mode == "synthetic":
+        return "polarization_only"
+    if mode == "none":
+        return "off"
+    return "unknown"
+
+
+def _a5_semantics_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    a5_rows = [r for r in rows if str(r.get("scenario_id", "")).upper() == "A5"]
+    stress_rows = [r for r in a5_rows if int(_num(r.get("roughness_flag", 0))) == 1 or int(_num(r.get("human_flag", 0))) == 1]
+    cnt = {"response": 0, "polarization_only": 0, "off": 0, "unknown": 0}
+    for r in stress_rows:
+        sem = _a5_row_semantics(r)
+        cnt[sem] = int(cnt.get(sem, 0) + 1)
+    total = int(len(stress_rows))
+    dominant = "none"
+    if total > 0:
+        dominant = max(["response", "polarization_only", "off", "unknown"], key=lambda k: int(cnt.get(k, 0)))
+    if total == 0:
+        status = "INCONCLUSIVE"
+        note = "A5 stress rows not found."
+    elif int(cnt.get("response", 0)) > 0 and int(cnt.get("polarization_only", 0)) == 0:
+        status = "PASS"
+        note = "Geometric path-structure stress is active; delay/path contamination-response interpretation is valid."
+    elif int(cnt.get("response", 0)) > 0 and int(cnt.get("polarization_only", 0)) > 0:
+        status = "WARN"
+        note = "Mixed A5 semantics detected (response + polarization_only); interpret delay-structure claims only on response subset."
+    elif int(cnt.get("response", 0)) == 0 and int(cnt.get("polarization_only", 0)) > 0:
+        status = "WARN"
+        note = "Synthetic depol only: polarization-axis stress is active, but delay/path-structure stress is not active."
+    else:
+        status = "WARN"
+        note = "A5 stress semantics could not be resolved reliably."
+    return {
+        "status": str(status),
+        "n_a5_rows": int(len(a5_rows)),
+        "n_stress_rows": int(total),
+        "n_response": int(cnt.get("response", 0)),
+        "n_polarization_only": int(cnt.get("polarization_only", 0)),
+        "n_off": int(cnt.get("off", 0)),
+        "n_unknown": int(cnt.get("unknown", 0)),
+        "dominant_semantics": str(dominant),
+        "contamination_response_ready": bool(int(cnt.get("response", 0)) > 0),
+        "note": str(note),
+    }
 
 
 def _inc_bin(v: float) -> str:
@@ -387,6 +470,18 @@ def _db_ratio(num: float, den: float, eps: float = 1e-30) -> float:
     return float(10.0 * np.log10(n / d))
 
 
+def _as_float_list(v: Any, default: list[float]) -> list[float]:
+    if isinstance(v, list):
+        out: list[float] = []
+        for x in v:
+            vv = _num(x)
+            if np.isfinite(vv):
+                out.append(float(vv))
+        if out:
+            return out
+    return [float(x) for x in default]
+
+
 def _estimate_freq_grid(link_rows: list[dict[str, Any]], cfg: dict[str, Any]) -> tuple[float, float, str]:
     # Prefer frequency axis embedded in link rows (actual run output),
     # with C0 rows prioritized for calibration consistency.
@@ -555,6 +650,81 @@ def _target_window_stats(
     }
 
 
+def _estimate_target_gap_median(
+    ray_rows: list[dict[str, Any]],
+    *,
+    scenario_id: str,
+    target_n: int,
+) -> float:
+    by_case = _group_rays_by_case(ray_rows, scenario_id)
+    gap_vals: list[float] = []
+    for _, cr in by_case.items():
+        cand = [x for x in cr if int(round(_num(x.get("n_bounce", np.nan)))) == int(target_n)]
+        if not cand:
+            continue
+        m_tar = sorted(cand, key=lambda x: _num(x.get("P_lin", np.nan)), reverse=True)[0]
+        tau_tar = _num(m_tar.get("tau_s", np.nan))
+        if not np.isfinite(tau_tar):
+            continue
+        local_gaps: list[float] = []
+        for r in cr:
+            if r is m_tar:
+                continue
+            tau = _num(r.get("tau_s", np.nan))
+            if np.isfinite(tau):
+                local_gaps.append(abs(float(tau) - float(tau_tar)))
+        if local_gaps:
+            gap_vals.append(float(np.min(np.asarray(local_gaps, dtype=float))))
+    return float(np.nanmedian(np.asarray(gap_vals, dtype=float))) if gap_vals else float("nan")
+
+
+def _resolve_target_window_by_scenario(
+    *,
+    ws: dict[str, Any],
+    ray_rows: list[dict[str, Any]],
+    target_map: dict[str, int],
+    default_w_target_s: float,
+    dt_res_s: float,
+) -> tuple[dict[str, float], dict[str, str]]:
+    out_w = {sid: float(default_w_target_s) for sid in target_map.keys()}
+    out_mode = {sid: "default" for sid in target_map.keys()}
+
+    ns_override = ws.get("target_window_ns_by_scenario", {})
+    if isinstance(ns_override, dict):
+        for k, v in ns_override.items():
+            sid = str(k).upper().strip()
+            vv = _num(v)
+            if sid in out_w and np.isfinite(vv) and vv > 0:
+                out_w[sid] = float(vv) * 1e-9
+                out_mode[sid] = "fixed"
+
+    a3_legacy = _num(ws.get("A3_target_window_ns", np.nan))
+    if np.isfinite(a3_legacy) and a3_legacy > 0:
+        out_w["A3"] = float(a3_legacy) * 1e-9
+        out_mode["A3"] = "fixed"
+
+    mode_cfg = ws.get("target_window_mode_by_scenario", {})
+    mode_map: dict[str, str] = {}
+    if isinstance(mode_cfg, dict):
+        for k, v in mode_cfg.items():
+            mode_map[str(k).upper().strip()] = str(v).lower().strip()
+
+    for sid, tn in target_map.items():
+        if mode_map.get(sid, "") != "adaptive":
+            continue
+        gap_med = _estimate_target_gap_median(ray_rows, scenario_id=sid, target_n=int(tn))
+        w = float(out_w[sid])
+        if np.isfinite(gap_med) and gap_med > 0:
+            # Keep target window below nearest-path median gap to reduce contamination.
+            w = min(w, 0.8 * float(gap_med))
+        if np.isfinite(dt_res_s) and dt_res_s > 0:
+            w = max(w, 2.0 * float(dt_res_s))
+        w = max(w, 0.5e-9)
+        out_w[sid] = float(w)
+        out_mode[sid] = "adaptive"
+    return out_w, out_mode
+
+
 def _dominant_target_tau_by_link(
     ray_rows: list[dict[str, Any]],
     *,
@@ -591,6 +761,7 @@ def _target_window_sign_metric(
     w_target_s: float,
     floor_db: float,
     expected_sign: int,
+    sign_metric: str = "excess",
 ) -> dict[str, Any]:
     run = None
     for rr in runs:
@@ -602,11 +773,10 @@ def _target_window_sign_metric(
         return {"scenario": str(scenario_id), "status": "WARN", "reason": "missing run or rows"}
 
     tau_by_link = _dominant_target_tau_by_link(ray_rows, scenario_id=scenario_id, target_n=target_n)
-    # G1/G2 sign is judged on raw target-window dominance (XPD_target_raw),
-    # NOT on excess domain.  Excess is stored separately for L/M/R reporting.
-    raw_vals: list[float] = []
-    ex_vals: list[float] = []
-    hits: list[bool] = []
+    vals_ex: list[float] = []
+    vals_raw: list[float] = []
+    hits_ex: list[bool] = []
+    hits_raw: list[bool] = []
     for r in rows:
         lid = str(r.get("link_id", ""))
         tau_tar = _num(tau_by_link.get(lid, np.nan))
@@ -625,25 +795,31 @@ def _target_window_sign_metric(
         m = (tau >= t0) & (tau <= t1)
         sco = float(np.sum(pco[m]))
         scr = float(np.sum(pcr[m]))
-        xpd_target_raw = _db_ratio(sco, scr)
-        if not np.isfinite(xpd_target_raw):
+        xpd_target = _db_ratio(sco, scr)
+        xpd_target_ex = float(xpd_target - floor_db) if np.isfinite(floor_db) else float("nan")
+        if not np.isfinite(xpd_target):
             continue
-        xpd_target_ex = float(xpd_target_raw - floor_db) if np.isfinite(floor_db) else float("nan")
-        raw_vals.append(float(xpd_target_raw))
+        vals_raw.append(float(xpd_target))
+        vals_ex.append(float(xpd_target_ex) if np.isfinite(xpd_target_ex) else float("nan"))
+        hits_raw.append(bool(xpd_target < 0.0) if int(expected_sign) < 0 else bool(xpd_target > 0.0))
         if np.isfinite(xpd_target_ex):
-            ex_vals.append(float(xpd_target_ex))
-        # Sign check uses raw: odd(A2) expects co<cross → raw<0; even(A3) expects co>cross → raw>0
-        hits.append(bool(xpd_target_raw < 0.0) if int(expected_sign) < 0 else bool(xpd_target_raw > 0.0))
+            hits_ex.append(bool(xpd_target_ex < 0.0) if int(expected_sign) < 0 else bool(xpd_target_ex > 0.0))
 
-    raw_arr = np.asarray(raw_vals, dtype=float)
-    ex_arr = np.asarray(ex_vals, dtype=float)
-    hit = float(np.mean(hits)) if hits else float("nan")
-    med_raw = float(np.nanmedian(raw_arr)) if len(raw_arr) else float("nan")
-    p10_raw = float(np.nanpercentile(raw_arr, 10.0)) if len(raw_arr) else float("nan")
-    p90_raw = float(np.nanpercentile(raw_arr, 90.0)) if len(raw_arr) else float("nan")
-    med_ex = float(np.nanmedian(ex_arr)) if len(ex_arr) else float("nan")
-    p10_ex = float(np.nanpercentile(ex_arr, 10.0)) if len(ex_arr) else float("nan")
-    p90_ex = float(np.nanpercentile(ex_arr, 90.0)) if len(ex_arr) else float("nan")
+    arr_ex = np.asarray(vals_ex, dtype=float)
+    arr_raw = np.asarray(vals_raw, dtype=float)
+    med_ex = float(np.nanmedian(arr_ex)) if len(arr_ex) else float("nan")
+    p10_ex = float(np.nanpercentile(arr_ex, 10.0)) if len(arr_ex) else float("nan")
+    p90_ex = float(np.nanpercentile(arr_ex, 90.0)) if len(arr_ex) else float("nan")
+    med_raw = float(np.nanmedian(arr_raw)) if len(arr_raw) else float("nan")
+    p10_raw = float(np.nanpercentile(arr_raw, 10.0)) if len(arr_raw) else float("nan")
+    p90_raw = float(np.nanpercentile(arr_raw, 90.0)) if len(arr_raw) else float("nan")
+    hit_ex = float(np.mean(hits_ex)) if hits_ex else float("nan")
+    hit_raw = float(np.mean(hits_raw)) if hits_raw else float("nan")
+
+    mode = str(sign_metric).strip().lower()
+    if mode not in {"excess", "raw"}:
+        mode = "excess"
+    hit = hit_raw if mode == "raw" else hit_ex
     if np.isfinite(hit) and hit >= 0.8:
         st = "PASS"
     elif np.isfinite(hit) and hit >= 0.6:
@@ -657,95 +833,328 @@ def _target_window_sign_metric(
         "target_n": int(target_n),
         "W_target_s": float(w_target_s),
         "expected_sign": "negative" if int(expected_sign) < 0 else "positive",
-        "sign_domain": "raw",  # sign judged on XPD_target_raw, not excess
         "n_links": int(len(rows)),
-        "n_eval": int(len(raw_arr)),
-        # Primary: raw target-window dominance (for G1/G2 sign claims)
-        "median_xpd_target_raw_db": med_raw,
-        "p10_xpd_target_raw_db": p10_raw,
-        "p90_xpd_target_raw_db": p90_raw,
-        "expected_sign_hit_rate": hit,
-        "status": st,
-        # Supplementary: excess domain (for L/M/R reporting)
+        "n_eval": int(len(arr_raw)),
         "median_xpd_target_ex_db": med_ex,
         "p10_xpd_target_ex_db": p10_ex,
         "p90_xpd_target_ex_db": p90_ex,
+        "median_xpd_target_raw_db": med_raw,
+        "p10_xpd_target_raw_db": p10_raw,
+        "p90_xpd_target_raw_db": p90_raw,
+        "expected_sign_hit_rate_ex": hit_ex,
+        "expected_sign_hit_rate_raw": hit_raw,
+        "sign_metric_for_status": mode,
+        "expected_sign_hit_rate": hit,
+        "status": st,
     }
 
 
-def _a6_sign_check(
+def _a6_parity_benchmark(
+    *,
+    link_rows: list[dict[str, Any]],
+    ray_rows: list[dict[str, Any]],
+    runs: list[dict[str, Any]],
+    w_target_s: float,
+    floor_db: float,
+    sign_metric: str = "raw",
+) -> dict[str, Any]:
+    """Near-normal parity benchmark for A6 (odd/even separated by target bounce)."""
+    odd = _target_window_sign_metric(
+        link_rows=link_rows,
+        ray_rows=ray_rows,
+        runs=runs,
+        scenario_id="A6",
+        target_n=1,
+        w_target_s=float(w_target_s),
+        floor_db=float(floor_db),
+        expected_sign=-1,
+        sign_metric=str(sign_metric),
+    )
+    even = _target_window_sign_metric(
+        link_rows=link_rows,
+        ray_rows=ray_rows,
+        runs=runs,
+        scenario_id="A6",
+        target_n=2,
+        w_target_s=float(w_target_s),
+        floor_db=float(floor_db),
+        expected_sign=+1,
+        sign_metric=str(sign_metric),
+    )
+    n_odd = int(_num(odd.get("n_eval", np.nan))) if np.isfinite(_num(odd.get("n_eval", np.nan))) else 0
+    n_even = int(_num(even.get("n_eval", np.nan))) if np.isfinite(_num(even.get("n_eval", np.nan))) else 0
+    available = bool((n_odd + n_even) > 0)
+    hit_odd = _num(odd.get("expected_sign_hit_rate", np.nan))
+    hit_even = _num(even.get("expected_sign_hit_rate", np.nan))
+    hit_min = float(min(hit_odd, hit_even)) if np.isfinite(hit_odd) and np.isfinite(hit_even) else float("nan")
+    if not available:
+        st = "INCONCLUSIVE"
+    elif np.isfinite(hit_min) and hit_min >= 0.8:
+        st = "PASS"
+    elif np.isfinite(hit_min) and hit_min >= 0.6:
+        st = "WARN"
+    elif np.isfinite(hit_min):
+        st = "FAIL"
+    else:
+        st = "INCONCLUSIVE"
+    return {
+        "available": bool(available),
+        "status": str(st),
+        "sign_metric_for_status": str(sign_metric),
+        "n_eval_total": int(n_odd + n_even),
+        "n_eval_odd": int(n_odd),
+        "n_eval_even": int(n_even),
+        "hit_rate_odd": float(hit_odd) if np.isfinite(hit_odd) else float("nan"),
+        "hit_rate_even": float(hit_even) if np.isfinite(hit_even) else float("nan"),
+        "hit_rate_min": float(hit_min) if np.isfinite(hit_min) else float("nan"),
+        "odd": odd,
+        "even": even,
+        "note": "A6 is near-normal parity benchmark; use as primary G2 evidence when available.",
+    }
+
+
+def _stress_flag_row(r: dict[str, Any]) -> int:
+    mode = str(r.get("stress_mode", "")).strip().lower()
+    rf = int(round(_num(r.get("roughness_flag", 0)))) if np.isfinite(_num(r.get("roughness_flag", np.nan))) else 0
+    hf = int(round(_num(r.get("human_flag", 0)))) if np.isfinite(_num(r.get("human_flag", np.nan))) else 0
+    if rf == 1 or hf == 1:
+        return 1
+    if mode in {"geometry", "hybrid", "synthetic", "stress", "on"}:
+        return 1
+    return 0
+
+
+def _build_case_level_rows(link_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for r in link_rows:
+        rows.append(
+            {
+                "scenario_id": str(r.get("scenario_id", "")),
+                "case_id": str(r.get("case_id", "")),
+                "link_id": str(r.get("link_id", "")),
+                "xpd_early_ex_db": _num(r.get("XPD_early_excess_db", np.nan)),
+                "xpd_late_ex_db": _num(r.get("XPD_late_excess_db", np.nan)),
+                "l_pol_db": _num(r.get("L_pol_db", np.nan)),
+                "rho_early_linear": _num(r.get("rho_early_lin", np.nan)),
+                "rho_early_db": _num(r.get("rho_early_db", np.nan)),
+                "ds_ns": _num(r.get("delay_spread_rms_s", np.nan)) * 1e9,
+                "early_energy_fraction": _num(r.get("early_energy_fraction", np.nan)),
+                "EL_proxy_db": _num(r.get("EL_proxy_db", np.nan)),
+                "LOSflag": int(round(_num(r.get("LOSflag", np.nan)))) if np.isfinite(_num(r.get("LOSflag", np.nan))) else "",
+                "material": str(r.get("material_class", "")),
+                "stress_flag": int(_stress_flag_row(r)),
+                "claim_caution_early": int(round(_num(r.get("claim_caution_early", 0)))) if np.isfinite(_num(r.get("claim_caution_early", np.nan))) else 0,
+                "claim_caution_late": int(round(_num(r.get("claim_caution_late", 0)))) if np.isfinite(_num(r.get("claim_caution_late", np.nan))) else 0,
+            }
+        )
+    return rows
+
+
+def _build_target_level_rows(
+    *,
+    link_rows: list[dict[str, Any]],
+    ray_rows: list[dict[str, Any]],
+    runs: list[dict[str, Any]],
+    floor_db: float,
+    te_default_s: float,
+    dt_res_s: float,
+    w_target_s_by_sid: dict[str, float],
+    target_map: dict[str, int],
+) -> list[dict[str, Any]]:
+    run_by_sid = {str(r.get("scenario_id", "")): r for r in runs}
+    rays_by_link: dict[str, list[dict[str, Any]]] = {}
+    for rr in ray_rows:
+        lid = str(rr.get("link_id", ""))
+        if lid:
+            rays_by_link.setdefault(lid, []).append(rr)
+
+    tol = 0.25 * float(dt_res_s) if np.isfinite(dt_res_s) and dt_res_s > 0 else 0.0
+    out: list[dict[str, Any]] = []
+    for r in link_rows:
+        sid = str(r.get("scenario_id", ""))
+        if sid not in target_map:
+            continue
+        lid = str(r.get("link_id", ""))
+        run = run_by_sid.get(sid)
+        rr = rays_by_link.get(lid, [])
+        target_n = int(target_map[sid])
+        cand = [x for x in rr if int(round(_num(x.get("n_bounce", np.nan)))) == target_n and _num(x.get("P_lin", np.nan)) > 0]
+        if not cand:
+            continue
+        m_tar = sorted(cand, key=lambda x: _num(x.get("P_lin", np.nan)), reverse=True)[0]
+        tau_tar = _num(m_tar.get("tau_s", np.nan))
+        p_tar = _num(m_tar.get("P_lin", np.nan))
+        inc_deg = _num(m_tar.get("incidence_deg", np.nan))
+        nb = int(round(_num(m_tar.get("n_bounce", np.nan)))) if np.isfinite(_num(m_tar.get("n_bounce", np.nan))) else target_n
+        parity = "even" if (int(nb) % 2 == 0) else "odd"
+
+        all_tau = np.asarray([_num(x.get("tau_s", np.nan)) for x in rr], dtype=float)
+        all_tau = all_tau[np.isfinite(all_tau)]
+        tau_first = float(np.min(all_tau)) if len(all_tau) else float("nan")
+        target_rank = float("nan")
+        if np.isfinite(tau_tar) and len(all_tau):
+            taus = np.sort(np.unique(all_tau))
+            target_rank = float(int(np.argmin(np.abs(taus - float(tau_tar)))) + 1)
+
+        w = _window_dict(r)
+        tau0 = _num(w.get("tau0_s", np.nan))
+        te_s = _num(w.get("Te_s", np.nan))
+        if not np.isfinite(te_s):
+            te_s = float(te_default_s)
+        if not np.isfinite(tau0):
+            tau0 = tau_first
+        in_early = int(np.isfinite(tau_tar) and np.isfinite(tau0) and (float(tau_tar) - float(tau0) <= float(te_s)))
+        is_first = int(np.isfinite(tau_tar) and np.isfinite(tau_first) and abs(float(tau_tar) - float(tau_first)) <= float(tol))
+
+        w_target_s = float(w_target_s_by_sid.get(sid, max(2e-9, 0.8 * float(te_default_s))))
+        pco_t = float("nan")
+        pcx_t = float("nan")
+        xpd_raw = float("nan")
+        xpd_ex = float("nan")
+        if run is not None and np.isfinite(tau_tar):
+            pdp = io_lib.load_pdp_npz(run, lid)
+            if pdp is not None:
+                tau = np.asarray(pdp.get("delay_tau_s", []), dtype=float)
+                pco = np.asarray(pdp.get("P_co", []), dtype=float)
+                pcx = np.asarray(pdp.get("P_cross", []), dtype=float)
+                if len(tau) and len(pco) == len(tau) and len(pcx) == len(tau):
+                    t0 = float(tau_tar - 0.5 * w_target_s)
+                    t1 = float(tau_tar + 0.5 * w_target_s)
+                    m = (tau >= t0) & (tau <= t1)
+                    pco_t = float(np.sum(pco[m]))
+                    pcx_t = float(np.sum(pcx[m]))
+                    xpd_raw = _db_ratio(pco_t, pcx_t)
+                    xpd_ex = float(xpd_raw - floor_db) if np.isfinite(floor_db) else float("nan")
+
+        c_target = float("nan")
+        if np.isfinite(tau_tar) and np.isfinite(p_tar) and p_tar > 0:
+            t0 = float(tau_tar - 0.5 * w_target_s)
+            t1 = float(tau_tar + 0.5 * w_target_s)
+            p_other = 0.0
+            for x in rr:
+                if x is m_tar:
+                    continue
+                tau_x = _num(x.get("tau_s", np.nan))
+                p_x = _num(x.get("P_lin", np.nan))
+                if np.isfinite(tau_x) and np.isfinite(p_x) and p_x > 0 and (t0 <= tau_x <= t1):
+                    p_other += float(p_x)
+            c_target = _db_ratio(p_other, p_tar)
+
+        out.append(
+            {
+                "scenario_id": sid,
+                "case_id": str(r.get("case_id", "")),
+                "link_id": lid,
+                "target_tau_ns": float(tau_tar) * 1e9 if np.isfinite(tau_tar) else float("nan"),
+                "target_rank": target_rank,
+                "target_in_Wearly": int(in_early),
+                "target_is_first": int(is_first),
+                "bounce_count": int(nb),
+                "parity": parity,
+                "incidence_angle_deg": float(inc_deg) if np.isfinite(inc_deg) else float("nan"),
+                "Pco_target": pco_t,
+                "Pcross_target": pcx_t,
+                "xpd_target_raw_db": xpd_raw,
+                "xpd_target_ex_db": xpd_ex,
+                "C_target_db": c_target,
+            }
+        )
+    return out
+
+
+def _build_sensitivity_level_rows(
     *,
     link_rows: list[dict[str, Any]],
     runs: list[dict[str, Any]],
     floor_db: float,
-) -> dict[str, Any]:
-    """Check A6 odd/even parity sign at near-normal incidence (G2 core evidence).
-
-    A6-odd  expected: XPD_early_raw < 0  (cross-dominant)
-    A6-even expected: XPD_early_raw > 0  (co-dominant)
-    Sign is judged on raw early-window XPD, not excess.
-    """
+    te_ns_list: list[float],
+    noise_tail_ns_list: list[float],
+    threshold_db_list: list[float],
+    tmax_s: float,
+) -> list[dict[str, Any]]:
     run_by_sid = {str(r.get("scenario_id", "")): r for r in runs}
-    results: dict[str, Any] = {}
-    for sid, expected_sign in [("A6_odd", -1), ("A6_even", +1)]:
-        # Accept both "A6_odd"/"A6_even" and plain "A6" with mode field
-        rows_sid = [r for r in link_rows if str(r.get("scenario_id", "")) == sid]
-        if not rows_sid:
-            rows_sid = [
-                r for r in link_rows
-                if str(r.get("scenario_id", "")) == "A6"
-                and str(_provenance(r).get("link_params", {}).get("mode", "")).lower() == sid.split("_", 1)[1]
-            ]
-        run = run_by_sid.get(sid) or run_by_sid.get("A6")
-        if run is None or not rows_sid:
-            results[sid] = {"status": "SKIP", "reason": "no data for scenario"}
+    out: list[dict[str, Any]] = []
+    for r in link_rows:
+        sid = str(r.get("scenario_id", ""))
+        run = run_by_sid.get(sid)
+        if run is None:
             continue
-        raw_vals: list[float] = []
-        hits: list[bool] = []
-        for r in rows_sid:
-            pdp = io_lib.load_pdp_npz(run, str(r.get("link_id", "")))
-            if pdp is None:
-                continue
-            tau = np.asarray(pdp.get("delay_tau_s", []), dtype=float)
-            pco = np.asarray(pdp.get("P_co", []), dtype=float)
-            pcr = np.asarray(pdp.get("P_cross", []), dtype=float)
-            if len(tau) == 0 or len(pco) != len(tau):
-                continue
-            p_total = pco + pcr
-            i0 = int(np.argmax(p_total)) if len(p_total) else -1
-            if i0 < 0:
-                continue
-            tau0 = float(tau[i0])
-            te_s = 3e-9
-            early = (tau >= tau0) & (tau <= tau0 + te_s)
-            sco = float(np.sum(pco[early]))
-            scr = float(np.sum(pcr[early]))
-            xpd_raw = _db_ratio(sco, scr)
-            if not np.isfinite(xpd_raw):
-                continue
-            raw_vals.append(float(xpd_raw))
-            hits.append(bool(xpd_raw < 0.0) if expected_sign < 0 else bool(xpd_raw > 0.0))
-        if not hits:
-            results[sid] = {"status": "SKIP", "reason": "no valid pdp data"}
+        lid = str(r.get("link_id", ""))
+        pdp = io_lib.load_pdp_npz(run, lid)
+        if pdp is None:
             continue
-        rate = float(np.mean(hits))
-        raw_arr = np.asarray(raw_vals, dtype=float)
-        status = "PASS" if rate >= 0.8 else ("WARN" if rate >= 0.6 else "FAIL")
-        results[sid] = {
-            "n_links": int(len(rows_sid)),
-            "n_eval": int(len(raw_vals)),
-            "expected_sign": "negative" if expected_sign < 0 else "positive",
-            "sign_domain": "raw",
-            "expected_sign_hit_rate": rate,
-            "median_xpd_early_raw_db": float(np.nanmedian(raw_arr)) if len(raw_arr) else float("nan"),
-            "status": status,
-        }
-    # Overall: both odd and even must PASS for G2 claim
-    statuses = [v.get("status", "SKIP") for v in results.values() if v.get("status") not in {"SKIP"}]
-    overall = "PASS" if statuses and all(s == "PASS" for s in statuses) else (
-        "WARN" if any(s in {"PASS", "WARN"} for s in statuses) else "FAIL"
-    )
-    return {"per_mode": results, "overall_status": overall, "floor_db": float(floor_db)}
+        tau = np.asarray(pdp.get("delay_tau_s", []), dtype=float)
+        pco = np.asarray(pdp.get("P_co", []), dtype=float)
+        pcx = np.asarray(pdp.get("P_cross", []), dtype=float)
+        if len(tau) == 0 or len(pco) != len(tau) or len(pcx) != len(tau):
+            continue
+
+        base_xpd_e_ex = _num(r.get("XPD_early_excess_db", np.nan))
+        base_xpd_l_ex = _num(r.get("XPD_late_excess_db", np.nan))
+        base_lpol = _num(r.get("L_pol_db", np.nan))
+        base_rho_db = _num(r.get("rho_early_db", np.nan))
+        base_ds_ns = _num(r.get("delay_spread_rms_s", np.nan)) * 1e9
+        base_ef = _num(r.get("early_energy_fraction", np.nan))
+
+        p_total = pco + pcx
+        for te_ns in te_ns_list:
+            for noise_ns in noise_tail_ns_list:
+                for thr_db in threshold_db_list:
+                    det = windowing_lib.estimate_tau0(
+                        tau,
+                        p_total,
+                        method="threshold",
+                        noise_tail_s=float(noise_ns) * 1e-9,
+                        margin_db=float(thr_db),
+                    )
+                    tau0 = float(det.get("tau0_s", 0.0))
+                    early, late = windowing_lib.make_early_late_masks(
+                        tau,
+                        tau0_s=tau0,
+                        Te_s=float(te_ns) * 1e-9,
+                        Tmax_s=float(tmax_s),
+                    )
+                    met = link_metrics_lib.compute_link_metrics(
+                        {"P_co": pco, "P_cross": pcx},
+                        tau,
+                        (early, late),
+                        ds_reference="total",
+                        window_params={
+                            "tau0_s": tau0,
+                            "Te_s": float(te_ns) * 1e-9,
+                            "Tmax_s": float(tmax_s),
+                            "noise_tail_ns": float(noise_ns),
+                            "threshold_db": float(thr_db),
+                            "method": "threshold",
+                        },
+                    )
+                    xpd_e_ex = float(met.XPD_early_db - floor_db) if np.isfinite(floor_db) else float("nan")
+                    xpd_l_ex = float(met.XPD_late_db - floor_db) if np.isfinite(floor_db) else float("nan")
+                    ds_ns = float(met.delay_spread_rms_s) * 1e9 if np.isfinite(_num(met.delay_spread_rms_s)) else float("nan")
+                    out.append(
+                        {
+                            "scenario_id": sid,
+                            "case_id": str(r.get("case_id", "")),
+                            "link_id": lid,
+                            "Te_ns": float(te_ns),
+                            "noise_tail_ns": float(noise_ns),
+                            "threshold_db": float(thr_db),
+                            "xpd_early_ex_db": xpd_e_ex,
+                            "xpd_late_ex_db": xpd_l_ex,
+                            "l_pol_db": float(met.L_pol_db),
+                            "rho_early_linear": float(met.rho_early_lin),
+                            "rho_early_db": float(met.rho_early_db),
+                            "ds_ns": ds_ns,
+                            "early_energy_fraction": float(met.early_energy_fraction),
+                            "delta_xpd_early_ex_db": float(xpd_e_ex - base_xpd_e_ex) if np.isfinite(xpd_e_ex) and np.isfinite(base_xpd_e_ex) else float("nan"),
+                            "delta_xpd_late_ex_db": float(xpd_l_ex - base_xpd_l_ex) if np.isfinite(xpd_l_ex) and np.isfinite(base_xpd_l_ex) else float("nan"),
+                            "delta_l_pol_db": float(met.L_pol_db - base_lpol) if np.isfinite(_num(met.L_pol_db)) and np.isfinite(base_lpol) else float("nan"),
+                            "delta_rho_early_db": float(met.rho_early_db - base_rho_db) if np.isfinite(_num(met.rho_early_db)) and np.isfinite(base_rho_db) else float("nan"),
+                            "delta_ds_ns": float(ds_ns - base_ds_ns) if np.isfinite(ds_ns) and np.isfinite(base_ds_ns) else float("nan"),
+                            "delta_early_energy_fraction": float(met.early_energy_fraction - base_ef) if np.isfinite(_num(met.early_energy_fraction)) and np.isfinite(base_ef) else float("nan"),
+                        }
+                    )
+    return out
 
 
 def _impute_missing_el_proxy(
@@ -1106,8 +1515,7 @@ def _target_sign_stability_te_sweep(
             continue
         per_te: list[dict[str, Any]] = []
         for te_ns in te_ns_list:
-            raw_vals: list[float] = []
-            ex_vals: list[float] = []
+            vals: list[float] = []
             hit: list[bool] = []
             for r in rows:
                 pdp = io_lib.load_pdp_npz(run, str(r.get("link_id", "")))
@@ -1130,26 +1538,19 @@ def _target_sign_stability_te_sweep(
                 early = (tau >= tau0) & (tau <= tau0 + te_s)
                 sco = float(np.sum(pco[early]))
                 scr = float(np.sum(pcr[early]))
-                xpd_e = _db_ratio(sco, scr)   # raw early-window XPD
-                if not np.isfinite(xpd_e):
-                    continue
+                xpd_e = _db_ratio(sco, scr)
                 xpd_ex = float(xpd_e - floor_db) if np.isfinite(floor_db) else float("nan")
-                raw_vals.append(float(xpd_e))
-                if np.isfinite(xpd_ex):
-                    ex_vals.append(float(xpd_ex))
-                # Sign check on raw: odd expects raw<0, even expects raw>0
-                hit.append(bool(xpd_e < 0.0) if expected_sign < 0 else bool(xpd_e > 0.0))
+                if not np.isfinite(xpd_ex):
+                    continue
+                vals.append(float(xpd_ex))
+                hit.append(bool(xpd_ex < 0.0) if expected_sign < 0 else bool(xpd_ex > 0.0))
             rate = float(np.mean(hit)) if hit else float("nan")
-            raw_arr = np.asarray(raw_vals, dtype=float)
-            ex_arr = np.asarray(ex_vals, dtype=float)
             per_te.append(
                 {
                     "Te_ns": float(te_ns),
-                    "n": int(len(raw_vals)),
-                    "median_xpd_early_raw_db": float(np.median(raw_arr)) if len(raw_arr) else float("nan"),
-                    "median_xpd_early_ex_db": float(np.median(ex_arr)) if len(ex_arr) else float("nan"),
+                    "n": int(len(vals)),
+                    "median_xpd_early_ex_db": float(np.median(np.asarray(vals, dtype=float))) if vals else float("nan"),
                     "expected_sign_hit_rate": rate,
-                    "sign_domain": "raw",
                 }
             )
         rates = np.asarray([_num(x.get("expected_sign_hit_rate", np.nan)) for x in per_te], dtype=float)
@@ -1343,6 +1744,75 @@ def _build_a3_geometry_review_rows(
     return sorted(out, key=lambda x: (str(x.get("case_id", "")), str(x.get("case_label", ""))))
 
 
+def _collect_unique_values(rows: list[dict[str, Any]], key: str) -> list[str]:
+    vals = []
+    for r in rows:
+        v = r.get(key, "")
+        if isinstance(v, (dict, list, tuple)):
+            continue
+        s = str(v).strip()
+        if not s or s.lower() == "nan":
+            continue
+        vals.append(s)
+    return sorted(set(vals))
+
+
+def _build_figure_metadata_rows(
+    link_rows: list[dict[str, Any]],
+    idx_rows: list[dict[str, Any]],
+    runs: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    run_by_sid: dict[str, dict[str, Any]] = {}
+    for rr in list(runs or []):
+        sid = str(rr.get("scenario_id", ""))
+        if sid and sid not in run_by_sid:
+            run_by_sid[sid] = dict(rr)
+
+    by_case: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for r in link_rows:
+        by_case.setdefault((str(r.get("scenario_id", "")), str(r.get("case_id", ""))), []).append(r)
+
+    out: list[dict[str, Any]] = []
+    for i in idx_rows:
+        sid = str(i.get("scenario_id", ""))
+        cid = str(i.get("case_id", ""))
+        rows = by_case.get((sid, cid), [])
+        r0 = rows[0] if rows else {}
+        sm = dict(run_by_sid.get(sid, {}).get("summary", {})) if sid in run_by_sid else {}
+        ac = dict(sm.get("antenna_config", {})) if isinstance(sm.get("antenna_config", {}), dict) else {}
+        fcp = _num(r0.get("force_cp_swap_on_odd_reflection", np.nan))
+        if not np.isfinite(fcp):
+            fcp = _num(sm.get("force_cp_swap_on_odd_reflection", np.nan))
+        out.append(
+            {
+                "scenario_id": sid,
+                "case_id": cid,
+                "case_label": str(i.get("case_label", "")),
+                "link_id": str(r0.get("link_id", i.get("link_id", ""))),
+                "scene_png_path": str(i.get("scene_png_path", "")),
+                "basis": str(r0.get("basis", sm.get("basis", ""))),
+                "convention": str(r0.get("convention", sm.get("convention", ""))),
+                "matrix_source": str(r0.get("matrix_source", sm.get("matrix_source", ""))),
+                "force_cp_swap_on_odd_reflection": fcp,
+                "a4_layout_mode": str(r0.get("a4_layout_mode", sm.get("a4_layout_mode", ""))),
+                "a4_dispersion_mode": str(r0.get("a4_dispersion_mode", sm.get("a4_dispersion_mode", ""))),
+                "material_dispersion": str(r0.get("material_dispersion", sm.get("material_dispersion", ""))),
+                "include_late_panel": _num(r0.get("include_late_panel", sm.get("include_late_panel", np.nan))),
+                "stress_mode": str(r0.get("stress_mode", sm.get("stress_mode", ""))),
+                "scatterer_count": _num(r0.get("scatterer_count", sm.get("scatterer_count", np.nan))),
+                "diffuse_enabled": _num(r0.get("diffuse_enabled", sm.get("diffuse_enabled", np.nan))),
+                "diffuse_factor": _num(r0.get("diffuse_factor", sm.get("diffuse_factor", np.nan))),
+                "diffuse_lobe_alpha": _num(r0.get("diffuse_lobe_alpha", sm.get("diffuse_lobe_alpha", np.nan))),
+                "diffuse_rays_per_hit": _num(r0.get("diffuse_rays_per_hit", sm.get("diffuse_rays_per_hit", np.nan))),
+                "tx_cross_pol_leakage_db": _num(r0.get("tx_cross_pol_leakage_db", ac.get("tx_cross_pol_leakage_db", np.nan))),
+                "rx_cross_pol_leakage_db": _num(r0.get("rx_cross_pol_leakage_db", ac.get("rx_cross_pol_leakage_db", np.nan))),
+                "tx_cross_pol_leakage_db_slope_per_ghz": _num(r0.get("tx_cross_pol_leakage_db_slope_per_ghz", ac.get("tx_cross_pol_leakage_db_slope_per_ghz", np.nan))),
+                "rx_cross_pol_leakage_db_slope_per_ghz": _num(r0.get("rx_cross_pol_leakage_db_slope_per_ghz", ac.get("rx_cross_pol_leakage_db_slope_per_ghz", np.nan))),
+            }
+        )
+    return out
+
+
 def _diagnostic_checks(
     link_rows: list[dict[str, Any]],
     ray_rows: list[dict[str, Any]],
@@ -1355,7 +1825,18 @@ def _diagnostic_checks(
     scenario_rows = metrics_lib.split_by_scenario(link_rows)
     scenario_roles = dict(cfg.get("scenario_roles", {}))
     a3_role = str(scenario_roles.get("A3", "mechanism")).strip().lower()
-    a5_role = str(scenario_roles.get("A5", "stress_response")).strip().lower()
+    a5_semantics = _a5_semantics_summary(link_rows)
+    a5_role_cfg = scenario_roles.get("A5", None)
+    if a5_role_cfg is None:
+        dom = str(a5_semantics.get("dominant_semantics", "none")).strip().lower()
+        if dom == "polarization_only":
+            a5_role = "stress_polarization_only"
+        elif dom == "response":
+            a5_role = "stress_response"
+        else:
+            a5_role = "stress_response"
+    else:
+        a5_role = str(a5_role_cfg).strip().lower()
 
     # A1 LOS blocked
     a1 = []
@@ -1395,25 +1876,33 @@ def _diagnostic_checks(
         "status": "WARN",
         "note": "Coordinate penetration sanity needs scenario geometry file review; not inferable from standard outputs only.",
     }
+    checks["A5_stress_semantics"] = dict(a5_semantics)
 
     # B: time-resolution checks with purpose-specific windows
     ws = dict(cfg.get("windows", {}))
     te_s = float(ws.get("Te_ns", 10.0)) * 1e-9
     tmax_s = float(ws.get("Tmax_ns", 200.0)) * 1e-9
     w_floor_s = float(ws.get("floor_window_ns", max(1.0, 0.5 * float(ws.get("Te_ns", 10.0))))) * 1e-9
-    w_target_s = float(ws.get("target_window_ns", max(2.0, 0.8 * float(ws.get("Te_ns", 10.0))))) * 1e-9
+    w_target_default_s = float(ws.get("target_window_ns", max(2.0, 0.8 * float(ws.get("Te_ns", 10.0))))) * 1e-9
     bw, df, freq_src = _estimate_freq_grid(link_rows, cfg)
     dt_res = 1.0 / bw if bw > 0 else float("nan")
     tau_max = 1.0 / df if df > 0 else float("nan")
 
     floor_stats = _floor_window_contamination(ray_rows, w_floor_s=w_floor_s)
     target_map = {"A2": 1, "A3": 2, "A4": 1, "A5": 2}
+    w_target_s_by_sid, w_target_mode_by_sid = _resolve_target_window_by_scenario(
+        ws=ws,
+        ray_rows=ray_rows,
+        target_map=target_map,
+        default_w_target_s=float(w_target_default_s),
+        dt_res_s=float(dt_res),
+    )
     target_stats = {
         sid: _target_window_stats(
             ray_rows,
             scenario_id=sid,
             target_n=tn,
-            w_target_s=w_target_s,
+            w_target_s=float(w_target_s_by_sid.get(sid, w_target_default_s)),
             te_s=te_s,
             dt_res_s=dt_res,
         )
@@ -1459,15 +1948,22 @@ def _diagnostic_checks(
         floor_db=float(floor_ref.get("xpd_floor_db", np.nan)),
     )
     floor_db_used = float(floor_ref.get("xpd_floor_db", np.nan))
+    sign_metric_cfg = ws.get("target_sign_metric_by_scenario", {})
+    if not isinstance(sign_metric_cfg, dict):
+        sign_metric_cfg = {}
+    sign_metric_a2 = str(sign_metric_cfg.get("A2", "excess"))
+    sign_metric_a3 = str(sign_metric_cfg.get("A3", "raw"))
+    sign_metric_a6 = str(sign_metric_cfg.get("A6", "raw"))
     a2_target_sign = _target_window_sign_metric(
         link_rows=link_rows,
         ray_rows=ray_rows,
         runs=runs,
         scenario_id="A2",
         target_n=1,
-        w_target_s=float(w_target_s),
+        w_target_s=float(w_target_s_by_sid.get("A2", w_target_default_s)),
         floor_db=floor_db_used,
         expected_sign=-1,
+        sign_metric=sign_metric_a2,
     )
     a3_target_sign = _target_window_sign_metric(
         link_rows=link_rows,
@@ -1475,9 +1971,24 @@ def _diagnostic_checks(
         runs=runs,
         scenario_id="A3",
         target_n=2,
-        w_target_s=float(w_target_s),
+        w_target_s=float(w_target_s_by_sid.get("A3", w_target_default_s)),
         floor_db=floor_db_used,
         expected_sign=+1,
+        sign_metric=sign_metric_a3,
+    )
+    tw_cfg = ws.get("target_window_ns_by_scenario", {})
+    a6_w_target_s = float(w_target_s_by_sid.get("A3", w_target_default_s))
+    if isinstance(tw_cfg, dict):
+        a6_w_ns = _num(tw_cfg.get("A6", np.nan))
+        if np.isfinite(a6_w_ns) and a6_w_ns > 0:
+            a6_w_target_s = float(a6_w_ns) * 1e-9
+    a6_parity = _a6_parity_benchmark(
+        link_rows=link_rows,
+        ray_rows=ray_rows,
+        runs=runs,
+        w_target_s=float(a6_w_target_s),
+        floor_db=float(floor_db_used),
+        sign_metric=sign_metric_a6,
     )
 
     a3_t = target_stats.get("A3", {})
@@ -1496,6 +2007,9 @@ def _diagnostic_checks(
         a3_early_status = "WARN"
     else:
         a3_early_status = "FAIL"
+    a3_target_status_reporting = str(a3_target_sign.get("status", "INCONCLUSIVE"))
+    if a3_role in {"mechanism", "mechanism_only", "supplementary", "candidate"} and a3_target_status_reporting == "FAIL":
+        a3_target_status_reporting = "WARN"
 
     a5_t = target_stats.get("A5", {})
     a5_ct = _num(a5_t.get("C_target_median_db", np.nan))
@@ -1509,12 +2023,17 @@ def _diagnostic_checks(
     else:
         a5_target_mode = "unknown"
 
-    # A6 sign check: G2 core evidence at near-normal incidence
-    a6_sign = _a6_sign_check(
-        link_rows=link_rows,
-        runs=runs,
-        floor_db=floor_db_used,
-    )
+    if bool(a6_parity.get("available", False)):
+        g2_primary_source = "A6_near_normal_benchmark"
+        g2_primary_status = str(a6_parity.get("status", "INCONCLUSIVE"))
+        a3_evidence_tier = "supplementary"
+    else:
+        g2_primary_source = "A3_target_window_supplementary_only"
+        if str(a3_target_status_reporting) in {"PASS", "WARN"}:
+            g2_primary_status = "WARN"
+        else:
+            g2_primary_status = str(a3_target_status_reporting)
+        a3_evidence_tier = "primary_if_no_A6"
 
     checks["B_time_resolution"] = {
         "freq_source": str(freq_src),
@@ -1525,7 +2044,10 @@ def _diagnostic_checks(
         "Te_s": float(te_s),
         "Tmax_s": float(tmax_s),
         "W_floor_s": float(w_floor_s),
-        "W_target_s": float(w_target_s),
+        "W_target_s_default": float(w_target_default_s),
+        "W_target_s": float(w_target_default_s),
+        "W_target_s_by_scenario": {k: float(v) for k, v in w_target_s_by_sid.items()},
+        "W_target_mode_by_scenario": {k: str(v) for k, v in w_target_mode_by_sid.items()},
         "W_floor_status": str(floor_stats.get("status", "WARN")),
         "W_floor_C_median_db": float(floor_stats.get("C_floor_median_db", np.nan)),
         "A2_target_in_Wearly_rate": float(target_stats["A2"].get("target_in_Wearly_rate", np.nan)),
@@ -1546,13 +2068,20 @@ def _diagnostic_checks(
         "A2A3_sign_stability": sign_stability,
         "A2_target_window_sign": a2_target_sign,
         "A3_target_window_sign": a3_target_sign,
+        "A3_target_window_sign_reporting_status": str(a3_target_status_reporting),
+        "A6_parity_benchmark": a6_parity,
         "A3_role": a3_role,
+        "A3_evidence_tier": str(a3_evidence_tier),
+        "G2_primary_evidence_source": str(g2_primary_source),
+        "G2_primary_evidence_status": str(g2_primary_status),
         "A3_mechanism_status": a3_mech_status,
         "A3_system_early_status": a3_early_status,
+        "A3_reporting_rule": "A3 is mechanism-only/supplementary: use target-window metrics for mechanism context; fixed system early-window dominance is not primary evidence. If A6 is present, use A6 as primary G2 sign evidence.",
         "A5_role": a5_role,
         "A5_target_mode": a5_target_mode,
-        # A6: G2 core evidence at near-normal incidence (sign on raw, not excess)
-        "A6_sign_check": a6_sign,
+        "A5_stress_semantics": str(a5_semantics.get("dominant_semantics", "none")),
+        "A5_contamination_response_ready": bool(a5_semantics.get("contamination_response_ready", False)),
+        "A5_semantics_note": str(a5_semantics.get("note", "")),
     }
 
     # C effect vs floor (C2-M / C2-S endpoints)
@@ -1683,6 +2212,13 @@ def _diagnostic_checks(
     else:
         c2s_status = "FAIL"
 
+    c2s_semantics_gate = "PASS"
+    if bool(a5_semantics.get("n_stress_rows", 0)) and not bool(a5_semantics.get("contamination_response_ready", False)):
+        # Synthetic-only stress cannot support delay/path-structure contamination-response claims.
+        c2s_semantics_gate = "WARN"
+        if c2s_status == "PASS":
+            c2s_status = "WARN"
+
     if c2m_status == "PASS" and c2s_status == "PASS":
         c2_status = "PASS"
     elif c2m_status == "FAIL" and c2s_status == "FAIL":
@@ -1731,6 +2267,9 @@ def _diagnostic_checks(
         "C2S_late_ex_var_ratio": float(var_ratio),
         "C2S_gate_delta_p_target_db": float(gate_dp_target_db),
         "C2S_gate_status": str(gate_status),
+        "C2S_semantics_gate_status": str(c2s_semantics_gate),
+        "C2S_semantics": str(a5_semantics.get("dominant_semantics", "none")),
+        "C2S_semantics_note": str(a5_semantics.get("note", "")),
         "C2S_gate_pair_count": int(len(dp_target_vals)),
     }
 
@@ -2039,9 +2578,90 @@ def _diagnostic_checks(
         },
     }
 
-    # E power-based only
+    # E power-based only + strict meta-contract checks.
+    basis_vals = _collect_unique_values(link_rows, "basis")
+    conv_vals = _collect_unique_values(link_rows, "convention")
+    msrc_vals = [v.upper() for v in _collect_unique_values(link_rows, "matrix_source")]
+    if not basis_vals:
+        basis_vals = sorted(
+            set(
+                str((dict(r.get("summary", {})).get("basis", "") if isinstance(r, dict) else "")).strip()
+                for r in runs
+                if str((dict(r.get("summary", {})).get("basis", "") if isinstance(r, dict) else "")).strip()
+            )
+        )
+    if not conv_vals:
+        conv_vals = sorted(
+            set(
+                str((dict(r.get("summary", {})).get("convention", "") if isinstance(r, dict) else "")).strip()
+                for r in runs
+                if str((dict(r.get("summary", {})).get("convention", "") if isinstance(r, dict) else "")).strip()
+            )
+        )
+    if not msrc_vals:
+        msrc_vals = sorted(
+            set(
+                str((dict(r.get("summary", {})).get("matrix_source", "") if isinstance(r, dict) else "")).upper().strip()
+                for r in runs
+                if str((dict(r.get("summary", {})).get("matrix_source", "") if isinstance(r, dict) else "")).strip()
+            )
+        )
+    fcp = np.asarray([_num(r.get("force_cp_swap_on_odd_reflection", np.nan)) for r in link_rows], dtype=float)
+    force_cp_any_true = bool(np.any(np.isfinite(fcp) & (np.round(fcp) == 1)))
+    if not np.any(np.isfinite(fcp)):
+        force_cp_any_true = any(
+            bool(dict(r.get("summary", {})).get("force_cp_swap_on_odd_reflection", False))
+            for r in runs
+            if isinstance(r, dict)
+        )
+    meta_contract_ok = (
+        len(basis_vals) == 1
+        and len(conv_vals) == 1
+        and len(msrc_vals) == 1
+        and msrc_vals[0] in {"A", "J"}
+    )
+    if meta_contract_ok and (not force_cp_any_true):
+        e_status = "PASS"
+    elif meta_contract_ok:
+        e_status = "WARN"
+    else:
+        e_status = "FAIL"
+
+    c0_rows = scenario_rows.get("C0", [])
+    tx_leak = np.asarray([_num(r.get("tx_cross_pol_leakage_db", np.nan)) for r in c0_rows], dtype=float)
+    rx_leak = np.asarray([_num(r.get("rx_cross_pol_leakage_db", np.nan)) for r in c0_rows], dtype=float)
+    c0_floor = np.asarray([_num(r.get("XPD_early_db", np.nan)) for r in c0_rows], dtype=float)
+    tx_med = float(np.nanmedian(tx_leak)) if np.any(np.isfinite(tx_leak)) else float("nan")
+    rx_med = float(np.nanmedian(rx_leak)) if np.any(np.isfinite(rx_leak)) else float("nan")
+    if not np.isfinite(tx_med) or not np.isfinite(rx_med):
+        tx_runs = []
+        rx_runs = []
+        for rr in runs:
+            sm = dict(rr.get("summary", {})) if isinstance(rr, dict) else {}
+            ac = dict(sm.get("antenna_config", {})) if isinstance(sm.get("antenna_config", {}), dict) else {}
+            txv = _num(ac.get("tx_cross_pol_leakage_db", np.nan))
+            rxv = _num(ac.get("rx_cross_pol_leakage_db", np.nan))
+            if np.isfinite(txv):
+                tx_runs.append(float(txv))
+            if np.isfinite(rxv):
+                rx_runs.append(float(rxv))
+        if (not np.isfinite(tx_med)) and tx_runs:
+            tx_med = float(np.median(np.asarray(tx_runs, dtype=float)))
+        if (not np.isfinite(rx_med)) and rx_runs:
+            rx_med = float(np.median(np.asarray(rx_runs, dtype=float)))
+    c0_floor_med = float(np.nanmedian(c0_floor)) if np.any(np.isfinite(c0_floor)) else float("nan")
+    # Heuristic sanity target for coupling-limited floor.
+    coupling_floor_nominal_db = float(min(tx_med, rx_med)) if np.isfinite(tx_med) and np.isfinite(rx_med) else float("nan")
+    coupling_floor_delta_db = float(c0_floor_med - coupling_floor_nominal_db) if np.isfinite(c0_floor_med) and np.isfinite(coupling_floor_nominal_db) else float("nan")
+    if np.isfinite(coupling_floor_delta_db) and abs(coupling_floor_delta_db) <= 10.0:
+        coupling_status = "PASS"
+    elif np.isfinite(coupling_floor_delta_db):
+        coupling_status = "WARN"
+    else:
+        coupling_status = "INCONCLUSIVE"
+
     checks["E_power_based"] = {
-        "status": "PASS",
+        "status": str(e_status),
         "used_metrics": [
             "XPD_early_db",
             "XPD_late_db",
@@ -2052,7 +2672,25 @@ def _diagnostic_checks(
             "EL_proxy_db",
             "LOSflag",
         ],
+        "basis_values": basis_vals,
+        "convention_values": conv_vals,
+        "matrix_source_values": msrc_vals,
+        "force_cp_swap_any_true": bool(force_cp_any_true),
+        "matrix_source_rule": "Use circular basis for CP interpretation and keep matrix_source fixed (A_f for antenna-embedded, J_f for de-embedded).",
+        "main_result_rule": "force_cp_swap_on_odd_reflection must be false for main-result evidence.",
+        "coupling_floor_check": {
+            "status": str(coupling_status),
+            "c0_xpd_floor_median_db": float(c0_floor_med),
+            "tx_cross_pol_leakage_median_db": float(tx_med),
+            "rx_cross_pol_leakage_median_db": float(rx_med),
+            "coupling_floor_nominal_db": float(coupling_floor_nominal_db),
+            "delta_c0_minus_nominal_db": float(coupling_floor_delta_db),
+            "note": "Heuristic sanity check only; measured C0 floor should be reviewed against configured antenna coupling/leakage model.",
+        },
         "note": "No complex-phase fields are used by this report pipeline.",
+        "a5_stress_semantics": str(a5_semantics.get("dominant_semantics", "none")),
+        "a5_contamination_response_ready": bool(a5_semantics.get("contamination_response_ready", False)),
+        "a5_semantics_note": str(a5_semantics.get("note", "")),
     }
     return checks
 
@@ -2184,6 +2822,17 @@ def _build_markdown(
     rows = [{"scenario": s, "n_links": n} for s, n in sorted(scen_counts.items())]
     lines.append(report_md.md_table(rows, ["scenario", "n_links"]))
     lines.append("")
+    lines.append("- Figure metadata: [figure_metadata.csv](tables/figure_metadata.csv)")
+    lines.append("")
+    lines.append("## Final Scenario Structure (Agreed)")
+    lines.append("")
+    lines.append(
+        report_md.md_table(
+            report_md.final_structure_rows(),
+            ["unit", "role", "notes"],
+        )
+    )
+    lines.append("")
     lines.append("## Floor Reference")
     lines.append("")
     lines.append(
@@ -2216,6 +2865,35 @@ def _build_markdown(
     a3c = checks.get("A3_coord_sanity", {})
     lines.append(f"- A3 coordinate sanity: **{a3c.get('status', 'WARN')}** ({a3c.get('note', '')})")
     lines.append("")
+    a5s = checks.get("A5_stress_semantics", {})
+    if isinstance(a5s, dict):
+        lines.append("- A5 stress semantics (path-structure vs polarization-only)")
+        lines.append("")
+        lines.append(
+            report_md.md_table(
+                [
+                    {
+                        "status": a5s.get("status", ""),
+                        "dominant_semantics": a5s.get("dominant_semantics", ""),
+                        "n_stress_rows": a5s.get("n_stress_rows", 0),
+                        "n_response": a5s.get("n_response", 0),
+                        "n_polarization_only": a5s.get("n_polarization_only", 0),
+                        "contamination_response_ready": a5s.get("contamination_response_ready", False),
+                        "note": a5s.get("note", ""),
+                    }
+                ],
+                [
+                    "status",
+                    "dominant_semantics",
+                    "n_stress_rows",
+                    "n_response",
+                    "n_polarization_only",
+                    "contamination_response_ready",
+                    "note",
+                ],
+            )
+        )
+        lines.append("")
     if a3_review_rows:
         lines.append("- A3 geometry manual review (ray-path visualization required before experiment)")
         lines.append("")
@@ -2272,9 +2950,17 @@ def _build_markdown(
                     "A2_target_sign_status": dict(b.get("A2_target_window_sign", {})).get("status", ""),
                     "A3_target_sign_hit_rate": _num(dict(b.get("A3_target_window_sign", {})).get("expected_sign_hit_rate", np.nan)),
                     "A3_target_sign_status": dict(b.get("A3_target_window_sign", {})).get("status", ""),
+                    "A3_target_sign_status_reporting": b.get("A3_target_window_sign_reporting_status", ""),
+                    "A6_parity_status": dict(b.get("A6_parity_benchmark", {})).get("status", ""),
+                    "A6_hit_rate_odd": _num(dict(b.get("A6_parity_benchmark", {})).get("hit_rate_odd", np.nan)),
+                    "A6_hit_rate_even": _num(dict(b.get("A6_parity_benchmark", {})).get("hit_rate_even", np.nan)),
+                    "G2_primary_evidence_source": b.get("G2_primary_evidence_source", ""),
+                    "G2_primary_evidence_status": b.get("G2_primary_evidence_status", ""),
                     "A3_mechanism_status": b.get("A3_mechanism_status", ""),
                     "A3_system_early_status": b.get("A3_system_early_status", ""),
                     "A5_target_mode": b.get("A5_target_mode", ""),
+                    "A5_stress_semantics": b.get("A5_stress_semantics", ""),
+                    "A5_contamination_response_ready": b.get("A5_contamination_response_ready", False),
                     "min_delay_gap_median_s": b.get("B2_min_delay_gap_median_s", np.nan),
                     "B2_status": b.get("B2_status", ""),
                     "B3_status": b.get("B3_status", ""),
@@ -2299,9 +2985,17 @@ def _build_markdown(
                 "A2_target_sign_status",
                 "A3_target_sign_hit_rate",
                 "A3_target_sign_status",
+                "A3_target_sign_status_reporting",
+                "A6_parity_status",
+                "A6_hit_rate_odd",
+                "A6_hit_rate_even",
+                "G2_primary_evidence_source",
+                "G2_primary_evidence_status",
                 "A3_mechanism_status",
                 "A3_system_early_status",
                 "A5_target_mode",
+                "A5_stress_semantics",
+                "A5_contamination_response_ready",
                 "min_delay_gap_median_s",
                 "B2_status",
                 "B3_status",
@@ -2312,6 +3006,18 @@ def _build_markdown(
         )
     )
     lines.append("")
+    if str(b.get("A3_reporting_rule", "")).strip():
+        lines.append(f"- A3 reporting rule: {b.get('A3_reporting_rule', '')}")
+        lines.append("")
+    if str(b.get("G2_primary_evidence_source", "")).strip():
+        lines.append(
+            f"- G2 primary evidence: `{b.get('G2_primary_evidence_source', '')}` "
+            f"(status={b.get('G2_primary_evidence_status', 'INCONCLUSIVE')})"
+        )
+        lines.append("")
+    if str(b.get("A5_semantics_note", "")).strip():
+        lines.append(f"- A5 semantics note: {b.get('A5_semantics_note', '')}")
+        lines.append("")
     wfloor = b.get("W_floor_detail", {})
     if isinstance(wfloor, dict):
         lines.append("- W_floor(C0) contamination summary")
@@ -2335,6 +3041,26 @@ def _build_markdown(
         lines.append("")
     wtarget = b.get("W_target_detail", {})
     if isinstance(wtarget, dict):
+        wmap = b.get("W_target_s_by_scenario", {})
+        mmap = b.get("W_target_mode_by_scenario", {})
+        if isinstance(wmap, dict) and wmap:
+            wr = []
+            for sid in ["A2", "A3", "A4", "A5"]:
+                if sid not in wmap:
+                    continue
+                wr.append(
+                    {
+                        "scenario": sid,
+                        "W_target_s": _num(wmap.get(sid, np.nan)),
+                        "W_target_ns": _num(wmap.get(sid, np.nan)) * 1e9 if np.isfinite(_num(wmap.get(sid, np.nan))) else np.nan,
+                        "mode": str(mmap.get(sid, "default")) if isinstance(mmap, dict) else "default",
+                    }
+                )
+            if wr:
+                lines.append("- W_target per-scenario configuration")
+                lines.append("")
+                lines.append(report_md.md_table(wr, ["scenario", "W_target_s", "W_target_ns", "mode"]))
+                lines.append("")
         trows = []
         for sid in ["A2", "A3", "A4", "A5"]:
             wsid = wtarget.get(sid, {})
@@ -2413,13 +3139,42 @@ def _build_markdown(
                 "W_target_s": d.get("W_target_s", np.nan),
                 "expected_sign": d.get("expected_sign", ""),
                 "n_eval": d.get("n_eval", 0),
+                "sign_metric_for_status": d.get("sign_metric_for_status", ""),
                 "expected_sign_hit_rate": d.get("expected_sign_hit_rate", np.nan),
+                "expected_sign_hit_rate_raw": d.get("expected_sign_hit_rate_raw", np.nan),
+                "expected_sign_hit_rate_ex": d.get("expected_sign_hit_rate_ex", np.nan),
+                "median_xpd_target_raw_db": d.get("median_xpd_target_raw_db", np.nan),
                 "median_xpd_target_ex_db": d.get("median_xpd_target_ex_db", np.nan),
                 "status": d.get("status", ""),
             }
         )
+    a6b = b.get("A6_parity_benchmark", {})
+    if isinstance(a6b, dict):
+        for vv in ["odd", "even"]:
+            d = a6b.get(vv, {})
+            if not isinstance(d, dict) or not d:
+                continue
+            n_eval = _num(d.get("n_eval", np.nan))
+            if (not np.isfinite(n_eval) or n_eval <= 0) and not np.isfinite(_num(d.get("expected_sign_hit_rate", np.nan))):
+                continue
+            tw_rows.append(
+                {
+                    "scenario": f"A6_{vv}",
+                    "target_n": d.get("target_n", np.nan),
+                    "W_target_s": d.get("W_target_s", np.nan),
+                    "expected_sign": d.get("expected_sign", ""),
+                    "n_eval": d.get("n_eval", 0),
+                    "sign_metric_for_status": d.get("sign_metric_for_status", ""),
+                    "expected_sign_hit_rate": d.get("expected_sign_hit_rate", np.nan),
+                    "expected_sign_hit_rate_raw": d.get("expected_sign_hit_rate_raw", np.nan),
+                    "expected_sign_hit_rate_ex": d.get("expected_sign_hit_rate_ex", np.nan),
+                    "median_xpd_target_raw_db": d.get("median_xpd_target_raw_db", np.nan),
+                    "median_xpd_target_ex_db": d.get("median_xpd_target_ex_db", np.nan),
+                    "status": d.get("status", ""),
+                }
+            )
     if tw_rows:
-        lines.append("- Target-window sign metric (A2/A3)")
+        lines.append("- Target-window sign metric (A2/A3 and A6 parity benchmark when available)")
         lines.append("")
         lines.append(
             report_md.md_table(
@@ -2430,7 +3185,11 @@ def _build_markdown(
                     "W_target_s",
                     "expected_sign",
                     "n_eval",
+                    "sign_metric_for_status",
                     "expected_sign_hit_rate",
+                    "expected_sign_hit_rate_raw",
+                    "expected_sign_hit_rate_ex",
+                    "median_xpd_target_raw_db",
                     "median_xpd_target_ex_db",
                     "status",
                 ],
@@ -2464,6 +3223,8 @@ def _build_markdown(
                     "C2S_primary_status": c.get("C2S_primary_status", ""),
                     "C2S_gate_delta_p_target_db": c.get("C2S_gate_delta_p_target_db", np.nan),
                     "C2S_gate_status": c.get("C2S_gate_status", ""),
+                    "C2S_semantics_gate_status": c.get("C2S_semantics_gate_status", ""),
+                    "C2S_semantics": c.get("C2S_semantics", ""),
                     "C2S_status": c.get("C2S_status", ""),
                     "C2_status": c.get("C2_status", ""),
                 }
@@ -2484,12 +3245,17 @@ def _build_markdown(
                 "C2S_primary_status",
                 "C2S_gate_delta_p_target_db",
                 "C2S_gate_status",
+                "C2S_semantics_gate_status",
+                "C2S_semantics",
                 "C2S_status",
                 "C2_status",
             ],
         )
     )
     lines.append("")
+    if str(c.get("C2S_semantics_note", "")).strip():
+        lines.append(f"- C2-S semantics note: {c.get('C2S_semantics_note', '')}")
+        lines.append("")
 
     # D
     d = checks.get("D_identifiability", {})
@@ -2695,9 +3461,32 @@ def _build_markdown(
     lines.append("")
     lines.append(f"- Status: **{e.get('status', 'PASS')}**")
     lines.append(f"- Note: {e.get('note', '')}")
+    lines.append(f"- basis values: `{e.get('basis_values', [])}`")
+    lines.append(f"- convention values: `{e.get('convention_values', [])}`")
+    lines.append(f"- matrix_source values: `{e.get('matrix_source_values', [])}`")
+    lines.append(f"- force_cp_swap_on_odd_reflection(any): `{e.get('force_cp_swap_any_true', False)}`")
+    if str(e.get("matrix_source_rule", "")).strip():
+        lines.append(f"- matrix_source rule: {e.get('matrix_source_rule', '')}")
+    if str(e.get("main_result_rule", "")).strip():
+        lines.append(f"- main-result rule: {e.get('main_result_rule', '')}")
     used = e.get("used_metrics", [])
     if isinstance(used, list):
         lines.append("- Used metrics: " + ", ".join(str(x) for x in used))
+    cfc = e.get("coupling_floor_check", {})
+    if isinstance(cfc, dict):
+        lines.append(
+            f"- C0 coupling-floor sanity: status={cfc.get('status', 'INCONCLUSIVE')}, "
+            f"C0 floor={_num(cfc.get('c0_xpd_floor_median_db', np.nan)):.3f} dB, "
+            f"nominal={_num(cfc.get('coupling_floor_nominal_db', np.nan)):.3f} dB, "
+            f"delta={_num(cfc.get('delta_c0_minus_nominal_db', np.nan)):.3f} dB"
+        )
+        if str(cfc.get("note", "")).strip():
+            lines.append(f"- coupling-floor note: {cfc.get('note', '')}")
+    lines.append(f"- A5 stress semantics: `{e.get('a5_stress_semantics', 'none')}`")
+    lines.append(f"- A5 contamination-response ready: `{e.get('a5_contamination_response_ready', False)}`")
+    if str(e.get("a5_semantics_note", "")).strip():
+        lines.append(f"- A5 semantics note: {e.get('a5_semantics_note', '')}")
+    lines.append("- Figure metadata table: [figure_metadata.csv](tables/figure_metadata.csv)")
     lines.append("")
 
     lines.append("## Scenario Sections")
@@ -2706,6 +3495,16 @@ def _build_markdown(
         lines.append(f"### {s}")
         lines.append("")
         lines.append(f"- 의미: {report_md.scenario_meaning(s)}")
+        if s == "A5":
+            a5s2 = checks.get("A5_stress_semantics", {})
+            if isinstance(a5s2, dict):
+                lines.append(
+                    f"- stress_semantics: `{a5s2.get('dominant_semantics', 'none')}` "
+                    f"(response={a5s2.get('n_response', 0)}, polarization_only={a5s2.get('n_polarization_only', 0)})"
+                )
+                lines.append(f"- contamination-response ready: `{a5s2.get('contamination_response_ready', False)}`")
+                if str(a5s2.get("note", "")).strip():
+                    lines.append(f"- note: {a5s2.get('note', '')}")
         lines.append("")
         scene_png = scenario_scene[s]
         scene_rel = report_md.relpath(scene_png, out_root)
@@ -2814,6 +3613,7 @@ def main() -> None:
         scene_map=scene_map,
     )
     a3_review_rows = _build_a3_geometry_review_rows(idx_rows, scene_map=scene_map, ray_rows=ray_rows)
+    figure_meta_rows = _build_figure_metadata_rows(link_rows, idx_rows, runs=runs)
 
     # checks
     checks = _diagnostic_checks(
@@ -2825,9 +3625,121 @@ def main() -> None:
         selected_rows=selected_rows,
     )
 
+    # requested analysis tables (target/case/sensitivity levels)
+    bt = dict(checks.get("B_time_resolution", {}))
+    ws_cfg = dict(cfg.get("windows", {})) if isinstance(cfg.get("windows", {}), dict) else {}
+    te_default_s = _num(bt.get("Te_s", np.nan))
+    if not np.isfinite(te_default_s):
+        te_default_s = float(_num(ws_cfg.get("Te_ns", 10.0))) * 1e-9
+    dt_res_s = _num(bt.get("dt_res_s", np.nan))
+    tmax_s = _num(bt.get("Tmax_s", np.nan))
+    if not np.isfinite(tmax_s):
+        tmax_s = float(_num(ws_cfg.get("Tmax_ns", 200.0))) * 1e-9
+    floor_db = _num(floor_ref.get("xpd_floor_db", np.nan))
+    w_target_s_by_sid_raw = bt.get("W_target_s_by_scenario", {})
+    w_target_s_by_sid: dict[str, float] = {}
+    if isinstance(w_target_s_by_sid_raw, dict):
+        for k, v in w_target_s_by_sid_raw.items():
+            vv = _num(v)
+            if np.isfinite(vv) and vv > 0:
+                w_target_s_by_sid[str(k)] = float(vv)
+    target_map = {"A2": 1, "A3": 2, "A4": 1, "A5": 2}
+    target_level_rows = _build_target_level_rows(
+        link_rows=link_rows,
+        ray_rows=ray_rows,
+        runs=runs,
+        floor_db=float(floor_db),
+        te_default_s=float(te_default_s),
+        dt_res_s=float(dt_res_s),
+        w_target_s_by_sid=w_target_s_by_sid,
+        target_map=target_map,
+    )
+    case_level_rows = _build_case_level_rows(link_rows)
+    te_sweep_ns = _as_float_list(ws_cfg.get("te_sweep_ns", None), [2.0, 3.0, 5.0])
+    noise_tail_sweep_ns = _as_float_list(ws_cfg.get("noise_tail_sweep_ns", None), [30.0, 50.0, 80.0])
+    threshold_sweep_db = _as_float_list(ws_cfg.get("threshold_sweep_db", None), [4.0, 6.0, 8.0])
+    sensitivity_level_rows = _build_sensitivity_level_rows(
+        link_rows=link_rows,
+        runs=runs,
+        floor_db=float(floor_db),
+        te_ns_list=te_sweep_ns,
+        noise_tail_ns_list=noise_tail_sweep_ns,
+        threshold_db_list=threshold_sweep_db,
+        tmax_s=float(tmax_s),
+    )
+
     # save tables/json
     _write_rows_csv(tab_dir / "diagnostic_link_rows.csv", link_rows)
     _write_rows_csv(tab_dir / "diagnostic_ray_rows.csv", ray_rows)
+    _write_rows_csv(tab_dir / "figure_metadata.csv", figure_meta_rows)
+    _write_rows_csv_with_columns(
+        tab_dir / "target_level.csv",
+        target_level_rows,
+        [
+            "scenario_id",
+            "case_id",
+            "link_id",
+            "target_tau_ns",
+            "target_rank",
+            "target_in_Wearly",
+            "target_is_first",
+            "bounce_count",
+            "parity",
+            "incidence_angle_deg",
+            "Pco_target",
+            "Pcross_target",
+            "xpd_target_raw_db",
+            "xpd_target_ex_db",
+            "C_target_db",
+        ],
+    )
+    _write_rows_csv_with_columns(
+        tab_dir / "case_level.csv",
+        case_level_rows,
+        [
+            "scenario_id",
+            "case_id",
+            "link_id",
+            "xpd_early_ex_db",
+            "xpd_late_ex_db",
+            "l_pol_db",
+            "rho_early_linear",
+            "rho_early_db",
+            "ds_ns",
+            "early_energy_fraction",
+            "EL_proxy_db",
+            "LOSflag",
+            "material",
+            "stress_flag",
+            "claim_caution_early",
+            "claim_caution_late",
+        ],
+    )
+    _write_rows_csv_with_columns(
+        tab_dir / "sensitivity_level.csv",
+        sensitivity_level_rows,
+        [
+            "scenario_id",
+            "case_id",
+            "link_id",
+            "Te_ns",
+            "noise_tail_ns",
+            "threshold_db",
+            "xpd_early_ex_db",
+            "xpd_late_ex_db",
+            "l_pol_db",
+            "rho_early_linear",
+            "rho_early_db",
+            "ds_ns",
+            "early_energy_fraction",
+            "delta_xpd_early_ex_db",
+            "delta_xpd_late_ex_db",
+            "delta_l_pol_db",
+            "delta_rho_early_db",
+            "delta_ds_ns",
+            "delta_early_energy_fraction",
+        ],
+    )
     _write_rows_csv(tab_dir / "el_proxy_imputation_rows.csv", list(el_impute_info.get("rows", [])))
     _write_rows_csv(tab_dir / "A3_geometry_manual_review.csv", a3_review_rows)
     report_md.write_json(tab_dir / "diagnostic_checks.json", checks)
@@ -2840,8 +3752,14 @@ def main() -> None:
     _write_rows_csv(
         tab_dir / "A3_target_window_sign.csv",
         [
-            dict(dict(checks.get("B_time_resolution", {})).get("A2_target_window_sign", {})),
-            dict(dict(checks.get("B_time_resolution", {})).get("A3_target_window_sign", {})),
+            row for row in [
+                dict(dict(checks.get("B_time_resolution", {})).get("A2_target_window_sign", {})),
+                dict(dict(checks.get("B_time_resolution", {})).get("A3_target_window_sign", {})),
+                dict(dict(dict(checks.get("B_time_resolution", {})).get("A6_parity_benchmark", {})).get("odd", {})),
+                dict(dict(dict(checks.get("B_time_resolution", {})).get("A6_parity_benchmark", {})).get("even", {})),
+            ]
+            if (np.isfinite(_num(row.get("n_eval", np.nan))) and _num(row.get("n_eval", np.nan)) > 0)
+            or np.isfinite(_num(row.get("expected_sign_hit_rate", np.nan)))
         ],
     )
 

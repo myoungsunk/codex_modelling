@@ -174,6 +174,10 @@ def _build_final_markdown(
 
     a2_sign = dict(b.get("A2_target_window_sign", {}))
     a3_sign = dict(b.get("A3_target_window_sign", {}))
+    a3_sign_reporting = str(b.get("A3_target_window_sign_reporting_status", a3_sign.get("status", "INCONCLUSIVE")))
+    a6_parity = dict(b.get("A6_parity_benchmark", {}))
+    g2_src = str(b.get("G2_primary_evidence_source", "A3_target_window_supplementary_only"))
+    g2_st = str(b.get("G2_primary_evidence_status", "INCONCLUSIVE"))
     holes = [x for x in d3.get("hole_analysis", []) if str(x.get("hole_type", "")) != "none"]
 
     los_list = [int(_num(x.get("los_rays", np.nan))) for x in a1 if np.isfinite(_num(x.get("los_rays", np.nan)))]
@@ -207,6 +211,10 @@ def _build_final_markdown(
         "Calibration, effect size, and power-domain proxy modeling are validated for measurement start; "
         "remaining warnings are interpretation/role-definition items, not blocking physics failures."
     )
+    lines.append("")
+    lines.append("## Final Scenario Structure (Agreed)")
+    lines.append("")
+    lines.append(report_md.md_table(report_md.final_structure_rows(), ["unit", "role", "notes"]))
     lines.append("")
     lines.append("## Promotion to Go requires")
     lines.append(f"1. A3 manual review sign-off (`A3 pass={a3_pass}/{a3_total}` now; reviewer sign-off pending)")
@@ -246,8 +254,15 @@ def _build_final_markdown(
     )
     lines.append(
         f"- C0 floor window={b.get('W_floor_status','NA')}, "
-        f"A2 target-window sign={a2_sign.get('status','NA')}, A3 target-window sign={a3_sign.get('status','NA')}"
+        f"A2 target-window sign={a2_sign.get('status','NA')}, "
+        f"A3 target-window sign(raw)={a3_sign.get('status','NA')} -> reporting={a3_sign_reporting}"
     )
+    if bool(a6_parity.get("available", False)):
+        lines.append(
+            f"- A6 parity benchmark={a6_parity.get('status','NA')} "
+            f"(odd hit={_fmt(a6_parity.get('hit_rate_odd', np.nan),3)}, even hit={_fmt(a6_parity.get('hit_rate_even', np.nan),3)})"
+        )
+    lines.append(f"- G2 primary evidence source={g2_src}, status={g2_st}")
     lines.append(
         f"- A3 mechanism status={b.get('A3_mechanism_status','NA')}, "
         f"A3 system-early status={b.get('A3_system_early_status','NA')}"
@@ -265,9 +280,10 @@ def _build_final_markdown(
     )
     lines.append("")
     lines.append("### Reporting rule")
-    lines.append("- A3: mechanism validation only")
+    lines.append("- A3: mechanism validation only (supplementary when A6 is present)")
     lines.append("- A5: stress-response / contamination analysis")
     lines.append("- A3를 fixed system early-window even baseline 증거로 사용하지 않음")
+    lines.append(f"- G2 본증거는 `{g2_src}` 기준으로 사용")
     lines.append("")
 
     lines.append("## C. Effect Size vs Calibration Uncertainty")
@@ -338,13 +354,18 @@ def _build_final_markdown(
 
     lines.append("## Scenario-level Final Roles and Decisions")
     lines.append("")
-    lines.append("| Scenario | Final Role | Status | Use in paper | Exclude from |")
+    lines.append("| Scenario Unit | Final Role | Status | Use in paper | Exclude from |")
     lines.append("|---|---|---:|---|---|")
     lines.append("| C0 | floor calibration | PASS | calibration / uncertainty | effect regression |")
-    lines.append("| A2 | odd parity isolation | PASS | parity anchor | EL-identification |")
-    lines.append("| A3 | even mechanism validation | WARN | mechanism-only | system early baseline |")
-    lines.append("| A4 | material effect | PASS | material coefficient / target-window stats | none |")
-    lines.append("| A5 | stress response | PASS | stress-response / contamination analysis | stress-isolation claim |")
+    lines.append("| A2_off | odd parity isolation | PASS | G1 primary evidence | EL-identification |")
+    lines.append("| A2_on | bridge observability | WARN | LOS-on bridge check | G1 sign-off |")
+    lines.append("| A3_corner | supplementary mechanism | WARN | mechanism-only context | system early baseline / G2 sign-off |")
+    if bool(a6_parity.get("available", False)):
+        lines.append(f"| A6 | near-normal parity benchmark | {a6_parity.get('status','NA')} | G2 primary sign evidence | oblique generalization |")
+    lines.append("| A4_iso | material effect primary | PASS | L2-M primary | none |")
+    lines.append("| A4_bridge | material effect secondary | WARN | L2-M bridge/late sensitivity | primary material claim |")
+    lines.append("| A4_on | bridge observability | WARN | LOS-on bridge check | L2-M sign-off |")
+    lines.append("| A5_pair | proxy stress response | PASS | L2-S primary (synthetic) + geometric sensitivity | faithful rough/human solver claim |")
     lines.append(f"| B1 | LOS real-space baseline | {b_per.get('B1',{}).get('status','NA')} | leverage baseline | strict full-strata claim |")
     lines.append(f"| B2 | partition NLOS | {b_per.get('B2',{}).get('status','NA')} | contamination / NLOS comparison | none |")
     lines.append(f"| B3 | corner high-EL NLOS | {b_per.get('B3',{}).get('status','NA')} | high-EL / structural stress region | none |")
@@ -377,7 +398,7 @@ def _build_final_markdown(
     lines.append("")
     lines.append("- Full gallery and links: [scenario_space_plots.md](scenario_space_plots.md)")
     lines.append("- Case-level index: [index.md](index.md)")
-    for sid in ["C0", "A2", "A3", "A4", "A5", "B1", "B2", "B3"]:
+    for sid in ["C0", "A2", "A3", "A4", "A5", "A6", "B1", "B2", "B3"]:
         p = out_root / "figures" / f"{sid}__ALL__scene_montage.png"
         if p.exists():
             lines.append(f"- [{p.name}]({report_md.relpath(p, out_root)})")
@@ -390,7 +411,7 @@ def _build_final_markdown(
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", required=True, help="Path to analysis_report config (json/yaml)")
-    ap.add_argument("--scenarios", default="C0,A2,A3,A4,A5,B1,B2,B3")
+    ap.add_argument("--scenarios", default="C0,A2,A3,A4,A5,A6,B1,B2,B3")
     args = ap.parse_args()
 
     cfg = io_lib.load_config(args.config)
@@ -431,4 +452,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

@@ -24,6 +24,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy import stats
+from matplotlib.ticker import MultipleLocator
 
 if __package__ is None or __package__ == "":
     sys.path.append(str(Path(__file__).resolve().parents[1]))
@@ -69,6 +70,19 @@ def _to_int(v: Any, default: int = 0) -> int:
     return int(round(x))
 
 
+def _to_bool(v: Any, default: bool = False) -> bool:
+    if isinstance(v, bool):
+        return v
+    if v is None:
+        return default
+    s = str(v).strip().lower()
+    if s in {"1", "true", "t", "yes", "y", "on"}:
+        return True
+    if s in {"0", "false", "f", "no", "n", "off"}:
+        return False
+    return default
+
+
 def _finite(a: list[float] | np.ndarray) -> np.ndarray:
     x = np.asarray(a, dtype=float)
     return x[np.isfinite(x)]
@@ -93,6 +107,39 @@ def _parse_jsonish(v: Any) -> Any:
 
 def _safe_log10(x: np.ndarray, floor: float = 1e-20) -> np.ndarray:
     return 10.0 * np.log10(np.maximum(np.asarray(x, dtype=float), floor))
+
+
+def _style_db_axis(ax: Any, *, ymin: float | None = None, ymax: float | None = None) -> None:
+    if ymin is not None and ymax is not None and np.isfinite(ymin) and np.isfinite(ymax) and ymax > ymin:
+        ax.set_ylim(float(ymin), float(ymax))
+    ax.yaxis.set_major_locator(MultipleLocator(5.0))
+    ax.yaxis.set_minor_locator(MultipleLocator(1.0))
+    ax.grid(True, which="major", axis="y", alpha=0.35)
+    ax.grid(True, which="minor", axis="y", alpha=0.12)
+
+
+def _pdp_db_window(co_db: np.ndarray, cr_db: np.ndarray) -> tuple[float, float]:
+    vals = np.concatenate([_finite(co_db), _finite(cr_db)])
+    if vals.size == 0:
+        return (-100.0, -60.0)
+    pmax = float(np.max(vals))
+    # Common PDP visualization rule: [peak-40, peak-5] dB
+    y_top = pmax - 5.0
+    y_bot = pmax - 40.0
+    # Clamp to a practical RT/PDP display range
+    y_top = min(y_top, pmax + 3.0)
+    y_bot = max(y_bot, -140.0)
+    if y_top <= y_bot:
+        y_top = y_bot + 10.0
+    return (y_bot, y_top)
+
+
+def _centered_zero_ylim(values: np.ndarray | list[float], min_half_span: float = 5.0, pad_ratio: float = 0.15) -> tuple[float, float]:
+    v = _finite(values)
+    if v.size == 0:
+        return (-float(min_half_span), float(min_half_span))
+    half = max(float(min_half_span), float(np.max(np.abs(v))) * (1.0 + float(pad_ratio)))
+    return (-half, half)
 
 
 def _status_to_pass_fail(s: str) -> str:
@@ -176,72 +223,46 @@ def _plot_pdp_overlay_with_windows(
     title: str,
     w_early: tuple[float, float] | None = None,
     w_target: tuple[float, float] | None = None,
-    clip_db: float = 40.0,
 ) -> None:
-    """PDP overlay with y-axis clipped to [peak-clip_db, peak+5] and XPD subplot.
-
-    clip_db: dynamic range below peak to show (default 40 dB).
-    A lower sub-panel shows XPD(tau) = P_co - P_cross in dB so co/cross
-    contrast is visible even when absolute power difference is small.
-    """
     out = _prep_fig(out)
     d_ns = d_s * 1e9
+    p_tot = np.maximum(pco + pcr, 1e-20)
+    frac_co = np.clip(pco / p_tot, 0.0, 1.0)
+    frac_cr = np.clip(pcr / p_tot, 0.0, 1.0)
     co_db = _safe_log10(pco)
     cr_db = _safe_log10(pcr)
-    nz_co = pco > 0
-    nz_cr = pcr > 0
-    sparse = np.sum(nz_co) <= 16 and np.sum(nz_cr) <= 16
-
-    # Compute sensible y-axis limits centred on the peak
-    peak_db = float(max(
-        np.max(co_db[nz_co]) if np.any(nz_co) else -200.0,
-        np.max(cr_db[nz_cr]) if np.any(nz_cr) else -200.0,
-    ))
-    y_top = peak_db + 5.0
-    y_bot = peak_db - float(clip_db)
-
-    xpd_tau = co_db - cr_db  # tap-wise XPD in dB
-
-    fig, (ax, ax2) = plt.subplots(2, 1, figsize=(8.0, 6.4), sharex=True,
-                                   gridspec_kw={"height_ratios": [3, 1]})
-    if sparse:
-        stem_bot = y_bot
-        if np.any(nz_co):
-            ax.vlines(d_ns[nz_co], stem_bot, co_db[nz_co], colors="tab:red", linewidth=2.0, alpha=0.9)
-            ax.scatter(d_ns[nz_co], co_db[nz_co], color="tab:red", s=28, label="P_co", zorder=5)
-        if np.any(nz_cr):
-            ax.vlines(d_ns[nz_cr], stem_bot, cr_db[nz_cr], colors="tab:blue", linewidth=2.0, linestyles="--", alpha=0.9)
-            ax.scatter(d_ns[nz_cr], cr_db[nz_cr], color="tab:blue", s=28, label="P_cross", zorder=5)
-    else:
-        ax.plot(d_ns, co_db, color="tab:red", lw=1.8, label="P_co")
-        ax.plot(d_ns, cr_db, color="tab:blue", lw=1.6, ls="--", label="P_cross")
-
-    ax.set_ylim(y_bot, y_top)
-    for wspan, color, label in [
-        (w_early, "#98df8a", "W_early"),
-        (w_target, "#ffbb78", "W_target"),
-    ]:
-        if wspan is not None:
-            ax.axvspan(wspan[0] * 1e9, wspan[1] * 1e9, color=color, alpha=0.20, label=label)
+    xpd_tap = co_db - cr_db
+    yb2, yt2 = _centered_zero_ylim(xpd_tap, min_half_span=5.0, pad_ratio=0.2)
+    fig, axs = plt.subplots(2, 1, figsize=(8.2, 6.2), sharex=True, gridspec_kw={"height_ratios": [2.6, 1.6]})
+    ax = axs[0]
+    ax.plot(d_ns, frac_co, color="tab:red", lw=1.8, label="P_co / P_total")
+    ax.plot(d_ns, frac_cr, color="tab:blue", lw=1.6, ls="--", label="P_cross / P_total")
+    if w_early is not None:
+        ax.axvspan(w_early[0] * 1e9, w_early[1] * 1e9, color="#98df8a", alpha=0.18, label="W_early")
+    if w_target is not None:
+        ax.axvspan(w_target[0] * 1e9, w_target[1] * 1e9, color="#ffbb78", alpha=0.20, label="W_target")
     ax.set_title(title)
-    ax.set_ylabel("PDP power (dB)")
-    ax.grid(True, alpha=0.3)
+    ax.set_ylabel("Normalized fraction")
+    ax.set_ylim(-0.02, 1.02)
+    ax.yaxis.set_major_locator(MultipleLocator(0.2))
+    ax.yaxis.set_minor_locator(MultipleLocator(0.1))
+    ax.grid(True, which="major", axis="y", alpha=0.35)
+    ax.grid(True, which="minor", axis="y", alpha=0.12)
+    ax.grid(True, axis="x", alpha=0.25)
     ax.legend(loc="best", fontsize=8)
 
-    # XPD sub-panel: contrast between co and cross
-    ax2.axhline(0.0, color="#444", lw=0.9, ls="--")
-    valid = nz_co & nz_cr
-    if np.any(valid):
-        ax2.plot(d_ns[valid], xpd_tau[valid], color="#d95319", lw=1.6, label="XPD(tau)")
+    ax2 = axs[1]
+    ax2.plot(d_ns, xpd_tap, color="#d95319", lw=1.5, label="XPD_tap = P_co - P_cross")
     if w_early is not None:
         ax2.axvspan(w_early[0] * 1e9, w_early[1] * 1e9, color="#98df8a", alpha=0.15)
     if w_target is not None:
-        ax2.axvspan(w_target[0] * 1e9, w_target[1] * 1e9, color="#ffbb78", alpha=0.15)
-    ax2.set_ylabel("XPD (dB)")
+        ax2.axvspan(w_target[0] * 1e9, w_target[1] * 1e9, color="#ffbb78", alpha=0.18)
+    ax2.axhline(0.0, color="#666", lw=0.9, ls="--")
     ax2.set_xlabel("Delay (ns)")
-    ax2.grid(True, alpha=0.3)
-    ax2.legend(loc="best", fontsize=7)
-
+    ax2.set_ylabel("XPD_tap (dB)")
+    _style_db_axis(ax2, ymin=yb2, ymax=yt2)
+    ax2.grid(True, axis="x", alpha=0.25)
+    ax2.legend(loc="best", fontsize=8)
     fig.tight_layout()
     fig.savefig(out, dpi=140)
     plt.close(fig)
@@ -254,7 +275,8 @@ def _plot_tap_xpd(out: Path, d_s: np.ndarray, xpd_tau: np.ndarray, title: str) -
     ax.set_title(title)
     ax.set_xlabel("Delay (ns)")
     ax.set_ylabel("XPD_tau (dB)")
-    ax.grid(True, alpha=0.3)
+    _style_db_axis(ax)
+    ax.grid(True, axis="x", alpha=0.25)
     fig.tight_layout()
     fig.savefig(out, dpi=140)
     plt.close(fig)
@@ -305,6 +327,23 @@ def _make_m1_m2_plots(
         out = _prep_fig(fig_dir / "M1-1__C0_raw_pdp_overlay_grid.png")
         nr = len(yvals)
         nc = len(dvals)
+        y_bots: list[float] = []
+        y_tops: list[float] = []
+        for y in yvals:
+            for d in dvals:
+                r0 = pick.get((d, y))
+                if r0 is None:
+                    continue
+                pdp0 = _load_pdp(run_c0, "C0", str(r0.get("case_id", "0")))
+                if pdp0 is None:
+                    continue
+                tau0, pco0, pcr0, _ = pdp0
+                _ = tau0
+                yb0, yt0 = _pdp_db_window(_safe_log10(pco0), _safe_log10(pcr0))
+                y_bots.append(float(yb0))
+                y_tops.append(float(yt0))
+        g_ymin = float(np.min(np.asarray(y_bots, dtype=float))) if y_bots else -95.0
+        g_ymax = float(np.max(np.asarray(y_tops, dtype=float))) if y_tops else -55.0
         fig, axs = plt.subplots(nr, nc, figsize=(max(10, 2.8 * nc), max(5, 2.2 * nr)), sharex=True, sharey=True)
         if nr == 1 and nc == 1:
             axs = np.asarray([[axs]])
@@ -335,7 +374,8 @@ def _make_m1_m2_plots(
                 if np.isfinite(w_floor_s) and w_floor_s > 0:
                     ax.axvspan((tau0 - 0.5 * w_floor_s) * 1e9, (tau0 + 0.5 * w_floor_s) * 1e9, color="#98df8a", alpha=0.14)
                 ax.set_title(f"d={d:g}m, yaw={y:g}")
-                ax.grid(True, alpha=0.2)
+                _style_db_axis(ax, ymin=g_ymin, ymax=g_ymax)
+                ax.grid(True, axis="x", alpha=0.2)
         fig.supxlabel("Delay (ns)")
         fig.supylabel("PDP power (dB)")
         fig.suptitle("M1-1 C0 raw PDP overlay")
@@ -383,6 +423,7 @@ def _make_m1_m2_plots(
         ax.set_xlabel("Yaw (deg)")
         ax.set_ylabel("C_floor (dB)")
         ax.set_title("M1-2 C_floor contamination by yaw")
+        _style_db_axis(ax)
         ax.grid(True, axis="y", alpha=0.3)
         ax.legend(loc="best", fontsize=8)
         fig.tight_layout()
@@ -417,6 +458,7 @@ def _make_m1_m2_plots(
         ax.set_xlabel("Frequency (GHz)")
         ax.set_ylabel("XPD_floor (dB)")
         ax.set_title("M1-5 XPD_floor vs frequency")
+        _style_db_axis(ax)
         ax.grid(True, alpha=0.3)
         ax.legend(loc="best", fontsize=8)
         fig.tight_layout()
@@ -445,6 +487,7 @@ def _make_m1_m2_plots(
             ax.scatter(np.full(len(vals), i) + jitter, vals, s=14, color="#555", alpha=0.8)
         ax.set_ylabel("XPD_floor (dB)")
         ax.set_title("M1-6 repeatability by condition")
+        _style_db_axis(ax)
         ax.grid(True, axis="y", alpha=0.3)
         plt.setp(ax.get_xticklabels(), rotation=35, ha="right")
         fig.tight_layout()
@@ -460,61 +503,94 @@ def _make_m1_m2_plots(
     floor_db = _to_float(c0[0].get("xpd_floor_db")) if c0 else float("nan")
     if np.isfinite(floor_delta) and np.isfinite(rep_delta) and np.isfinite(ref_delta):
         out = _prep_fig(fig_dir / "M1-7__uncertainty_budget_summary.png")
-        # Two-panel: left = absolute floor; right = delta items zoomed in
-        fig, (ax_l, ax_r) = plt.subplots(1, 2, figsize=(10.0, 4.4),
-                                           gridspec_kw={"width_ratios": [1, 2]})
-        # Left: XPD_floor absolute value
-        ax_l.bar(["XPD_floor"], [floor_db], color="#4c78a8")
-        ax_l.set_ylabel("dB")
-        ax_l.set_title("Calibration floor")
-        ax_l.grid(True, axis="y", alpha=0.25)
-        # Right: delta items on a zoomed scale so small values are visible
-        d_labels = ["Delta_floor", "Delta_repeat", "Delta_ref"]
-        d_vals = [floor_delta, rep_delta, ref_delta]
-        d_colors = ["#f58518", "#e45756", "#72b7b2"]
-        ax_r.bar(d_labels, d_vals, color=d_colors)
-        ax_r.set_ylabel("dB")
-        ax_r.set_title("Uncertainty components (expanded scale)")
-        ax_r.grid(True, axis="y", alpha=0.25)
-        d_fin = [v for v in d_vals if np.isfinite(v) and v > 0]
-        if d_fin:
-            ax_r.set_ylim(0.0, max(d_fin) * 1.4)
-        fig.suptitle("M1-7 uncertainty budget (Delta_ref=max(Delta_floor, Delta_repeat))")
+        fig, axs = plt.subplots(1, 2, figsize=(10.2, 4.4), gridspec_kw={"width_ratios": [1.0, 1.5]})
+        ax0 = axs[0]
+        ax0.bar(["XPD_floor"], [floor_db], color=["#4c78a8"])
+        ax0.set_ylabel("dB")
+        ax0.set_title("XPD_floor (absolute)")
+        _style_db_axis(ax0)
+        ax0.grid(True, axis="x", alpha=0.2)
+
+        ax1 = axs[1]
+        labels = ["Delta_floor", "Delta_repeat", "Delta_ref"]
+        vals = [floor_delta, rep_delta, ref_delta]
+        colors = ["#f58518", "#e45756", "#72b7b2"]
+        ax1.bar(labels, vals, color=colors)
+        ax1.set_ylabel("dB")
+        ax1.set_title("Uncertainty deltas")
+        _style_db_axis(ax1)
+        ax1.grid(True, axis="x", alpha=0.2)
+        fig.suptitle("M1-7 uncertainty budget (absolute vs delta split)")
         fig.tight_layout()
         fig.savefig(out, dpi=140)
         plt.close(fig)
-        detail_rows.append({"plot_id": "M1-7", "file": out.name,
-                             "note": "two-panel: floor absolute (left) + deltas zoomed (right)"})
+        detail_rows.append({"plot_id": "M1-7", "file": out.name, "note": "Delta_ref=max(Delta_floor,Delta_repeat)"})
 
     # M2-1 scenario-wise early/late box with threshold lines
     delta_ref = _to_float(cfx.get("delta_ref_db"), _to_float(c0[0].get("delta_floor_db")) if c0 else 0.0)
     scen_order = ["A2", "A3", "A4", "A5", "B1", "B2", "B3"]
     out = _prep_fig(fig_dir / "M2-1__scenario_early_late_ex_box.png")
     fig, axs = plt.subplots(1, 2, figsize=(12.5, 4.8), sharey=True)
+    rng = np.random.default_rng(20260304)
+    caution_cfg = {
+        "XPD_early_excess_db": "claim_caution_early",
+        "XPD_late_excess_db": "claim_caution_late",
+    }
     for ai, key in enumerate(["XPD_early_excess_db", "XPD_late_excess_db"]):
         ax = axs[ai]
         data = []
         labels = []
+        rows_by_label: list[list[dict[str, str]]] = []
         for s in scen_order:
-            vals = _finite([_to_float(r.get(key)) for r in by.get(s, [])])
+            rr = by.get(s, [])
+            vals = _finite([_to_float(r.get(key)) for r in rr])
             if len(vals) == 0:
                 continue
             data.append(vals)
             labels.append(s)
+            rows_by_label.append(rr)
+        if np.isfinite(delta_ref) and delta_ref > 0:
+            ax.axhspan(-delta_ref, +delta_ref, color="#cfd8dc", alpha=0.28, zorder=0, label="±Delta_ref band")
         if data:
-            ax.boxplot(data, labels=labels, showfliers=True)
+            ax.boxplot(data, labels=labels, showfliers=True, zorder=1)
+            ckey = caution_cfg[key]
+            for idx, rr in enumerate(rows_by_label, start=1):
+                for r in rr:
+                    yv = _to_float(r.get(key))
+                    if not np.isfinite(yv):
+                        continue
+                    is_caution = _to_bool(r.get(ckey))
+                    xj = float(idx) + float(rng.uniform(-0.12, 0.12))
+                    if is_caution:
+                        ax.scatter(
+                            [xj],
+                            [yv],
+                            s=28,
+                            facecolors="none",
+                            edgecolors="#444",
+                            linewidths=0.9,
+                            alpha=0.95,
+                            zorder=3,
+                        )
+                    else:
+                        ax.scatter([xj], [yv], s=16, color="#444", alpha=0.55, zorder=2)
         if np.isfinite(delta_ref) and delta_ref > 0:
             ax.axhline(+delta_ref, color="#999", ls="--", lw=1.0)
             ax.axhline(-delta_ref, color="#999", ls="--", lw=1.0)
         ax.set_title("early excess" if "early" in key else "late excess")
         ax.set_xlabel("scenario")
+        _style_db_axis(ax)
         ax.grid(True, axis="y", alpha=0.3)
+        if ai == 0:
+            ax.scatter([], [], s=28, facecolors="none", edgecolors="#444", linewidths=0.9, label="claim_caution")
+            ax.scatter([], [], s=16, color="#444", alpha=0.55, label="claim_ok")
+            ax.legend(loc="best", fontsize=8)
     axs[0].set_ylabel("XPD_excess (dB)")
     fig.suptitle("M2-1 scenario-wise XPD excess vs threshold")
     fig.tight_layout()
     fig.savefig(out, dpi=140)
     plt.close(fig)
-    detail_rows.append({"plot_id": "M2-1", "file": out.name, "note": "with ±Delta_ref lines"})
+    detail_rows.append({"plot_id": "M2-1", "file": out.name, "note": "with ±Delta_ref band + claim_caution markers"})
 
     # M2-2 exceedance rate
     out = _prep_fig(fig_dir / "M2-2__exceedance_rate_bar.png")
@@ -583,7 +659,10 @@ def _make_g_plots(
 ) -> None:
     by = _by_scenario(link_rows)
     bt = diag.get("B_time_resolution", {})
-    w_target_s = _to_float(bt.get("W_target_s"), 3e-9)
+    w_target_map = bt.get("W_target_s_by_scenario", {}) if isinstance(bt, dict) else {}
+    w_target_s_default = _to_float(bt.get("W_target_s_default"), _to_float(bt.get("W_target_s"), 3e-9))
+    w_target_a2 = _to_float(w_target_map.get("A2"), w_target_s_default) if isinstance(w_target_map, dict) else w_target_s_default
+    w_target_a3 = _to_float(w_target_map.get("A3"), w_target_s_default) if isinstance(w_target_map, dict) else w_target_s_default
     # G1-1, G1-2, G1-3 (A2)
     a2row = _sample_case_for_scenario(link_rows, "A2", case_id="0") or _sample_case_for_scenario(link_rows, "A2")
     run_a2 = _first_index_run(index_rows, "A2")
@@ -599,65 +678,78 @@ def _make_g_plots(
             # target center from rays: dominant n_bounce==1
             rr = [r for r in ray_rows if str(r.get("scenario_id", "")) == "A2" and str(r.get("case_id", "")) == cid and _to_int(r.get("n_bounce")) == 1]
             tau_t = _to_float(rr[0].get("tau_s")) if rr else float("nan")
-            w_target = (tau_t - 0.5 * w_target_s, tau_t + 0.5 * w_target_s) if np.isfinite(tau_t) else None
+            w_target = (tau_t - 0.5 * w_target_a2, tau_t + 0.5 * w_target_a2) if np.isfinite(tau_t) else None
             out = fig_dir / "G1-1__A2_pdp_overlay_target_early.png"
             _plot_pdp_overlay_with_windows(out, d, pco, pcr, "G1-1 A2 PDP overlay", w_early=w_early, w_target=w_target)
             detail_rows.append({"plot_id": "G1-1", "file": out.name, "note": "W_target/W_early shown"})
-            if xt is not None:
-                out2 = fig_dir / "G1-1b__A2_tap_xpd_tau.png"
-                _plot_tap_xpd(out2, d, xt, "G1 A2 tap-wise XPD(tau)")
-                detail_rows.append({"plot_id": "G1-1b", "file": out2.name, "note": "tap-wise"})
+            xt_use = np.asarray(xt, dtype=float) if xt is not None else (_safe_log10(pco) - _safe_log10(pcr))
+            out2 = fig_dir / "G1-1b__A2_tap_xpd_tau.png"
+            _plot_tap_xpd(out2, d, xt_use, "G1 A2 tap-wise XPD(tau)")
+            detail_rows.append({"plot_id": "G1-1b", "file": out2.name, "note": "tap-wise"})
 
-    # G1-2: A2 XPD_early_ex by case_id with ±delta_ref band and claim_caution markers
+    # G1-2: A2 XPD_early_ex by case_id
     a2 = by.get("A2", [])
     if a2:
         out = _prep_fig(fig_dir / "G1-2__A2_xpd_early_ex_by_case.png")
         x = np.arange(len(a2), dtype=float)
         y = np.asarray([_to_float(r.get("XPD_early_excess_db")) for r in a2], dtype=float)
-        delta = _to_float(a2[0].get("delta_floor_db") if a2 else float("nan"))
-        caution = np.asarray([bool(r.get("claim_caution_early", False)) for r in a2])
-        fig, ax = plt.subplots(figsize=(8.0, 4.8))
-        # Solid markers for reliable points, hollow for caution
-        solid = ~caution
-        if np.any(solid):
-            ax.scatter(x[solid], y[solid], s=22, color=_scenario_color("A2"), alpha=0.85, label="reliable")
-        if np.any(caution):
-            ax.scatter(x[caution], y[caution], s=22, facecolors="none",
-                       edgecolors=_scenario_color("A2"), alpha=0.85, label="claim_caution")
-        # ±delta_ref floor uncertainty band
-        if np.isfinite(delta) and delta > 0:
-            ax.axhspan(-delta, delta, color="#aaaaaa", alpha=0.18, label=f"±Δ_ref ({delta:.2f} dB)")
-        ax.axhline(0.0, color="#444", lw=0.9, ls="--")
-        # Zoom y-axis to ±max(5, 1.5×delta) so band is visible
-        y_fin = y[np.isfinite(y)]
-        half = max(5.0, abs(delta) * 2.0 if np.isfinite(delta) else 5.0)
-        if len(y_fin):
-            half = max(half, abs(float(np.min(y_fin))) + 1.0)
-        ax.set_ylim(-half, half)
+        a3v = _finite([_to_float(r.get("XPD_early_excess_db")) for r in by.get("A3", [])])
+        a4v = _finite([_to_float(r.get("XPD_early_excess_db")) for r in by.get("A4", [])])
+        fig, axs = plt.subplots(1, 2, figsize=(11.6, 4.6), gridspec_kw={"width_ratios": [2.0, 1.0]})
+        ax = axs[0]
+        ax.scatter(x, y, s=18, color=_scenario_color("A2"), alpha=0.88, label="A2 cases")
+        if len(a3v):
+            ax.axhline(float(np.median(a3v)), color=_scenario_color("A3"), lw=1.1, ls="--", label="A3 median")
+        if len(a4v):
+            ax.axhline(float(np.median(a4v)), color=_scenario_color("A4"), lw=1.1, ls=":", label="A4 median")
+        ax.axhline(0.0, color="#666", lw=0.9)
+        if np.any(np.isfinite(y)):
+            ym = _finite(y)
+            lo = float(np.nanmin(ym) - 2.0)
+            hi = float(np.nanmax(ym) + 2.0)
+            if hi - lo < 10.0:
+                c = 0.5 * (hi + lo)
+                lo = c - 5.0
+                hi = c + 5.0
+            _style_db_axis(ax, ymin=lo, ymax=hi)
         ax.set_xlabel("A2 case index")
         ax.set_ylabel("XPD_early_ex (dB)")
-        ax.set_title("G1-2 A2 early excess | hollow=claim_caution, band=±Δ_ref")
-        ax.grid(True, alpha=0.3)
-        ax.legend(fontsize=8)
+        ax.set_title("G1-2 A2 early excess (zoom)")
+        ax.grid(True, axis="x", alpha=0.25)
+        ax.legend(loc="best", fontsize=8)
+
+        ax2 = axs[1]
+        data = []
+        labels = []
+        for sid in ["A2", "A3", "A4"]:
+            vv = _finite([_to_float(r.get("XPD_early_excess_db")) for r in by.get(sid, [])])
+            if len(vv):
+                data.append(vv)
+                labels.append(sid)
+        if data:
+            ax2.boxplot(data, labels=labels, showfliers=True)
+        ax2.axhline(0.0, color="#666", lw=0.9)
+        ax2.set_title("A2 vs A3/A4")
+        _style_db_axis(ax2)
+        ax2.grid(True, axis="x", alpha=0.25)
         fig.tight_layout()
         fig.savefig(out, dpi=140)
         plt.close(fig)
-        detail_rows.append({"plot_id": "G1-2", "file": out.name,
-                             "note": "case-wise excess with floor-uncertainty band and caution markers"})
+        detail_rows.append({"plot_id": "G1-2", "file": out.name, "note": "A2 zoom + A3/A4 contrast"})
 
-    # G1-3: A2 rho_early vs incidence — LINEAR rho axis
+    # G1-3: A2 rho_early vs incidence
     dom_a2 = _dominant_incidence_by_link(ray_rows, "A2")
     pts = []
     for r in a2:
         lid = str(r.get("link_id", ""))
         ang = dom_a2.get(lid, float("nan"))
-        # Prefer linear rho; fall back to converting from dB
-        rho_lin = _to_float(r.get("rho_early_lin", r.get("rho_early")))
-        rho_db = _to_float(r.get("rho_early_db"))
-        if not np.isfinite(rho_lin) and np.isfinite(rho_db):
-            rho_lin = float(10 ** (rho_db / 10.0))
-        if np.isfinite(ang) and np.isfinite(rho_lin):
-            pts.append((ang, rho_lin))
+        rho = _to_float(r.get("rho_early_lin"))
+        if not np.isfinite(rho):
+            rho_db = _to_float(r.get("rho_early_db"))
+            if np.isfinite(rho_db):
+                rho = float(10.0 ** (rho_db / 10.0))
+        if np.isfinite(ang) and np.isfinite(rho):
+            pts.append((ang, rho))
     if pts:
         out = _prep_fig(fig_dir / "G1-3__A2_rho_vs_incidence.png")
         x = np.asarray([p[0] for p in pts], dtype=float)
@@ -668,16 +760,20 @@ def _make_g_plots(
             z = np.polyfit(x, y, 1)
             xx = np.linspace(float(np.min(x)), float(np.max(x)), 100)
             ax.plot(xx, z[0] * xx + z[1], "--", lw=1.4, color="#333")
-        ax.set_ylim(0.0, 1.0)   # rho_early on linear [0,1] scale
         ax.set_xlabel("Dominant incidence angle (deg)")
-        ax.set_ylabel("rho_early (linear 0–1)")
-        ax.set_title("G1-3 A2 rho_early [linear] vs incidence")
+        ax.set_ylabel("rho_early (linear)")
+        ax.set_title("G1-3 A2 rho_early (linear) vs incidence")
+        ymax = max(1.02, float(np.nanpercentile(y, 97.0)) * 1.08) if len(y) else 1.0
+        ax.set_ylim(0.0, ymax)
+        ax.yaxis.set_major_locator(MultipleLocator(0.1))
+        ax.yaxis.set_minor_locator(MultipleLocator(0.05))
+        ax.grid(True, which="major", axis="y", alpha=0.35)
+        ax.grid(True, which="minor", axis="y", alpha=0.12)
         ax.grid(True, alpha=0.3)
         fig.tight_layout()
         fig.savefig(out, dpi=140)
         plt.close(fig)
-        detail_rows.append({"plot_id": "G1-3", "file": out.name,
-                             "note": "rho_early linear axis; mixing severity [0,1]"})
+        detail_rows.append({"plot_id": "G1-3", "file": out.name, "note": "dominant-incidence proxy"})
 
     # G2-1: A3 PDP with target window
     a3row = _sample_case_for_scenario(link_rows, "A3", case_id="0") or _sample_case_for_scenario(link_rows, "A3")
@@ -693,7 +789,7 @@ def _make_g_plots(
             w_early = (tau0, tau0 + te) if np.isfinite(tau0) else None
             rr = [r for r in ray_rows if str(r.get("scenario_id", "")) == "A3" and str(r.get("case_id", "")) == cid and _to_int(r.get("n_bounce")) == 2]
             tau_t = _to_float(rr[0].get("tau_s")) if rr else float("nan")
-            w_target = (tau_t - 0.5 * w_target_s, tau_t + 0.5 * w_target_s) if np.isfinite(tau_t) else None
+            w_target = (tau_t - 0.5 * w_target_a3, tau_t + 0.5 * w_target_a3) if np.isfinite(tau_t) else None
             out = fig_dir / "G2-1__A3_pdp_overlay_target_early.png"
             _plot_pdp_overlay_with_windows(out, d, pco, pcr, "G2-1 A3 PDP overlay", w_early=w_early, w_target=w_target)
             detail_rows.append({"plot_id": "G2-1", "file": out.name, "note": "A3 mechanism view"})
@@ -711,57 +807,57 @@ def _make_g_plots(
             if str(r.get("scenario", "")) == "A2":
                 a2 = r
         if a3:
-            out = _prep_fig(fig_dir / "G2-2__A3_xpd_target_raw_summary.png")
-            # Use raw target-window XPD for G2 sign claim (not excess)
-            p10_raw = _to_float(a3.get("p10_xpd_target_raw_db", a3.get("p10_xpd_target_ex_db")))
-            p50_raw = _to_float(a3.get("median_xpd_target_raw_db", a3.get("median_xpd_target_ex_db")))
-            p90_raw = _to_float(a3.get("p90_xpd_target_raw_db", a3.get("p90_xpd_target_ex_db")))
-            fig, ax = plt.subplots(figsize=(5.6, 4.6))
-            bars = ax.bar(["p10", "median", "p90"], [p10_raw, p50_raw, p90_raw],
-                          color=_scenario_color("A3"), alpha=0.85)
-            ax.axhline(0.0, color="#222", lw=1.4, ls="-", label="0 dB (sign boundary)")
-            # Annotate sign direction
-            ax.text(0.02, 0.97, "< 0 → cross-dominant (odd)\n> 0 → co-dominant (even)",
-                    transform=ax.transAxes, va="top", fontsize=7.5,
-                    bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.7))
-            ax.set_ylabel("XPD_target_raw (dB)")
-            ax.set_title("G2-2 A3 target-window RAW (mechanism-only)")
+            metric = str(a3.get("sign_metric_for_status", "excess")).lower()
+            use_raw = metric == "raw"
+            out_name = "G2-2__A3_xpd_target_raw_summary.png" if use_raw else "G2-2__A3_xpd_target_ex_summary.png"
+            stale_name = "G2-2__A3_xpd_target_ex_summary.png" if use_raw else "G2-2__A3_xpd_target_raw_summary.png"
+            stale_path = fig_dir / stale_name
+            if stale_path.exists():
+                try:
+                    stale_path.unlink()
+                except Exception:
+                    pass
+            out = _prep_fig(fig_dir / out_name)
+            p10 = _to_float(a3.get("p10_xpd_target_raw_db")) if use_raw else _to_float(a3.get("p10_xpd_target_ex_db"))
+            p50 = _to_float(a3.get("median_xpd_target_raw_db")) if use_raw else _to_float(a3.get("median_xpd_target_ex_db"))
+            p90 = _to_float(a3.get("p90_xpd_target_raw_db")) if use_raw else _to_float(a3.get("p90_xpd_target_ex_db"))
+            fig, ax = plt.subplots(figsize=(5.6, 4.2))
+            ax.bar(["p10", "median", "p90"], [p10, p50, p90], color=_scenario_color("A3"))
+            ax.axhline(0.0, color="#666", lw=0.9)
+            ax.set_ylabel("XPD_target_raw (dB)" if use_raw else "XPD_target_ex (dB)")
+            ax.set_title(f"G2-2 A3 target-window summary ({metric})")
+            if use_raw:
+                ylo, yhi = _centered_zero_ylim(np.asarray([p10, p50, p90], dtype=float), min_half_span=5.0, pad_ratio=0.2)
+                _style_db_axis(ax, ymin=ylo, ymax=yhi)
+            else:
+                _style_db_axis(ax)
             ax.grid(True, axis="y", alpha=0.3)
-            ax.legend(fontsize=8)
-            # Zoom to a ±20 dB window around 0 so sign margin is readable
-            vals_finite = [v for v in [p10_raw, p50_raw, p90_raw] if np.isfinite(v)]
-            if vals_finite:
-                lo = min(min(vals_finite) - 3, -5)
-                hi = max(max(vals_finite) + 3, 5)
-                ax.set_ylim(lo, hi)
             fig.tight_layout()
             fig.savefig(out, dpi=140)
             plt.close(fig)
-            detail_rows.append({"plot_id": "G2-2", "file": out.name,
-                                 "note": "raw target-window sign (mechanism-only, not system baseline)"})
+            detail_rows.append({"plot_id": "G2-2", "file": out.name, "note": f"from A3_target_window_sign.csv ({metric})"})
         if a2 and a3:
             out = _prep_fig(fig_dir / "G2-3__A2_vs_A3_target_window_compare.png")
-            # Both on raw scale; 0 dB is the sign boundary
-            v2 = _to_float(a2.get("median_xpd_target_raw_db", a2.get("median_xpd_target_ex_db")))
-            v3 = _to_float(a3.get("median_xpd_target_raw_db", a3.get("median_xpd_target_ex_db")))
-            fig, ax = plt.subplots(figsize=(5.8, 4.6))
-            ax.bar(["A2 (odd)", "A3 (even)"], [v2, v3],
-                   color=[_scenario_color("A2"), _scenario_color("A3")], alpha=0.85)
-            ax.axhline(0.0, color="#222", lw=1.4, ls="-", label="0 dB (sign boundary)")
-            ax.set_ylabel("median XPD_target_raw (dB)")
-            ax.set_title("G2-3 A2 vs A3 target-window comparison (raw)")
+            metric2 = str(a3.get("sign_metric_for_status", "excess")).lower()
+            use_raw2 = metric2 == "raw"
+            a2v = _to_float(a2.get("median_xpd_target_raw_db")) if use_raw2 else _to_float(a2.get("median_xpd_target_ex_db"))
+            a3v = _to_float(a3.get("median_xpd_target_raw_db")) if use_raw2 else _to_float(a3.get("median_xpd_target_ex_db"))
+            vals = [a2v, a3v]
+            fig, ax = plt.subplots(figsize=(5.8, 4.2))
+            ax.bar(["A2", "A3"], vals, color=[_scenario_color("A2"), _scenario_color("A3")])
+            ax.axhline(0.0, color="#666", lw=0.9)
+            ax.set_ylabel("median XPD_target_raw (dB)" if use_raw2 else "median XPD_target_ex (dB)")
+            ax.set_title(f"G2-3 A2 vs A3 target-window comparison ({metric2})")
+            if use_raw2:
+                ylo, yhi = _centered_zero_ylim(np.asarray(vals, dtype=float), min_half_span=5.0, pad_ratio=0.2)
+                _style_db_axis(ax, ymin=ylo, ymax=yhi)
+            else:
+                _style_db_axis(ax)
             ax.grid(True, axis="y", alpha=0.3)
-            ax.legend(fontsize=8)
-            all_v = [v for v in [v2, v3] if np.isfinite(v)]
-            if all_v:
-                lo = min(min(all_v) - 3, -5)
-                hi = max(max(all_v) + 3, 5)
-                ax.set_ylim(lo, hi)
             fig.tight_layout()
             fig.savefig(out, dpi=140)
             plt.close(fig)
-            detail_rows.append({"plot_id": "G2-3", "file": out.name,
-                                 "note": "raw target-window compare; A3 = mechanism-only"})
+            detail_rows.append({"plot_id": "G2-3", "file": out.name, "note": f"target-window median compare ({metric2})"})
 
     # G2-4: target_in_Wearly / first-rate bars from diagnostics
     if bt:
@@ -799,6 +895,7 @@ def _make_g_plots(
         ax.set_xticklabels(["A2", "A3"])
         ax.set_ylabel("XPD_early_ex (dB)")
         ax.set_title("G3-1 A2/A3 leakage dispersion")
+        _style_db_axis(ax)
         ax.grid(True, axis="y", alpha=0.3)
         fig.tight_layout()
         fig.savefig(out, dpi=140)
@@ -811,15 +908,29 @@ def _make_g_plots(
         out = _prep_fig(fig_dir / "G3-2__abs_xpd_ex_vs_el_scatter.png")
         x = np.asarray([_to_float(r.get("EL_proxy_db")) for r in sc], dtype=float)
         y = np.asarray([abs(_to_float(r.get("XPD_early_excess_db"))) for r in sc], dtype=float)
-        c = np.asarray([{"A2": 0, "A3": 1, "A4": 2, "A5": 3}.get(str(r.get("scenario_id", "")), -1) for r in sc], dtype=float)
-        m = np.isfinite(x) & np.isfinite(y) & np.isfinite(c)
+        sid = np.asarray([str(r.get("scenario_id", "")) for r in sc], dtype=object)
+        m = np.isfinite(x) & np.isfinite(y)
         fig, ax = plt.subplots(figsize=(7.2, 4.6))
-        sca = ax.scatter(x[m], y[m], c=c[m], cmap="viridis", s=22, alpha=0.85)
-        fig.colorbar(sca, ax=ax, ticks=[0, 1, 2, 3], label="A2/A3/A4/A5")
+        marker_map = {"A2": "o", "A3": "s", "A4": "^", "A5": "D"}
+        for s in ["A2", "A3", "A4", "A5"]:
+            mm = m & (sid == s)
+            if not np.any(mm):
+                continue
+            ax.scatter(
+                x[mm],
+                y[mm],
+                s=22,
+                alpha=0.85,
+                color=_scenario_color(s),
+                marker=marker_map.get(s, "o"),
+                label=s,
+            )
         ax.set_xlabel("EL_proxy (dB)")
         ax.set_ylabel("|XPD_early_ex| (dB)")
         ax.set_title("G3-2 |XPD_ex| vs U(EL)")
+        _style_db_axis(ax)
         ax.grid(True, alpha=0.3)
+        ax.legend(loc="best", fontsize=8, ncol=2, title="scenario")
         fig.tight_layout()
         fig.savefig(out, dpi=140)
         plt.close(fig)
@@ -876,6 +987,7 @@ def _make_l_plots(
     ax.set_xticklabels(["early", "late"])
     ax.set_ylabel("XPD_ex (dB)")
     ax.set_title("L1-1 early vs late paired lines (sampled cases)")
+    _style_db_axis(ax)
     ax.grid(True, axis="y", alpha=0.3)
     fig.tight_layout()
     fig.savefig(out, dpi=140)
@@ -897,6 +1009,7 @@ def _make_l_plots(
     ax.axhline(0.0, color="#666", ls="--", lw=1.0)
     ax.set_ylabel("L_pol (dB)")
     ax.set_title("L1-2 L_pol distribution by scenario")
+    _style_db_axis(ax)
     ax.grid(True, axis="y", alpha=0.3)
     fig.tight_layout()
     fig.savefig(out, dpi=140)
@@ -944,6 +1057,7 @@ def _make_l_plots(
         ax.set_xticklabels(mats)
         ax.set_ylabel("XPD_early_ex (dB)")
         ax.set_title("L2-M1 A4 material effect with angle bins")
+        _style_db_axis(ax)
         ax.grid(True, axis="y", alpha=0.3)
         handles = [plt.Line2D([], [], ls="", marker="o", color=cmap[k], label=f"angle={k}") for k in ["low", "mid", "high"]]
         ax.legend(handles=handles, loc="best", fontsize=8)
@@ -966,6 +1080,7 @@ def _make_l_plots(
             ax.boxplot(data, labels=labels, showfliers=True)
         ax.set_ylabel("|XPD_early_ex| (dB)")
         ax.set_title("L2-M2 |XPD_ex| by material")
+        _style_db_axis(ax)
         ax.grid(True, axis="y", alpha=0.3)
         fig.tight_layout()
         fig.savefig(out, dpi=140)
@@ -1011,21 +1126,40 @@ def _make_l_plots(
         # L2-S1 paired L_pol
         if pair_ids:
             out = _prep_fig(fig_dir / "L2-S1__A5_base_stress_lpol_paired.png")
-            fig, ax = plt.subplots(figsize=(6.2, 4.5))
+            fig, axs = plt.subplots(1, 2, figsize=(11.0, 4.5), gridspec_kw={"width_ratios": [1.35, 1.0]})
+            ax = axs[0]
+            deltas: list[float] = []
             for cid in pair_ids:
                 b = _to_float(base_by_case[cid].get("L_pol_db"))
                 s = _to_float(stress_by_case[cid].get("L_pol_db"))
                 if np.isfinite(b) and np.isfinite(s):
                     ax.plot([0, 1], [b, s], color="#b05aa9", alpha=0.35, lw=1.0)
+                    deltas.append(float(s - b))
             ax.set_xticks([0, 1])
             ax.set_xticklabels(["base", "stress"])
             ax.set_ylabel("L_pol (dB)")
-            ax.set_title("L2-S1 A5 base vs stress paired L_pol")
+            ax.set_title("L2-S1 A5 paired slope (base→stress)")
+            _style_db_axis(ax)
             ax.grid(True, axis="y", alpha=0.3)
+            axd = axs[1]
+            if deltas:
+                vp = axd.violinplot([deltas], positions=[1], showmeans=True, showmedians=True)
+                for body in vp.get("bodies", []):
+                    body.set_facecolor("#f58518")
+                    body.set_alpha(0.35)
+                xj = 1.0 + np.random.default_rng(20260304).uniform(-0.08, 0.08, size=len(deltas))
+                axd.scatter(xj, deltas, s=20, color="#444", alpha=0.7)
+            axd.axhline(0.0, color="#666", lw=0.9, ls="--")
+            axd.set_xticks([1])
+            axd.set_xticklabels(["stress-base"])
+            axd.set_ylabel("Delta L_pol (dB)")
+            axd.set_title("paired-difference distribution")
+            _style_db_axis(axd)
+            axd.grid(True, axis="y", alpha=0.3)
             fig.tight_layout()
             fig.savefig(out, dpi=140)
             plt.close(fig)
-            detail_rows.append({"plot_id": "L2-S1", "file": out.name, "note": "paired by case_id"})
+            detail_rows.append({"plot_id": "L2-S1", "file": out.name, "note": "paired slope + delta distribution"})
 
         # L2-S2 late excess box
         out = _prep_fig(fig_dir / "L2-S2__A5_base_stress_xpd_late_ex.png")
@@ -1036,6 +1170,7 @@ def _make_l_plots(
             ax.boxplot([vb, vs], labels=["base", "stress"], showfliers=True)
         ax.set_ylabel("XPD_late_ex (dB)")
         ax.set_title("L2-S2 A5 late contamination")
+        _style_db_axis(ax)
         ax.grid(True, axis="y", alpha=0.3)
         fig.tight_layout()
         fig.savefig(out, dpi=140)
@@ -1061,33 +1196,41 @@ def _make_l_plots(
     sset = {"A3", "A4", "B1", "B2", "B3"}
     ss = [r for r in link_rows if str(r.get("scenario_id", "")) in sset]
     if ss:
-        # L3-1 scatter + trend — categorical colormap so scenarios are distinguishable
+        # L3-1 scatter + trend
         out = _prep_fig(fig_dir / "L3-1__el_vs_xpd_ex_scatter_regression.png")
         x = np.asarray([_to_float(r.get("EL_proxy_db")) for r in ss], dtype=float)
         y = np.asarray([_to_float(r.get("XPD_early_excess_db")) for r in ss], dtype=float)
-        _sid_map = {"A3": 0, "A4": 1, "B1": 2, "B2": 3, "B3": 4}
-        _sid_colors = ["#e41a1c", "#ff7f00", "#4daf4a", "#377eb8", "#984ea3"]
-        _sid_labels = ["A3", "A4", "B1", "B2", "B3"]
-        sid_idx = np.asarray([_sid_map.get(str(r.get("scenario_id", "")), -1) for r in ss])
-        m = np.isfinite(x) & np.isfinite(y) & (sid_idx >= 0)
-        fig, ax = plt.subplots(figsize=(7.6, 4.8))
-        for idx, (label, color) in enumerate(zip(_sid_labels, _sid_colors)):
-            sel = m & (sid_idx == idx)
-            if np.any(sel):
-                ax.scatter(x[sel], y[sel], color=color, s=22, alpha=0.82, label=label)
+        scn = np.asarray([str(r.get("scenario_id", "")) for r in ss], dtype=object)
+        m = np.isfinite(x) & np.isfinite(y)
+        fig, ax = plt.subplots(figsize=(7.4, 4.8))
+        marker_map = {"A3": "o", "A4": "s", "B1": "^", "B2": "D", "B3": "P"}
+        for sid in ["A3", "A4", "B1", "B2", "B3"]:
+            mm = m & (scn == sid)
+            if not np.any(mm):
+                continue
+            ax.scatter(
+                x[mm],
+                y[mm],
+                s=24,
+                alpha=0.85,
+                color=_scenario_color(sid),
+                marker=marker_map.get(sid, "o"),
+                label=sid,
+            )
         if np.sum(m) > 4 and len(np.unique(np.round(x[m], 6))) >= 2:
             z = np.polyfit(x[m], y[m], 1)
             xx = np.linspace(float(np.min(x[m])), float(np.max(x[m])), 120)
-            ax.plot(xx, z[0] * xx + z[1], "--", color="#222", lw=1.5, label=f"trend (slope={z[0]:.2f})")
+            ax.plot(xx, z[0] * xx + z[1], "--", color="#222", lw=1.5)
         ax.set_xlabel("EL_proxy (dB)")
         ax.set_ylabel("XPD_early_ex (dB)")
         ax.set_title("L3-1 EL vs XPD_ex (EL-identifying subset)")
-        ax.grid(True, alpha=0.3)
-        ax.legend(fontsize=8, loc="best")
+        _style_db_axis(ax)
+        ax.grid(True, axis="x", alpha=0.25)
+        ax.legend(loc="best", fontsize=8, ncol=2, title="scenario")
         fig.tight_layout()
         fig.savefig(out, dpi=140)
         plt.close(fig)
-        detail_rows.append({"plot_id": "L3-1", "file": out.name, "note": "categorical colors per scenario"})
+        detail_rows.append({"plot_id": "L3-1", "file": out.name, "note": "subset=A3/A4/B"})
 
         # L3-2 EL bin conditional box
         out = _prep_fig(fig_dir / "L3-2__el_bin_conditional_box.png")
@@ -1108,6 +1251,7 @@ def _make_l_plots(
         ax.set_xlabel("EL bin")
         ax.set_ylabel("XPD_early_ex (dB)")
         ax.set_title("L3-2 conditional box by EL tertile")
+        _style_db_axis(ax)
         ax.grid(True, axis="y", alpha=0.3)
         fig.tight_layout()
         fig.savefig(out, dpi=140)
@@ -1129,6 +1273,7 @@ def _make_l_plots(
         ax.set_xlabel("EL_proxy (dB)")
         ax.set_ylabel("XPD_early_ex (dB)")
         ax.set_title("L3-3 fitted mean μ(U) and residual band")
+        _style_db_axis(ax)
         ax.grid(True, alpha=0.3)
         ax.legend(loc="best", fontsize=8)
         fig.tight_layout()
@@ -1143,91 +1288,92 @@ def _make_r_plots(fig_dir: Path, link_rows: list[dict[str, str]], detail_rows: l
     pool = [r for r in link_rows if str(r.get("scenario_id", "")) in set(bset)]
     if not pool:
         return
+    support_n = {s: len(by.get(s, [])) for s in bset}
+    n_pool = len(pool)
+    rho_vals = _finite([_to_float(r.get("rho_early_lin")) for r in pool])
+    rho_vmax = float(np.nanpercentile(rho_vals, 95.0)) if rho_vals.size else 1.0
+    rho_vmax = max(1.0, rho_vmax)
 
-    # Pre-compute global vmin/vmax for each metric across all B scenarios
-    # so colorbar ranges are unified across B1/B2/B3 facets.
-    def _global_range(metric: str, pad: float = 1.0) -> tuple[float, float]:
-        all_v = _finite([_to_float(r.get(metric)) for r in pool])
-        if len(all_v) == 0:
-            return (float("nan"), float("nan"))
-        return (float(np.min(all_v)) - pad, float(np.max(all_v)) + pad)
-
-    _heat_ranges: dict[str, tuple[float, float]] = {
-        "XPD_early_excess_db": _global_range("XPD_early_excess_db"),
-        "rho_early_db": _global_range("rho_early_db"),
-        "L_pol_db": _global_range("L_pol_db"),
-    }
-
-    def _facet_heat(metric: str, out_name: str, title: str) -> None:
+    def _facet_heat(metric: str, out_name: str, title: str, *, vmin: float | None = None, vmax: float | None = None) -> None:
         out = _prep_fig(fig_dir / out_name)
-        vmin, vmax = _heat_ranges.get(metric, (float("nan"), float("nan")))
-        fig, axs = plt.subplots(1, 3, figsize=(14.0, 4.2), sharex=True, sharey=True)
+        fig, axs = plt.subplots(1, 3, figsize=(13.0, 4.0), sharex=True, sharey=True)
+        sc_last = None
         for i, s in enumerate(bset):
             rr = by.get(s, [])
-            xv = np.asarray([_to_float(r.get("rx_x")) for r in rr], dtype=float)
-            yv = np.asarray([_to_float(r.get("rx_y")) for r in rr], dtype=float)
+            x = np.asarray([_to_float(r.get("rx_x")) for r in rr], dtype=float)
+            y = np.asarray([_to_float(r.get("rx_y")) for r in rr], dtype=float)
             v = np.asarray([_to_float(r.get(metric)) for r in rr], dtype=float)
-            mv = np.isfinite(xv) & np.isfinite(yv) & np.isfinite(v)
+            m = np.isfinite(x) & np.isfinite(y) & np.isfinite(v)
             ax = axs[i]
-            n_valid = int(np.sum(mv))
-            if np.any(mv):
-                sc = ax.scatter(xv[mv], yv[mv], c=v[mv], s=52, cmap="coolwarm",
-                                vmin=vmin if np.isfinite(vmin) else None,
-                                vmax=vmax if np.isfinite(vmax) else None,
-                                edgecolor="k", linewidth=0.2)
-                if i == 2:  # colorbar only on rightmost panel
-                    fig.colorbar(sc, ax=ax, fraction=0.046, pad=0.04)
-            # Annotate support count in corner
-            ax.text(0.02, 0.97, f"n={n_valid}", transform=ax.transAxes,
-                    va="top", fontsize=8,
-                    bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.75))
-            ax.set_title(s)
+            if np.any(m):
+                sc_last = ax.scatter(
+                    x[m],
+                    y[m],
+                    c=v[m],
+                    s=52,
+                    cmap="coolwarm",
+                    vmin=vmin,
+                    vmax=vmax,
+                    edgecolor="k",
+                    linewidth=0.2,
+                )
+            ax.set_title(f"{s} (n={support_n.get(s, 0)})")
             ax.grid(True, alpha=0.2)
             ax.set_xlabel("x (m)")
             if i == 0:
                 ax.set_ylabel("y (m)")
-        fig.suptitle(f"{title}  |  colorbar: [{vmin:.1f}, {vmax:.1f}] dB (unified)")
+        if sc_last is not None:
+            fig.colorbar(sc_last, ax=axs.ravel().tolist(), fraction=0.035, pad=0.02)
+        fig.suptitle(title)
         fig.tight_layout()
         fig.savefig(out, dpi=140)
         plt.close(fig)
 
-    _facet_heat("XPD_early_excess_db", "R1-1__B123_heatmap_xpd_early_ex.png", "R1-1 B1/B2/B3 heatmap: XPD_early_ex")
-    detail_rows.append({"plot_id": "R1-1", "file": "R1-1__B123_heatmap_xpd_early_ex.png",
-                        "note": "unified colorbar across B1/B2/B3; n= annotated"})
-    _facet_heat("rho_early_db", "R1-2__B123_heatmap_rho_early.png", "R1-2 B1/B2/B3 heatmap: rho_early")
-    detail_rows.append({"plot_id": "R1-2", "file": "R1-2__B123_heatmap_rho_early.png",
-                        "note": "unified colorbar across B1/B2/B3; n= annotated"})
+    _facet_heat(
+        "XPD_early_excess_db",
+        "R1-1__B123_heatmap_xpd_early_ex.png",
+        "R1-1 B1/B2/B3 heatmap: XPD_early_ex",
+        vmin=-35.0,
+        vmax=-18.0,
+    )
+    detail_rows.append({"plot_id": "R1-1", "file": "R1-1__B123_heatmap_xpd_early_ex.png", "note": "facet B1/B2/B3 with support n"})
+    _facet_heat(
+        "rho_early_lin",
+        "R1-2__B123_heatmap_rho_early.png",
+        "R1-2 B1/B2/B3 heatmap: rho_early (linear)",
+        vmin=0.0,
+        vmax=rho_vmax,
+    )
+    detail_rows.append({"plot_id": "R1-2", "file": "R1-2__B123_heatmap_rho_early.png", "note": "facet B1/B2/B3 with support n"})
     _facet_heat("L_pol_db", "R1-3__B123_heatmap_lpol.png", "R1-3 B1/B2/B3 heatmap: L_pol")
-    detail_rows.append({"plot_id": "R1-3", "file": "R1-3__B123_heatmap_lpol.png",
-                        "note": "unified colorbar across B1/B2/B3; n= annotated"})
+    detail_rows.append({"plot_id": "R1-3", "file": "R1-3__B123_heatmap_lpol.png", "note": "facet B1/B2/B3 with support n"})
 
     # R1-4 LOS/NLOS grouped CDF for three metrics
     out = _prep_fig(fig_dir / "R1-4__los_nlos_grouped_metrics.png")
     fig, axs = plt.subplots(1, 3, figsize=(14.0, 4.2))
-    metrics = [("XPD_early_excess_db", "XPD_early_ex"), ("rho_early_db", "rho_early_db"), ("L_pol_db", "L_pol")]
+    metrics = [("XPD_early_excess_db", "XPD_early_ex"), ("rho_early_lin", "rho_early_lin"), ("L_pol_db", "L_pol")]
     los = [r for r in pool if _to_int(r.get("LOSflag")) == 1]
     nlos = [r for r in pool if _to_int(r.get("LOSflag")) == 0]
+    los_n = len(los)
+    nlos_n = len(nlos)
     for i, (k, label) in enumerate(metrics):
         ax = axs[i]
-        for name, rr, cc in [("LOS", los, "#1f77b4"), ("NLOS", nlos, "#d62728")]:
+        for name, rr, cc, nn in [("LOS", los, "#1f77b4", los_n), ("NLOS", nlos, "#d62728", nlos_n)]:
             vals = np.sort(_finite([_to_float(r.get(k)) for r in rr]))
-            n_pts = len(vals)
-            if n_pts:
-                cdf = np.arange(1, n_pts + 1, dtype=float) / float(n_pts)
-                ax.plot(vals, cdf, lw=1.6, label=f"{name} (n={n_pts})", color=cc)
+            if len(vals):
+                cdf = np.arange(1, len(vals) + 1, dtype=float) / float(len(vals))
+                ax.plot(vals, cdf, lw=1.6, label=f"{name} (n={nn})", color=cc)
         ax.set_title(label)
         ax.set_xlabel("value")
         ax.grid(True, alpha=0.3)
         if i == 0:
             ax.set_ylabel("CDF")
     axs[0].legend(loc="best", fontsize=8)
-    n_los = len(los)
-    n_nlos = len(nlos)
-    fig.suptitle(f"R1-4 LOS vs NLOS grouped CDF  |  LOS n={n_los}, NLOS n={n_nlos}")
+    fig.suptitle(f"R1-4 LOS vs NLOS grouped CDF (pooled n={n_pool})")
     fig.tight_layout()
     fig.savefig(out, dpi=140)
     plt.close(fig)
-    detail_rows.append({"plot_id": "R1-4", "file": out.name, "note": "LOS/NLOS grouped CDFs"})
+    detail_rows.append({"plot_id": "R1-4", "file": out.name, "note": "LOS/NLOS grouped CDFs with support n"})
 
     # R2-1, R2-2
     out = _prep_fig(fig_dir / "R2-1__xpd_early_ex_vs_ds_B123.png")
@@ -1240,7 +1386,7 @@ def _make_r_plots(fig_dir: Path, link_rows: list[dict[str, str]], detail_rows: l
     fig.colorbar(sc, ax=ax, label="LOSflag")
     ax.set_xlabel("XPD_early_ex (dB)")
     ax.set_ylabel("Delay spread (ns)")
-    ax.set_title("R2-1 XPD_early_ex vs DS")
+    ax.set_title(f"R2-1 XPD_early_ex vs DS (n={n_pool})")
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
     fig.savefig(out, dpi=140)
@@ -1248,14 +1394,20 @@ def _make_r_plots(fig_dir: Path, link_rows: list[dict[str, str]], detail_rows: l
     detail_rows.append({"plot_id": "R2-1", "file": out.name, "note": "B1/B2/B3 pooled"})
 
     out = _prep_fig(fig_dir / "R2-2__rho_early_vs_ds_B123.png")
-    xr = np.asarray([_to_float(r.get("rho_early_db")) for r in pool], dtype=float)
+    xr = np.asarray([_to_float(r.get("rho_early_lin")) for r in pool], dtype=float)
     m = np.isfinite(xr) & np.isfinite(y)
     fig, ax = plt.subplots(figsize=(7.2, 4.6))
     sc = ax.scatter(xr[m], y[m], c=c[m], cmap="coolwarm", s=24, alpha=0.85)
     fig.colorbar(sc, ax=ax, label="LOSflag")
-    ax.set_xlabel("rho_early (dB)")
+    ax.set_xlabel("rho_early (linear)")
     ax.set_ylabel("Delay spread (ns)")
-    ax.set_title("R2-2 rho_early vs DS")
+    ax.set_title(f"R2-2 rho_early (linear) vs DS (n={n_pool})")
+    if np.any(m):
+        xr_valid = xr[m]
+        xlo = max(0.0, float(np.min(xr_valid)) * 0.95)
+        xhi = float(np.max(xr_valid)) * 1.05
+        if xhi > xlo:
+            ax.set_xlim(xlo, xhi)
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
     fig.savefig(out, dpi=140)
@@ -1274,7 +1426,7 @@ def _make_r_plots(fig_dir: Path, link_rows: list[dict[str, str]], detail_rows: l
     ax.text(x0 - 0.2, y0 + 0.2, "risky", color="#d62728", fontsize=9, ha="right")
     ax.set_xlabel("XPD_early_ex (dB)")
     ax.set_ylabel("Delay spread (ns)")
-    ax.set_title("R2-3 quadrant: useful vs risky")
+    ax.set_title(f"R2-3 quadrant: useful vs risky (n={n_pool})")
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
     fig.savefig(out, dpi=140)
@@ -1290,7 +1442,7 @@ def _make_r_plots(fig_dir: Path, link_rows: list[dict[str, str]], detail_rows: l
     fig.colorbar(sc, ax=ax, label="LOSflag")
     ax.set_xlabel("XPD_early_ex (dB)")
     ax.set_ylabel("early_energy_fraction")
-    ax.set_title("R2-4 early concentration vs XPD_early_ex")
+    ax.set_title(f"R2-4 early concentration vs XPD_early_ex (n={n_pool})")
     ax.grid(True, alpha=0.3)
     fig.tight_layout()
     fig.savefig(out, dpi=140)
@@ -1303,9 +1455,11 @@ def _make_p_plots(fig_dir: Path, link_rows: list[dict[str, str]], detail_rows: l
     subset = [r for r in link_rows if str(r.get("scenario_id", "")) in {"A3", "A4", "B1", "B2", "B3"}]
     x = np.asarray([_to_float(r.get("EL_proxy_db")) for r in subset], dtype=float)
     y = np.asarray([_to_float(r.get("XPD_early_excess_db")) for r in subset], dtype=float)
+    sid = np.asarray([str(r.get("scenario_id", "")) for r in subset], dtype=object)
     m = np.isfinite(x) & np.isfinite(y)
     x = x[m]
     y = y[m]
+    sid = sid[m]
     if len(x) < 8:
         return
     # simple linear and constant baselines
@@ -1315,7 +1469,8 @@ def _make_p_plots(fig_dir: Path, link_rows: list[dict[str, str]], detail_rows: l
 
     # P1-1 observed vs predicted CDF
     out = _prep_fig(fig_dir / "P1-1__observed_vs_predicted_cdf_overlay.png")
-    fig, ax = plt.subplots(figsize=(7.2, 4.8))
+    fig, axs = plt.subplots(1, 2, figsize=(12.0, 4.8), gridspec_kw={"width_ratios": [2.0, 1.0]})
+    ax = axs[0]
     for name, vals, cc in [
         ("observed", y, "#000000"),
         ("conditional-linear", y_lin, "#1f77b4"),
@@ -1329,6 +1484,22 @@ def _make_p_plots(fig_dir: Path, link_rows: list[dict[str, str]], detail_rows: l
     ax.set_title("P1-1 observed vs predicted CDF")
     ax.grid(True, alpha=0.3)
     ax.legend(loc="best", fontsize=8)
+    # Tail-source panel: where observed upper tail comes from.
+    ax2 = axs[1]
+    q80 = float(np.percentile(y, 80.0))
+    tail = y >= q80
+    sid_tail = sid[tail]
+    cats = ["A3", "A4", "B1", "B2", "B3"]
+    counts = [int(np.sum(sid_tail == c)) for c in cats]
+    nz_idx = [i for i, v in enumerate(counts) if v > 0]
+    if nz_idx:
+        cats_nz = [cats[i] for i in nz_idx]
+        cnt_nz = [counts[i] for i in nz_idx]
+        ax2.bar(cats_nz, cnt_nz, color=[_scenario_color(c) for c in cats_nz])
+    ax2.set_title("Observed upper-tail source\n(top 20%)")
+    ax2.set_ylabel("count")
+    ax2.set_xlabel("scenario")
+    ax2.grid(True, axis="y", alpha=0.3)
     fig.tight_layout()
     fig.savefig(out, dpi=140)
     plt.close(fig)
@@ -1358,6 +1529,7 @@ def _make_p_plots(fig_dir: Path, link_rows: list[dict[str, str]], detail_rows: l
     ax.set_xlabel("EL bin")
     ax.set_ylabel("median Z (dB)")
     ax.set_title("P1-2 predicted vs observed bin medians")
+    _style_db_axis(ax)
     ax.grid(True, axis="y", alpha=0.3)
     ax.legend(loc="best", fontsize=8)
     fig.tight_layout()
@@ -1392,6 +1564,7 @@ def _make_p_plots(fig_dir: Path, link_rows: list[dict[str, str]], detail_rows: l
     ax.set_xlabel("EL_proxy (dB)")
     ax.set_ylabel("residual (dB)")
     ax.set_title("P1-4 residual vs EL")
+    _style_db_axis(ax)
     ax.grid(True, alpha=0.3)
     ax.legend(loc="best", fontsize=8)
     fig.tight_layout()
@@ -1494,6 +1667,7 @@ def _make_p_plots(fig_dir: Path, link_rows: list[dict[str, str]], detail_rows: l
             ax.plot(m2, np.arange(1, len(m2) + 1) / len(m2), lw=1.6, ls="--", label="minimal")
         ax.set_title(ttl)
         ax.set_xlabel("value")
+        _style_db_axis(ax)
         ax.grid(True, alpha=0.3)
     axs[0].set_ylabel("CDF")
     axs[0].legend(loc="best", fontsize=8)
@@ -1518,7 +1692,7 @@ class PlotSpec:
 def _specs() -> list[PlotSpec]:
     return [
         # M
-        PlotSpec("M1-1", "M1", "C0", "co/cross PDP, W_floor", "C0 raw PDP overlay facet(d,yaw)", "LOS-only contamination low", "M1-1__C0_raw_pdp_overlay_grid.png"),
+        PlotSpec("M1-1", "M1", "C0", "co/cross PDP, W_floor", "C0 normalized co/cross + tap-contrast facet(d,yaw)", "LOS-only contamination low", "M1-1__C0_raw_pdp_overlay_grid.png"),
         PlotSpec("M1-2", "M1", "C0", "rays(C_floor)", "C_floor boxplot", "C_floor below -10/-15 dB", "M1-2__C_floor_box_by_yaw.png"),
         PlotSpec("M1-3", "M1", "C0", "XPD_floor,d", "XPD_floor vs distance", "weak distance dependence", "C0__ALL__xpd_floor_vs_distance.png"),
         PlotSpec("M1-4", "M1", "C0", "XPD_floor,yaw", "XPD_floor vs yaw", "yaw-driven spread", "C0__ALL__xpd_floor_vs_yaw.png"),
@@ -1531,10 +1705,10 @@ def _specs() -> list[PlotSpec]:
         # G
         PlotSpec("G1-1", "G1", "A2", "PDP, W_target/W_early", "A2 PDP overlay", "odd cross-dominant trend", "G1-1__A2_pdp_overlay_target_early.png"),
         PlotSpec("G1-2", "G1", "A2", "XPD_early_ex", "A2 XPD distribution by case", "sign stability", "G1-2__A2_xpd_early_ex_by_case.png"),
-        PlotSpec("G1-3", "G1", "A2", "rho_early + incidence", "rho vs angle", "odd supports rho increase", "G1-3__A2_rho_vs_incidence.png"),
+        PlotSpec("G1-3", "G1", "A2", "rho_early(linear) + incidence", "rho(linear) vs angle", "odd supports rho increase", "G1-3__A2_rho_vs_incidence.png"),
         PlotSpec("G2-1", "G2", "A3", "PDP + target window", "A3 target-window PDP", "even mechanism visibility", "G2-1__A3_pdp_overlay_target_early.png"),
-        PlotSpec("G2-2", "G2", "A3", "target-window summary", "A3 XPD_target_ex summary", "co-dominant tendency", "G2-2__A3_xpd_target_ex_summary.png"),
-        PlotSpec("G2-3", "G2", "A2/A3", "target-window summary", "A2 vs A3 target compare", "sign reversal", "G2-3__A2_vs_A3_target_window_compare.png"),
+        PlotSpec("G2-2", "G2", "A3", "target-window summary", "A3 XPD_target(raw/ex) summary", "co-dominant tendency", "G2-2__A3_xpd_target_raw_summary.png"),
+        PlotSpec("G2-3", "G2", "A2/A3", "target-window summary", "A2 vs A3 target(raw/ex) compare", "sign reversal", "G2-3__A2_vs_A3_target_window_compare.png"),
         PlotSpec("G2-4", "G2", "A3", "target_in_early/first rates", "A3 system-early suitability", "role split", "G2-4__A3_target_inearly_first_rate.png"),
         PlotSpec("G3-1", "G3", "A2/A3", "XPD_ex", "A2/A3 variance violin", "not perfectly separable", "G3-1__A2_A3_xpd_ex_violin.png"),
         PlotSpec("G3-2", "G3", "A2/A3/A4/A5", "|XPD_ex| + U", "|XPD_ex| vs EL", "conditional variation", "G3-2__abs_xpd_ex_vs_el_scatter.png"),
@@ -1545,7 +1719,7 @@ def _specs() -> list[PlotSpec]:
         PlotSpec("L2-M1", "L2", "A4", "material,angle,XPD_ex", "material x angle branch", "material dependence", "L2-M1__A4_material_angle_xpd_early_ex.png"),
         PlotSpec("L2-M2", "L2", "A4", "|XPD_ex|", "abs XPD by material", "toward 0dB/dispersion", "L2-M2__A4_abs_xpd_ex_by_material.png"),
         PlotSpec("L2-M3", "L2", "A4", "variance", "variance by material", "dispersion growth", "L2-M3__A4_variance_by_material.png"),
-        PlotSpec("L2-S1", "L2", "A5", "base/stress L_pol", "paired L_pol", "stress-response", "L2-S1__A5_base_stress_lpol_paired.png"),
+        PlotSpec("L2-S1", "L2", "A5", "base/stress L_pol", "paired slope + delta distribution", "stress-response", "L2-S1__A5_base_stress_lpol_paired.png"),
         PlotSpec("L2-S2", "L2", "A5", "base/stress late_ex", "late-ex compare", "late contamination", "L2-S2__A5_base_stress_xpd_late_ex.png"),
         PlotSpec("L2-S3", "L2", "A5", "base/stress DS", "tail variance/DS", "tail widening", "L2-S3__A5_base_stress_ds_tail.png"),
         PlotSpec("L3-1", "L3", "A3/A4/B", "EL,XPD_ex", "scatter + regression", "a1<0 monotonic tendency", "L3-1__el_vs_xpd_ex_scatter_regression.png"),
@@ -1553,11 +1727,11 @@ def _specs() -> list[PlotSpec]:
         PlotSpec("L3-3", "L3", "stage1 fit", "EL,fitted mean", "residualized effect", "mu(U) visualization", "L3-3__residualized_effect_fit_ci.png"),
         # R
         PlotSpec("R1-1", "R1", "B1/B2/B3", "x,y,XPD_early_ex", "heatmap facet", "spatial pattern", "R1-1__B123_heatmap_xpd_early_ex.png"),
-        PlotSpec("R1-2", "R1", "B1/B2/B3", "x,y,rho_early", "heatmap facet", "cross contamination map", "R1-2__B123_heatmap_rho_early.png"),
+        PlotSpec("R1-2", "R1", "B1/B2/B3", "x,y,rho_early(linear)", "heatmap facet", "cross contamination map", "R1-2__B123_heatmap_rho_early.png"),
         PlotSpec("R1-3", "R1", "B1/B2/B3", "x,y,L_pol", "heatmap facet", "early-late structure map", "R1-3__B123_heatmap_lpol.png"),
         PlotSpec("R1-4", "R1", "B pooled", "LOS/NLOS grouped metrics", "grouped CDF/box", "group difference", "R1-4__los_nlos_grouped_metrics.png"),
         PlotSpec("R2-1", "R2", "B pooled", "XPD_early_ex,DS", "XPD vs DS", "useful/risky relation", "R2-1__xpd_early_ex_vs_ds_B123.png"),
-        PlotSpec("R2-2", "R2", "B pooled", "rho_early,DS", "rho vs DS", "contamination relation", "R2-2__rho_early_vs_ds_B123.png"),
+        PlotSpec("R2-2", "R2", "B pooled", "rho_early(linear),DS", "rho(linear) vs DS", "contamination relation", "R2-2__rho_early_vs_ds_B123.png"),
         PlotSpec("R2-3", "R2", "B pooled", "XPD,DS,L_pol", "quadrant plot", "useful vs risky regions", "R2-3__quadrant_useful_vs_risky.png"),
         PlotSpec("R2-4", "R2", "B pooled", "early_fraction,XPD", "early fraction vs XPD", "early concentration link", "R2-4__early_fraction_vs_xpd_early_ex.png"),
         # P
@@ -1838,8 +2012,12 @@ def _build_plot_data_rows(
         for r in by.get("A2", []):
             lk = str(r.get("link_id", ""))
             ang = float(dom.get(lk, np.nan))
-            y = _to_float(r.get("rho_early_db"))
-            add_row("rho_early_db", ang, y, y, scenario_id="A2", case_id=str(r.get("case_id", "")), link_id=lk)
+            y = _to_float(r.get("rho_early_lin"))
+            if not np.isfinite(y):
+                y_db = _to_float(r.get("rho_early_db"))
+                if np.isfinite(y_db):
+                    y = float(10.0 ** (y_db / 10.0))
+            add_row("rho_early_lin", ang, y, y, scenario_id="A2", case_id=str(r.get("case_id", "")), link_id=lk)
         return rows
 
     if plot_id == "G2-1":
@@ -1855,9 +2033,20 @@ def _build_plot_data_rows(
                 sc = str(r.get("scenario", ""))
                 if plot_id == "G2-2" and sc != "A3":
                     continue
-                y = _to_float(r.get("median_xpd_target_ex_db"))
+                metric = str(r.get("sign_metric_for_status", "excess")).lower()
+                if metric == "raw":
+                    y = _to_float(r.get("median_xpd_target_raw_db"))
+                else:
+                    y = _to_float(r.get("median_xpd_target_ex_db"))
                 hit = _to_float(r.get("expected_sign_hit_rate"))
-                add_row("median_xpd_target_ex_db", sc, y, y, scenario_id=sc, meta=f"expected_sign_hit_rate={hit:.4f}")
+                add_row(
+                    "median_xpd_target_raw_db" if metric == "raw" else "median_xpd_target_ex_db",
+                    sc,
+                    y,
+                    y,
+                    scenario_id=sc,
+                    meta=f"sign_metric={metric};expected_sign_hit_rate={hit:.4f}",
+                )
         return rows
 
     if plot_id == "G2-4":

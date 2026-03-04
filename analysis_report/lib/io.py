@@ -170,8 +170,20 @@ _NUMERIC_KEYS = {
     "roughness_flag",
     "human_flag",
     "obstacle_flag",
+    "stress_path_structure_active",
+    "stress_polarization_mixer_active",
     "yaw_deg",
     "pitch_deg",
+    "force_cp_swap_on_odd_reflection",
+    "tx_cross_pol_leakage_db",
+    "rx_cross_pol_leakage_db",
+    "tx_cross_pol_leakage_db_slope_per_ghz",
+    "rx_cross_pol_leakage_db_slope_per_ghz",
+    "scatterer_count",
+    "diffuse_enabled",
+    "diffuse_factor",
+    "diffuse_lobe_alpha",
+    "diffuse_rays_per_hit",
 }
 
 
