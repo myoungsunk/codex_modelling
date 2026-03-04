@@ -849,6 +849,70 @@ def _target_window_sign_metric(
     }
 
 
+def _a6_parity_benchmark(
+    *,
+    link_rows: list[dict[str, Any]],
+    ray_rows: list[dict[str, Any]],
+    runs: list[dict[str, Any]],
+    w_target_s: float,
+    floor_db: float,
+    sign_metric: str = "raw",
+) -> dict[str, Any]:
+    """Near-normal parity benchmark for A6 (odd/even separated by target bounce)."""
+    odd = _target_window_sign_metric(
+        link_rows=link_rows,
+        ray_rows=ray_rows,
+        runs=runs,
+        scenario_id="A6",
+        target_n=1,
+        w_target_s=float(w_target_s),
+        floor_db=float(floor_db),
+        expected_sign=-1,
+        sign_metric=str(sign_metric),
+    )
+    even = _target_window_sign_metric(
+        link_rows=link_rows,
+        ray_rows=ray_rows,
+        runs=runs,
+        scenario_id="A6",
+        target_n=2,
+        w_target_s=float(w_target_s),
+        floor_db=float(floor_db),
+        expected_sign=+1,
+        sign_metric=str(sign_metric),
+    )
+    n_odd = int(_num(odd.get("n_eval", np.nan))) if np.isfinite(_num(odd.get("n_eval", np.nan))) else 0
+    n_even = int(_num(even.get("n_eval", np.nan))) if np.isfinite(_num(even.get("n_eval", np.nan))) else 0
+    available = bool((n_odd + n_even) > 0)
+    hit_odd = _num(odd.get("expected_sign_hit_rate", np.nan))
+    hit_even = _num(even.get("expected_sign_hit_rate", np.nan))
+    hit_min = float(min(hit_odd, hit_even)) if np.isfinite(hit_odd) and np.isfinite(hit_even) else float("nan")
+    if not available:
+        st = "INCONCLUSIVE"
+    elif np.isfinite(hit_min) and hit_min >= 0.8:
+        st = "PASS"
+    elif np.isfinite(hit_min) and hit_min >= 0.6:
+        st = "WARN"
+    elif np.isfinite(hit_min):
+        st = "FAIL"
+    else:
+        st = "INCONCLUSIVE"
+    return {
+        "available": bool(available),
+        "status": str(st),
+        "sign_metric_for_status": str(sign_metric),
+        "n_eval_total": int(n_odd + n_even),
+        "n_eval_odd": int(n_odd),
+        "n_eval_even": int(n_even),
+        "hit_rate_odd": float(hit_odd) if np.isfinite(hit_odd) else float("nan"),
+        "hit_rate_even": float(hit_even) if np.isfinite(hit_even) else float("nan"),
+        "hit_rate_min": float(hit_min) if np.isfinite(hit_min) else float("nan"),
+        "odd": odd,
+        "even": even,
+        "note": "A6 is near-normal parity benchmark; use as primary G2 evidence when available.",
+    }
+
+
 def _stress_flag_row(r: dict[str, Any]) -> int:
     mode = str(r.get("stress_mode", "")).strip().lower()
     rf = int(round(_num(r.get("roughness_flag", 0)))) if np.isfinite(_num(r.get("roughness_flag", np.nan))) else 0
@@ -1820,6 +1884,7 @@ def _diagnostic_checks(
         sign_metric_cfg = {}
     sign_metric_a2 = str(sign_metric_cfg.get("A2", "excess"))
     sign_metric_a3 = str(sign_metric_cfg.get("A3", "raw"))
+    sign_metric_a6 = str(sign_metric_cfg.get("A6", "raw"))
     a2_target_sign = _target_window_sign_metric(
         link_rows=link_rows,
         ray_rows=ray_rows,
@@ -1842,6 +1907,20 @@ def _diagnostic_checks(
         expected_sign=+1,
         sign_metric=sign_metric_a3,
     )
+    tw_cfg = ws.get("target_window_ns_by_scenario", {})
+    a6_w_target_s = float(w_target_s_by_sid.get("A3", w_target_default_s))
+    if isinstance(tw_cfg, dict):
+        a6_w_ns = _num(tw_cfg.get("A6", np.nan))
+        if np.isfinite(a6_w_ns) and a6_w_ns > 0:
+            a6_w_target_s = float(a6_w_ns) * 1e-9
+    a6_parity = _a6_parity_benchmark(
+        link_rows=link_rows,
+        ray_rows=ray_rows,
+        runs=runs,
+        w_target_s=float(a6_w_target_s),
+        floor_db=float(floor_db_used),
+        sign_metric=sign_metric_a6,
+    )
 
     a3_t = target_stats.get("A3", {})
     a3_exists = _num(a3_t.get("target_exists_rate", np.nan))
@@ -1859,6 +1938,9 @@ def _diagnostic_checks(
         a3_early_status = "WARN"
     else:
         a3_early_status = "FAIL"
+    a3_target_status_reporting = str(a3_target_sign.get("status", "INCONCLUSIVE"))
+    if a3_role in {"mechanism", "mechanism_only", "supplementary", "candidate"} and a3_target_status_reporting == "FAIL":
+        a3_target_status_reporting = "WARN"
 
     a5_t = target_stats.get("A5", {})
     a5_ct = _num(a5_t.get("C_target_median_db", np.nan))
@@ -1871,6 +1953,15 @@ def _diagnostic_checks(
             a5_target_mode = "contamination_response"
     else:
         a5_target_mode = "unknown"
+
+    if bool(a6_parity.get("available", False)):
+        g2_primary_source = "A6_near_normal_benchmark"
+        g2_primary_status = str(a6_parity.get("status", "INCONCLUSIVE"))
+        a3_evidence_tier = "supplementary"
+    else:
+        g2_primary_source = "A3_target_window_supplementary_only"
+        g2_primary_status = str(a3_target_status_reporting)
+        a3_evidence_tier = "primary_if_no_A6"
 
     checks["B_time_resolution"] = {
         "freq_source": str(freq_src),
@@ -1905,10 +1996,15 @@ def _diagnostic_checks(
         "A2A3_sign_stability": sign_stability,
         "A2_target_window_sign": a2_target_sign,
         "A3_target_window_sign": a3_target_sign,
+        "A3_target_window_sign_reporting_status": str(a3_target_status_reporting),
+        "A6_parity_benchmark": a6_parity,
         "A3_role": a3_role,
+        "A3_evidence_tier": str(a3_evidence_tier),
+        "G2_primary_evidence_source": str(g2_primary_source),
+        "G2_primary_evidence_status": str(g2_primary_status),
         "A3_mechanism_status": a3_mech_status,
         "A3_system_early_status": a3_early_status,
-        "A3_reporting_rule": "A3 is mechanism-only: report target-window metrics; do not use fixed system early-window dominance as primary evidence.",
+        "A3_reporting_rule": "A3 is mechanism-only/supplementary: use target-window metrics for mechanism context; fixed system early-window dominance is not primary evidence. If A6 is present, use A6 as primary G2 sign evidence.",
         "A5_role": a5_role,
         "A5_target_mode": a5_target_mode,
         "A5_stress_semantics": str(a5_semantics.get("dominant_semantics", "none")),
@@ -2675,6 +2771,12 @@ def _build_markdown(
                     "A2_target_sign_status": dict(b.get("A2_target_window_sign", {})).get("status", ""),
                     "A3_target_sign_hit_rate": _num(dict(b.get("A3_target_window_sign", {})).get("expected_sign_hit_rate", np.nan)),
                     "A3_target_sign_status": dict(b.get("A3_target_window_sign", {})).get("status", ""),
+                    "A3_target_sign_status_reporting": b.get("A3_target_window_sign_reporting_status", ""),
+                    "A6_parity_status": dict(b.get("A6_parity_benchmark", {})).get("status", ""),
+                    "A6_hit_rate_odd": _num(dict(b.get("A6_parity_benchmark", {})).get("hit_rate_odd", np.nan)),
+                    "A6_hit_rate_even": _num(dict(b.get("A6_parity_benchmark", {})).get("hit_rate_even", np.nan)),
+                    "G2_primary_evidence_source": b.get("G2_primary_evidence_source", ""),
+                    "G2_primary_evidence_status": b.get("G2_primary_evidence_status", ""),
                     "A3_mechanism_status": b.get("A3_mechanism_status", ""),
                     "A3_system_early_status": b.get("A3_system_early_status", ""),
                     "A5_target_mode": b.get("A5_target_mode", ""),
@@ -2704,6 +2806,12 @@ def _build_markdown(
                 "A2_target_sign_status",
                 "A3_target_sign_hit_rate",
                 "A3_target_sign_status",
+                "A3_target_sign_status_reporting",
+                "A6_parity_status",
+                "A6_hit_rate_odd",
+                "A6_hit_rate_even",
+                "G2_primary_evidence_source",
+                "G2_primary_evidence_status",
                 "A3_mechanism_status",
                 "A3_system_early_status",
                 "A5_target_mode",
@@ -2721,6 +2829,12 @@ def _build_markdown(
     lines.append("")
     if str(b.get("A3_reporting_rule", "")).strip():
         lines.append(f"- A3 reporting rule: {b.get('A3_reporting_rule', '')}")
+        lines.append("")
+    if str(b.get("G2_primary_evidence_source", "")).strip():
+        lines.append(
+            f"- G2 primary evidence: `{b.get('G2_primary_evidence_source', '')}` "
+            f"(status={b.get('G2_primary_evidence_status', 'INCONCLUSIVE')})"
+        )
         lines.append("")
     if str(b.get("A5_semantics_note", "")).strip():
         lines.append(f"- A5 semantics note: {b.get('A5_semantics_note', '')}")
@@ -2855,8 +2969,33 @@ def _build_markdown(
                 "status": d.get("status", ""),
             }
         )
+    a6b = b.get("A6_parity_benchmark", {})
+    if isinstance(a6b, dict):
+        for vv in ["odd", "even"]:
+            d = a6b.get(vv, {})
+            if not isinstance(d, dict) or not d:
+                continue
+            n_eval = _num(d.get("n_eval", np.nan))
+            if (not np.isfinite(n_eval) or n_eval <= 0) and not np.isfinite(_num(d.get("expected_sign_hit_rate", np.nan))):
+                continue
+            tw_rows.append(
+                {
+                    "scenario": f"A6_{vv}",
+                    "target_n": d.get("target_n", np.nan),
+                    "W_target_s": d.get("W_target_s", np.nan),
+                    "expected_sign": d.get("expected_sign", ""),
+                    "n_eval": d.get("n_eval", 0),
+                    "sign_metric_for_status": d.get("sign_metric_for_status", ""),
+                    "expected_sign_hit_rate": d.get("expected_sign_hit_rate", np.nan),
+                    "expected_sign_hit_rate_raw": d.get("expected_sign_hit_rate_raw", np.nan),
+                    "expected_sign_hit_rate_ex": d.get("expected_sign_hit_rate_ex", np.nan),
+                    "median_xpd_target_raw_db": d.get("median_xpd_target_raw_db", np.nan),
+                    "median_xpd_target_ex_db": d.get("median_xpd_target_ex_db", np.nan),
+                    "status": d.get("status", ""),
+                }
+            )
     if tw_rows:
-        lines.append("- Target-window sign metric (A2/A3)")
+        lines.append("- Target-window sign metric (A2/A3 and A6 parity benchmark when available)")
         lines.append("")
         lines.append(
             report_md.md_table(
@@ -3413,8 +3552,14 @@ def main() -> None:
     _write_rows_csv(
         tab_dir / "A3_target_window_sign.csv",
         [
-            dict(dict(checks.get("B_time_resolution", {})).get("A2_target_window_sign", {})),
-            dict(dict(checks.get("B_time_resolution", {})).get("A3_target_window_sign", {})),
+            row for row in [
+                dict(dict(checks.get("B_time_resolution", {})).get("A2_target_window_sign", {})),
+                dict(dict(checks.get("B_time_resolution", {})).get("A3_target_window_sign", {})),
+                dict(dict(dict(checks.get("B_time_resolution", {})).get("A6_parity_benchmark", {})).get("odd", {})),
+                dict(dict(dict(checks.get("B_time_resolution", {})).get("A6_parity_benchmark", {})).get("even", {})),
+            ]
+            if (np.isfinite(_num(row.get("n_eval", np.nan))) and _num(row.get("n_eval", np.nan)) > 0)
+            or np.isfinite(_num(row.get("expected_sign_hit_rate", np.nan)))
         ],
     )
 

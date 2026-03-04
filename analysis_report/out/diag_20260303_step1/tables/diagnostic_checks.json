@@ -272,10 +272,36 @@
       "expected_sign_hit_rate": 1.0,
       "status": "PASS"
     },
+    "A3_target_window_sign_reporting_status": "PASS",
+    "A6_parity_benchmark": {
+      "available": false,
+      "status": "INCONCLUSIVE",
+      "sign_metric_for_status": "raw",
+      "n_eval_total": 0,
+      "n_eval_odd": 0,
+      "n_eval_even": 0,
+      "hit_rate_odd": NaN,
+      "hit_rate_even": NaN,
+      "hit_rate_min": NaN,
+      "odd": {
+        "scenario": "A6",
+        "status": "WARN",
+        "reason": "missing run or rows"
+      },
+      "even": {
+        "scenario": "A6",
+        "status": "WARN",
+        "reason": "missing run or rows"
+      },
+      "note": "A6 is near-normal parity benchmark; use as primary G2 evidence when available."
+    },
     "A3_role": "mechanism",
+    "A3_evidence_tier": "primary_if_no_A6",
+    "G2_primary_evidence_source": "A3_target_window_supplementary_only",
+    "G2_primary_evidence_status": "PASS",
     "A3_mechanism_status": "WARN",
     "A3_system_early_status": "WARN",
-    "A3_reporting_rule": "A3 is mechanism-only: report target-window metrics; do not use fixed system early-window dominance as primary evidence.",
+    "A3_reporting_rule": "A3 is mechanism-only/supplementary: use target-window metrics for mechanism context; fixed system early-window dominance is not primary evidence. If A6 is present, use A6 as primary G2 sign evidence.",
     "A5_role": "stress_response",
     "A5_target_mode": "contamination_response",
     "A5_stress_semantics": "response",

@@ -34,7 +34,9 @@
     "status": "SUPPORTED"
   },
   "G2": {
-    "definition": "A3 even-bounce recovery vs A2",
+    "definition": "A3 even-bounce recovery vs A2 (supplementary only when A6 is absent)",
+    "primary_source": "A3_target_window_supplementary_only",
+    "primary_status": "PASS",
     "delta_median_db": 7.999999707790597,
     "ks_wasserstein": {
       "ks_stat": 0.75,
@@ -51,7 +53,7 @@
     "status": "SUPPORTED"
   },
   "L2": {
-    "definition": "A5 stress impact on center/tails",
+    "definition": "A5 stress impact on center/tails (response-mode requires geometric path perturbation)",
     "base": {
       "n": 30,
       "mean": -19.032027097874245,
@@ -72,6 +74,16 @@
     },
     "delta_mean_db": -6.022436489595936,
     "var_ratio": 1.872531202928443,
+    "stress_semantics": {
+      "n_a5_rows": 60,
+      "n_stress_rows": 30,
+      "n_response": 30,
+      "n_polarization_only": 0,
+      "n_off": 0,
+      "n_unknown": 0,
+      "dominant_semantics": "response",
+      "contamination_response_ready": true
+    },
     "status": "SUPPORTED"
   },
   "L3": {

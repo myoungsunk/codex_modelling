@@ -407,6 +407,15 @@ def main() -> None:
     out_root.mkdir(parents=True, exist_ok=True)
     fig_dir.mkdir(parents=True, exist_ok=True)
     tab_dir.mkdir(parents=True, exist_ok=True)
+    diag_checks_path = tab_dir / "diagnostic_checks.json"
+    diag_checks: dict[str, Any] = {}
+    if diag_checks_path.exists():
+        try:
+            obj = json.loads(diag_checks_path.read_text(encoding="utf-8"))
+            if isinstance(obj, dict):
+                diag_checks = obj
+        except Exception:
+            diag_checks = {}
 
     payload = io_lib.collect_all(cfg)
     runs = payload["runs"]
@@ -471,6 +480,7 @@ def main() -> None:
 
     a2 = by_s.get("A2", [])
     a3 = by_s.get("A3", [])
+    a6 = by_s.get("A6", [])
     fig_paths["G1G2_xpd_early_ex_cdf"] = plot_lib.plot_multi_cdf(
         {
             "A2": [_num(r.get("XPD_early_excess_db", np.nan)) for r in a2],
@@ -618,13 +628,43 @@ def main() -> None:
 
     g2_shift = float(dmed_a3 - dmed_a2) if np.isfinite(dmed_a3) and np.isfinite(dmed_a2) else np.nan
     ks_a3_a2 = stats_lib.ks_wasserstein(_arr(a3, "XPD_early_excess_db"), _arr(a2, "XPD_early_excess_db"))
-    g2_ok = bool(np.isfinite(g2_shift) and g2_shift > 0)
-    props["G2"] = {
-        "definition": "A3 even-bounce recovery vs A2",
-        "delta_median_db": g2_shift,
-        "ks_wasserstein": ks_a3_a2,
-        "status": _status_support(g2_ok, cond_partial=bool(np.isfinite(g2_shift))),
-    }
+    b_diag = dict(diag_checks.get("B_time_resolution", {}))
+    a6_bench = dict(b_diag.get("A6_parity_benchmark", {}))
+    a6_available = bool(a6_bench.get("available", False))
+    g2_primary_source = str(b_diag.get("G2_primary_evidence_source", "A3_target_window_supplementary_only"))
+    g2_primary_status = str(b_diag.get("G2_primary_evidence_status", "INCONCLUSIVE"))
+    if a6_available:
+        odd_hit = _num(a6_bench.get("hit_rate_odd", np.nan))
+        even_hit = _num(a6_bench.get("hit_rate_even", np.nan))
+        if g2_primary_status == "PASS":
+            g2_status = "SUPPORTED"
+        elif g2_primary_status == "WARN":
+            g2_status = "PARTIAL"
+        elif g2_primary_status == "FAIL":
+            g2_status = "UNSUPPORTED"
+        else:
+            g2_status = "INCONCLUSIVE"
+        props["G2"] = {
+            "definition": "A6 near-normal parity benchmark as primary G2 evidence; A3 kept as mechanism-only supplementary evidence.",
+            "primary_source": g2_primary_source,
+            "primary_status": g2_primary_status,
+            "A6_hit_rate_odd": odd_hit,
+            "A6_hit_rate_even": even_hit,
+            "A6_n_eval_total": int(_num(a6_bench.get("n_eval_total", np.nan))) if np.isfinite(_num(a6_bench.get("n_eval_total", np.nan))) else 0,
+            "A3_delta_median_db_supplementary": g2_shift,
+            "A3_ks_wasserstein_supplementary": ks_a3_a2,
+            "status": g2_status,
+        }
+    else:
+        g2_ok = bool(np.isfinite(g2_shift) and g2_shift > 0)
+        props["G2"] = {
+            "definition": "A3 even-bounce recovery vs A2 (supplementary only when A6 is absent)",
+            "primary_source": g2_primary_source,
+            "primary_status": g2_primary_status,
+            "delta_median_db": g2_shift,
+            "ks_wasserstein": ks_a3_a2,
+            "status": _status_support(g2_ok, cond_partial=True),
+        }
 
     # L1/L2/L3
     early_med = _median(all_non_c0, "XPD_early_excess_db")
@@ -850,6 +890,10 @@ def main() -> None:
         lines.append(f"- 의미: {report_md.scenario_meaning(sid)}")
         if sid == "A3":
             lines.append("- 보고 규칙: A3는 mechanism-only 시나리오로 `target-window` 지표를 1차로 사용하고 fixed system `W_early` 우세는 보조 진단으로만 사용.")
+            if bool(dict(diag_checks.get("B_time_resolution", {})).get("A6_parity_benchmark", {}).get("available", False)):
+                lines.append("- G2 본증거는 A6 near-normal parity benchmark를 사용하고, A3는 보조 메커니즘 증거로만 사용.")
+        if sid == "A6":
+            lines.append("- 보고 규칙: A6는 near-normal parity benchmark로 G2의 primary sign evidence에 사용.")
         lines.append("")
         img = scene_global.get(sid, "")
         if not img:
