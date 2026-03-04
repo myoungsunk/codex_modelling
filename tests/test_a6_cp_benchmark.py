@@ -11,6 +11,17 @@ from scenarios import A6_cp_parity_benchmark as A6
 
 
 class A6CPBenchmarkTests(unittest.TestCase):
+    def test_a6_case_set_sizes(self) -> None:
+        full = A6.build_sweep_params(case_set="full")
+        minimal = A6.build_sweep_params(case_set="minimal")
+        both = A6.build_sweep_params(case_set="both")
+        self.assertEqual(len(full), 18)
+        self.assertEqual(len(minimal), 2)
+        self.assertEqual(len(both), 20)
+        self.assertEqual(sum(1 for p in minimal if str(p.get("mode")) == "odd"), 1)
+        self.assertEqual(sum(1 for p in minimal if str(p.get("mode")) == "even"), 1)
+        self.assertTrue(all(str(p.get("a6_case_set", "")) == "minimal" for p in minimal))
+
     def test_a6_near_normal_odd_even_separation_with_propagation_only_j(self) -> None:
         f_hz = np.linspace(6e9, 10e9, 64)
         ant_cfg = {

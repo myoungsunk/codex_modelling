@@ -136,7 +136,7 @@ python3 scripts/run_standard_sim.py --scenario A2 --out-h5 outputs/std_a2.h5 --o
 python3 scripts/run_standard_sim.py --scenario A3 --out-h5 outputs/std_a3.h5 --out-dir outputs/std_a3 --strict-los-blocked --basis circular --convention IEEE-RHCP --matrix-source A --force-cp-swap-on-odd-reflection false
 python3 scripts/run_standard_sim.py --scenario A4 --out-h5 outputs/std_a4.h5 --out-dir outputs/std_a4 --material-list glass,wood --a4-layout-modes iso,bridge --a4-dispersion-modes off,on --basis circular --convention IEEE-RHCP --matrix-source A --force-cp-swap-on-odd-reflection false
 python3 scripts/run_standard_sim.py --scenario A5 --out-h5 outputs/std_a5.h5 --out-dir outputs/std_a5 --stress-flag --strict-los-blocked --a5-stress-mode geometry --a5-scatterer-count 3 --a5-diffuse-enabled false --basis circular --convention IEEE-RHCP --matrix-source A --force-cp-swap-on-odd-reflection false
-python3 scripts/run_standard_sim.py --scenario A6 --out-h5 outputs/std_a6.h5 --out-dir outputs/std_a6 --strict-los-blocked --a6-modes odd,even --a6-incidence-max-deg 15 --basis circular --convention IEEE-RHCP --matrix-source J --force-cp-swap-on-odd-reflection false
+python3 scripts/run_standard_sim.py --scenario A6 --out-h5 outputs/std_a6.h5 --out-dir outputs/std_a6 --strict-los-blocked --a6-modes odd,even --a6-case-set both --a6-incidence-max-deg 15 --basis circular --convention IEEE-RHCP --matrix-source J --force-cp-swap-on-odd-reflection false
 python3 scripts/run_standard_sim.py --scenario B1 --out-h5 outputs/std_b1.h5 --out-dir outputs/std_b1
 python3 scripts/run_standard_sim.py --scenario B2 --out-h5 outputs/std_b2.h5 --out-dir outputs/std_b2
 python3 scripts/run_standard_sim.py --scenario B3 --out-h5 outputs/std_b3.h5 --out-dir outputs/std_b3

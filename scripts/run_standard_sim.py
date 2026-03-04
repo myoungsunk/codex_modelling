@@ -1235,7 +1235,14 @@ def _build_case_records(
         if not modes:
             modes = {"odd", "even"}
         inc_max = float(args.a6_incidence_max_deg)
-        base_params = [p for p in A6_cp_parity_benchmark.build_sweep_params() if str(p.get("mode", "")).lower() in modes]
+        a6_case_set = str(args.a6_case_set).strip().lower()
+        if a6_case_set not in {"full", "minimal", "both"}:
+            a6_case_set = "full"
+        base_params = [
+            p
+            for p in A6_cp_parity_benchmark.build_sweep_params(case_set=a6_case_set)
+            if str(p.get("mode", "")).lower() in modes
+        ]
         for p0 in base_params:
             for rep_id in range(n_rep):
                 p = dict(p0)
@@ -1264,6 +1271,7 @@ def _build_case_records(
                             "rep_id": int(rep_id),
                             "a6_mode": str(p.get("mode", "odd")),
                             "target_bounce": int(p.get("target_bounce", 1)),
+                            "a6_case_set": str(p.get("a6_case_set", a6_case_set)),
                             "incidence_max_deg": float(inc_max),
                             "near_normal_benchmark": 1,
                             "los_block_method": "synthetic_los_off",
@@ -1377,6 +1385,7 @@ def main() -> None:
     parser.add_argument("--a5-max-cases", type=int, default=0)
     parser.add_argument("--a6-incidence-max-deg", type=float, default=15.0)
     parser.add_argument("--a6-modes", type=str, default="odd,even")
+    parser.add_argument("--a6-case-set", type=str, default="full", choices=["full", "minimal", "both"])
     parser.add_argument("--material-list", type=str, default="")
     parser.add_argument("--stress-flag", action="store_true")
     parser.add_argument("--strict-los-blocked", action="store_true")

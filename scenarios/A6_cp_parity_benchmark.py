@@ -66,39 +66,58 @@ def build_scene(mode: str) -> list[Plane]:
     raise ValueError(f"unknown mode: {mode}")
 
 
-def build_sweep_params() -> list[dict[str, Any]]:
-    """Generate odd/even near-normal cases with small perturbations."""
+def build_sweep_params(case_set: str = "full") -> list[dict[str, Any]]:
+    """Generate odd/even near-normal cases.
 
-    params: list[dict[str, Any]] = []
-    dx_vals = [-0.2, 0.0, 0.2]
-    dz_vals = [-0.1, 0.0, 0.1]
+    case_set:
+      - "full":  odd/even 각각 3x3 perturbation (총 18개)
+      - "minimal": odd/even 각각 중심점 1개 (총 2개)
+      - "both": full + minimal을 함께 반환 (총 20개)
+    """
 
-    for dx in dx_vals:
-        for dz in dz_vals:
-            params.append(
-                {
-                    "mode": "odd",
-                    "target_bounce": 1,
-                    "rx_x": 2.4 + dx,
-                    "rx_y": -2.0,
-                    "rx_z": 1.5 + dz,
-                    "incidence_max_deg": 15.0,
-                }
-            )
+    set_key = str(case_set).strip().lower()
+    if set_key not in {"full", "minimal", "both"}:
+        set_key = "full"
 
-    for dx in dx_vals:
-        for dz in dz_vals:
-            params.append(
-                {
-                    "mode": "even",
-                    "target_bounce": 2,
-                    "rx_x": 2.4 + dx,
-                    "rx_y": 1.0,
-                    "rx_z": 1.5 + dz,
-                    "incidence_max_deg": 15.0,
-                }
-            )
-    return params
+    def _params_for(name: str) -> list[dict[str, Any]]:
+        if name == "minimal":
+            dx_vals = [0.0]
+            dz_vals = [0.0]
+        else:
+            dx_vals = [-0.2, 0.0, 0.2]
+            dz_vals = [-0.1, 0.0, 0.1]
+        out: list[dict[str, Any]] = []
+        for dx in dx_vals:
+            for dz in dz_vals:
+                out.append(
+                    {
+                        "mode": "odd",
+                        "target_bounce": 1,
+                        "rx_x": 2.4 + dx,
+                        "rx_y": -2.0,
+                        "rx_z": 1.5 + dz,
+                        "incidence_max_deg": 15.0,
+                        "a6_case_set": str(name),
+                    }
+                )
+        for dx in dx_vals:
+            for dz in dz_vals:
+                out.append(
+                    {
+                        "mode": "even",
+                        "target_bounce": 2,
+                        "rx_x": 2.4 + dx,
+                        "rx_y": 1.0,
+                        "rx_z": 1.5 + dz,
+                        "incidence_max_deg": 15.0,
+                        "a6_case_set": str(name),
+                    }
+                )
+        return out
+
+    if set_key == "both":
+        return _params_for("full") + _params_for("minimal")
+    return _params_for(set_key)
 
 
 def run_case(

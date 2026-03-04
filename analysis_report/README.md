@@ -50,6 +50,7 @@ python analysis_report/generate_proposition_plot_mapping_detailed.py --run-group
 - `/Users/kimmyoungsun/Documents/codex/analysis_report/out/<run_group>/tables/target_level.csv`
 - `/Users/kimmyoungsun/Documents/codex/analysis_report/out/<run_group>/tables/case_level.csv`
 - `/Users/kimmyoungsun/Documents/codex/analysis_report/out/<run_group>/tables/sensitivity_level.csv`
+- `/Users/kimmyoungsun/Documents/codex/analysis_report/out/<run_group>/tables/A6_case_set_sign_compare.csv` (A6 full/minimal odd-even 비교)
 
 ## Notes
 - 기본 구현은 **power 기반 지표(Z/U)**만 사용합니다.
@@ -57,6 +58,7 @@ python analysis_report/generate_proposition_plot_mapping_detailed.py --run-group
   - `C0`: calibration only
   - `A2_off`: G1 primary evidence
   - `A6`: G2 primary evidence (near-normal PEC, incidence <= 15 deg)
+    - A6 실행 시 `--a6-case-set both`를 쓰면 full/minimal을 한 번에 돌리고 `A6_case_set_sign_compare.csv`에서 odd/even 비교 가능
   - `A3_corner`: supplementary mechanism only
   - `A4_iso`: L2-M primary (`late_panel=false`, `dispersion=off`)
   - `A4_bridge`: L2-M secondary (`late_panel=true`, `dispersion=on`)

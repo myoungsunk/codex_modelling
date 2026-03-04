@@ -762,6 +762,7 @@ def _target_window_sign_metric(
     floor_db: float,
     expected_sign: int,
     sign_metric: str = "excess",
+    row_filter: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     run = None
     for rr in runs:
@@ -769,6 +770,18 @@ def _target_window_sign_metric(
             run = rr
             break
     rows = [r for r in link_rows if str(r.get("scenario_id", "")) == str(scenario_id)]
+    ff = dict(row_filter or {})
+    if ff:
+        out_rows: list[dict[str, Any]] = []
+        for rr in rows:
+            ok = True
+            for k, v in ff.items():
+                if str(rr.get(k, "")).strip().lower() != str(v).strip().lower():
+                    ok = False
+                    break
+            if ok:
+                out_rows.append(rr)
+        rows = out_rows
     if run is None or len(rows) == 0:
         return {"scenario": str(scenario_id), "status": "WARN", "reason": "missing run or rows"}
 
@@ -897,6 +910,82 @@ def _a6_parity_benchmark(
         st = "FAIL"
     else:
         st = "INCONCLUSIVE"
+    a6_rows = [r for r in link_rows if str(r.get("scenario_id", "")) == "A6"]
+    set_names = sorted(
+        {
+            str(r.get("a6_case_set", "full")).strip().lower()
+            for r in a6_rows
+            if str(r.get("a6_case_set", "full")).strip()
+        }
+    )
+    if not set_names and available:
+        set_names = ["full"]
+    per_set: dict[str, Any] = {}
+    for ss in set_names:
+        odd_s = _target_window_sign_metric(
+            link_rows=link_rows,
+            ray_rows=ray_rows,
+            runs=runs,
+            scenario_id="A6",
+            target_n=1,
+            w_target_s=float(w_target_s),
+            floor_db=float(floor_db),
+            expected_sign=-1,
+            sign_metric=str(sign_metric),
+            row_filter={"a6_case_set": str(ss)},
+        )
+        even_s = _target_window_sign_metric(
+            link_rows=link_rows,
+            ray_rows=ray_rows,
+            runs=runs,
+            scenario_id="A6",
+            target_n=2,
+            w_target_s=float(w_target_s),
+            floor_db=float(floor_db),
+            expected_sign=+1,
+            sign_metric=str(sign_metric),
+            row_filter={"a6_case_set": str(ss)},
+        )
+        h_odd = _num(odd_s.get("expected_sign_hit_rate", np.nan))
+        h_even = _num(even_s.get("expected_sign_hit_rate", np.nan))
+        h_min = float(min(h_odd, h_even)) if np.isfinite(h_odd) and np.isfinite(h_even) else float("nan")
+        if np.isfinite(h_min) and h_min >= 0.8:
+            st_set = "PASS"
+        elif np.isfinite(h_min) and h_min >= 0.6:
+            st_set = "WARN"
+        elif np.isfinite(h_min):
+            st_set = "FAIL"
+        else:
+            st_set = "INCONCLUSIVE"
+        per_set[str(ss)] = {
+            "status": str(st_set),
+            "hit_rate_min": float(h_min) if np.isfinite(h_min) else float("nan"),
+            "odd": odd_s,
+            "even": even_s,
+        }
+
+    full_vs_minimal: dict[str, Any] = {}
+    if "full" in per_set and "minimal" in per_set:
+        for mode in ["odd", "even"]:
+            f0 = dict(per_set.get("full", {})).get(mode, {})
+            m0 = dict(per_set.get("minimal", {})).get(mode, {})
+            full_vs_minimal[mode] = {
+                "n_eval_full": int(_num(dict(f0).get("n_eval", np.nan))) if np.isfinite(_num(dict(f0).get("n_eval", np.nan))) else 0,
+                "n_eval_minimal": int(_num(dict(m0).get("n_eval", np.nan))) if np.isfinite(_num(dict(m0).get("n_eval", np.nan))) else 0,
+                "median_raw_full_db": _num(dict(f0).get("median_xpd_target_raw_db", np.nan)),
+                "median_raw_minimal_db": _num(dict(m0).get("median_xpd_target_raw_db", np.nan)),
+                "delta_raw_minimal_minus_full_db": _num(dict(m0).get("median_xpd_target_raw_db", np.nan))
+                - _num(dict(f0).get("median_xpd_target_raw_db", np.nan)),
+                "median_ex_full_db": _num(dict(f0).get("median_xpd_target_ex_db", np.nan)),
+                "median_ex_minimal_db": _num(dict(m0).get("median_xpd_target_ex_db", np.nan)),
+                "delta_ex_minimal_minus_full_db": _num(dict(m0).get("median_xpd_target_ex_db", np.nan))
+                - _num(dict(f0).get("median_xpd_target_ex_db", np.nan)),
+                "hit_rate_full": _num(dict(f0).get("expected_sign_hit_rate", np.nan)),
+                "hit_rate_minimal": _num(dict(m0).get("expected_sign_hit_rate", np.nan)),
+                "delta_hit_rate_minimal_minus_full": _num(dict(m0).get("expected_sign_hit_rate", np.nan))
+                - _num(dict(f0).get("expected_sign_hit_rate", np.nan)),
+            }
+
     return {
         "available": bool(available),
         "status": str(st),
@@ -909,6 +998,11 @@ def _a6_parity_benchmark(
         "hit_rate_min": float(hit_min) if np.isfinite(hit_min) else float("nan"),
         "odd": odd,
         "even": even,
+        "case_set_compare": {
+            "available_sets": list(set_names),
+            "per_set": per_set,
+            "full_vs_minimal": full_vs_minimal,
+        },
         "note": "A6 is near-normal parity benchmark; use as primary G2 evidence when available.",
     }
 
@@ -3230,6 +3324,78 @@ def _build_markdown(
             )
         )
         lines.append("")
+    a6_cmp = dict(dict(b.get("A6_parity_benchmark", {})).get("case_set_compare", {}))
+    if a6_cmp:
+        per_set = dict(a6_cmp.get("per_set", {}))
+        rows_cmp: list[dict[str, Any]] = []
+        for ss in sorted(per_set.keys()):
+            ss_d = dict(per_set.get(ss, {}))
+            for mode in ["odd", "even"]:
+                mm = dict(ss_d.get(mode, {}))
+                if not mm:
+                    continue
+                rows_cmp.append(
+                    {
+                        "case_set": str(ss),
+                        "mode": str(mode),
+                        "n_eval": mm.get("n_eval", 0),
+                        "median_xpd_target_raw_db": mm.get("median_xpd_target_raw_db", np.nan),
+                        "median_xpd_target_ex_db": mm.get("median_xpd_target_ex_db", np.nan),
+                        "expected_sign_hit_rate": mm.get("expected_sign_hit_rate", np.nan),
+                        "status": ss_d.get("status", ""),
+                    }
+                )
+        if rows_cmp:
+            lines.append("- A6 case-set comparison (full vs minimal, odd/even)")
+            lines.append("")
+            lines.append(
+                report_md.md_table(
+                    rows_cmp,
+                    [
+                        "case_set",
+                        "mode",
+                        "n_eval",
+                        "median_xpd_target_raw_db",
+                        "median_xpd_target_ex_db",
+                        "expected_sign_hit_rate",
+                        "status",
+                    ],
+                )
+            )
+            lines.append("")
+        fvm = dict(a6_cmp.get("full_vs_minimal", {}))
+        rows_delta: list[dict[str, Any]] = []
+        for mode in ["odd", "even"]:
+            dd = dict(fvm.get(mode, {}))
+            if not dd:
+                continue
+            rows_delta.append(
+                {
+                    "mode": str(mode),
+                    "delta_raw_minimal_minus_full_db": dd.get("delta_raw_minimal_minus_full_db", np.nan),
+                    "delta_ex_minimal_minus_full_db": dd.get("delta_ex_minimal_minus_full_db", np.nan),
+                    "delta_hit_rate_minimal_minus_full": dd.get("delta_hit_rate_minimal_minus_full", np.nan),
+                    "n_eval_full": dd.get("n_eval_full", 0),
+                    "n_eval_minimal": dd.get("n_eval_minimal", 0),
+                }
+            )
+        if rows_delta:
+            lines.append("- A6 full vs minimal delta summary (`minimal - full`)")
+            lines.append("")
+            lines.append(
+                report_md.md_table(
+                    rows_delta,
+                    [
+                        "mode",
+                        "delta_raw_minimal_minus_full_db",
+                        "delta_ex_minimal_minus_full_db",
+                        "delta_hit_rate_minimal_minus_full",
+                        "n_eval_full",
+                        "n_eval_minimal",
+                    ],
+                )
+            )
+            lines.append("")
 
     # C
     c = checks.get("C_effect_vs_floor", {})
@@ -3796,6 +3962,47 @@ def main() -> None:
             or np.isfinite(_num(row.get("expected_sign_hit_rate", np.nan)))
         ],
     )
+    a6_cmp = dict(dict(dict(checks.get("B_time_resolution", {})).get("A6_parity_benchmark", {})).get("case_set_compare", {}))
+    a6_rows: list[dict[str, Any]] = []
+    per_set = dict(a6_cmp.get("per_set", {}))
+    for ss in sorted(per_set.keys()):
+        ss_d = dict(per_set.get(ss, {}))
+        for mode in ["odd", "even"]:
+            mm = dict(ss_d.get(mode, {}))
+            if not mm:
+                continue
+            a6_rows.append(
+                {
+                    "case_set": str(ss),
+                    "mode": str(mode),
+                    "status": str(ss_d.get("status", "")),
+                    "hit_rate_min_set": _num(ss_d.get("hit_rate_min", np.nan)),
+                    "n_eval": int(_num(mm.get("n_eval", np.nan))) if np.isfinite(_num(mm.get("n_eval", np.nan))) else 0,
+                    "median_xpd_target_raw_db": _num(mm.get("median_xpd_target_raw_db", np.nan)),
+                    "median_xpd_target_ex_db": _num(mm.get("median_xpd_target_ex_db", np.nan)),
+                    "expected_sign_hit_rate": _num(mm.get("expected_sign_hit_rate", np.nan)),
+                    "sign_metric_for_status": str(mm.get("sign_metric_for_status", "")),
+                }
+            )
+    fvm = dict(a6_cmp.get("full_vs_minimal", {}))
+    for mode in ["odd", "even"]:
+        mm = dict(fvm.get(mode, {}))
+        if not mm:
+            continue
+        a6_rows.append(
+            {
+                "case_set": "full_vs_minimal",
+                "mode": str(mode),
+                "status": "",
+                "hit_rate_min_set": np.nan,
+                "n_eval": np.nan,
+                "median_xpd_target_raw_db": _num(mm.get("delta_raw_minimal_minus_full_db", np.nan)),
+                "median_xpd_target_ex_db": _num(mm.get("delta_ex_minimal_minus_full_db", np.nan)),
+                "expected_sign_hit_rate": _num(mm.get("delta_hit_rate_minimal_minus_full", np.nan)),
+                "sign_metric_for_status": "delta(minimal-full)",
+            }
+        )
+    _write_rows_csv(tab_dir / "A6_case_set_sign_compare.csv", a6_rows)
 
     a3_lines = ["# A3 Geometry Manual Review", ""]
     if a3_review_rows:
