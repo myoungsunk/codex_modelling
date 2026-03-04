@@ -2824,6 +2824,15 @@ def _build_markdown(
     lines.append("")
     lines.append("- Figure metadata: [figure_metadata.csv](tables/figure_metadata.csv)")
     lines.append("")
+    lines.append("## Final Scenario Structure (Agreed)")
+    lines.append("")
+    lines.append(
+        report_md.md_table(
+            report_md.final_structure_rows(),
+            ["unit", "role", "notes"],
+        )
+    )
+    lines.append("")
     lines.append("## Floor Reference")
     lines.append("")
     lines.append(

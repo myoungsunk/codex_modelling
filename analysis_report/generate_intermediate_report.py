@@ -842,6 +842,10 @@ def main() -> None:
     lines: list[str] = []
     lines.append(f"# Intermediate Report ({run_group})")
     lines.append("")
+    lines.append("## Final Scenario Structure (Agreed)")
+    lines.append("")
+    lines.append(report_md.md_table(report_md.final_structure_rows(), ["unit", "role", "notes"]))
+    lines.append("")
     lines.append("## Proposition Status")
     lines.append("")
     lines.append(report_md.md_table(prop_rows, ["proposition", "status", "data_status", "definition"]))

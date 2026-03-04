@@ -3,6 +3,16 @@ input_runs:
   - "outputs/run_C0"
   - "outputs/run_A2"
 scenario_map: {}
+scenario_roles:
+  C0: calibration_only
+  A2: odd_isolation
+  A3: mechanism_supplementary
+  A4: material_effect
+  A5: stress_response_proxy
+  A6: g2_primary_benchmark
+  B1: realspace_los
+  B2: realspace_partition_nlos
+  B3: realspace_corner_nlos
 floor_policy:
   mode: "from_C0"           # from_C0 | from_calibration_json | none
   calibration_json: ""

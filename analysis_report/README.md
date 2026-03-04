@@ -53,6 +53,16 @@ python analysis_report/generate_proposition_plot_mapping_detailed.py --run-group
 
 ## Notes
 - 기본 구현은 **power 기반 지표(Z/U)**만 사용합니다.
+- 최종 시나리오 구조(합의):
+  - `C0`: calibration only
+  - `A2_off`: G1 primary evidence
+  - `A6`: G2 primary evidence (near-normal PEC, incidence <= 15 deg)
+  - `A3_corner`: supplementary mechanism only
+  - `A4_iso`: L2-M primary (`late_panel=false`, `dispersion=off`)
+  - `A4_bridge`: L2-M secondary (`late_panel=true`, `dispersion=on`)
+  - `A5_pair`: L2-S proxy stress response (synthetic primary, geometric sensitivity)
+  - `A2_on/A4_on`: LOS-on observability bridge set
+  - `B1/B2/B3`: R1/R2 real-space leverage (support count mandatory)
 - `scene_debug.json`이 없으면 해당 케이스 scene plot은 WARN으로 보고서에 기록됩니다.
 - 진단 B는 목적별 3-window를 분리해 계산합니다.
   - `W_floor` (C0): LOS peak 주변 contamination `C_floor`

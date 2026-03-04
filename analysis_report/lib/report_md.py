@@ -8,11 +8,12 @@ from typing import Any
 
 
 _SCENARIO_MEANING: dict[str, str] = {
-    "C0": "Free-space LOS calibration baseline for floor/alignment uncertainty.",
-    "A2": "LOS-blocked single-bounce(odd) control to probe early cross-leakage increase.",
-    "A3": "LOS-blocked double-bounce(even) control to test co-dominant recovery trend.",
-    "A4": "LOS-blocked material/angle sweep to isolate material-conditional leakage statistics.",
-    "A5": "LOS-blocked stress scenario: geometric/hybrid => delay-path response, synthetic => polarization-only stress.",
+    "C0": "Calibration-only baseline: floor reference and alignment sensitivity (W_floor).",
+    "A2": "Odd parity isolation anchor (A2_off core evidence); A2_on is observability bridge set.",
+    "A3": "Corner 2-bounce supplementary mechanism scene (target-window evidence only, not system early baseline).",
+    "A4": "Material branch: A4_iso primary (late_panel=off, dispersion=off), A4_bridge secondary (late_panel=on, dispersion=on).",
+    "A5": "Proxy stress response pair (A5_pair): synthetic is primary, geometric is sensitivity check.",
+    "A6": "Near-normal PEC parity benchmark; primary G2 sign evidence.",
     "B1": "Room grid baseline (mostly LOS) for spatial Z/U trend mapping.",
     "B2": "Room grid with partition obstacle to induce partial NLOS/blocked regions.",
     "B3": "Room grid with corner obstacles for stronger NLOS and multipath complexity.",
@@ -22,6 +23,21 @@ _SCENARIO_MEANING: dict[str, str] = {
 def scenario_meaning(scenario_id: Any) -> str:
     sid = str(scenario_id).upper().strip()
     return _SCENARIO_MEANING.get(sid, "Scenario-specific control/sweep for proxy Z/U validation.")
+
+
+def final_structure_rows() -> list[dict[str, str]]:
+    """Agreed final scenario structure for reporting and review."""
+    return [
+        {"unit": "C0", "role": "calibration only", "notes": "floor_reference 강화"},
+        {"unit": "A2_off", "role": "G1 primary evidence", "notes": "odd isolation, keep fixed"},
+        {"unit": "A6", "role": "G2 primary evidence", "notes": "near-normal PEC, incidence <= 15 deg"},
+        {"unit": "A3_corner", "role": "supplementary mechanism", "notes": "window mismatch documented; no sign-off"},
+        {"unit": "A4_iso", "role": "L2-M primary", "notes": "late_panel=false, dispersion=off"},
+        {"unit": "A4_bridge", "role": "L2-M secondary", "notes": "late_panel=true, dispersion=on"},
+        {"unit": "A5_pair", "role": "L2-S proxy stress-response", "notes": "synthetic primary, geometric sensitivity"},
+        {"unit": "A2_on/A4_on", "role": "bridge observability set", "notes": "LOS-on contrast bridge"},
+        {"unit": "B1/B2/B3", "role": "R1/R2 real-space leverage", "notes": "support count must be shown"},
+    ]
 
 
 def relpath(target: str | Path, base_dir: str | Path) -> str:
