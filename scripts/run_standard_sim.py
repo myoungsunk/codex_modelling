@@ -450,6 +450,8 @@ def _case_label(scenario_id: str, params: dict[str, Any]) -> str:
     if s == "A4":
         return (
             f"mat={_sanitize_token(p.get('material', 'na'))}"
+            f"_mode={_sanitize_token(p.get('a4_layout_mode', 'na'))}"
+            f"_disp={_sanitize_token(p.get('a4_dispersion_mode', p.get('material_dispersion', 'na')))}"
             f"_y={float(p.get('y_plane', np.nan)):.2f}"
             f"_d={float(p.get('distance_m', np.nan)):.2f}"
             f"_rep={int(p.get('rep_id', 0))}"
@@ -732,6 +734,8 @@ def _build_scene_snapshot(
             y_plane=float(params.get("y_plane", 2.0)),
             y_late_offset=float(params.get("y_late_offset", 2.4)),
             include_late_panel=bool(params.get("include_late_panel", True)),
+            materials_db=(str(params.get("materials_db", "")).strip() or None),
+            material_dispersion=str(params.get("a4_dispersion_mode", params.get("material_dispersion", "off"))),
         )
         if los_blocker:
             scene.append(
@@ -949,47 +953,73 @@ def _build_case_records(args: argparse.Namespace, f_hz: np.ndarray) -> list[dict
         mats = [m.strip() for m in str(args.material_list).split(",") if m.strip()] or list(DEFAULT_MATERIAL_SPECS.keys())
         yvals = _parse_float_list(args.a4_y_list, [1.5, 2.0, 2.5])
         dvals = _parse_float_list(args.dist_list, [6.0])
-        include_late_panel = _parse_bool(args.a4_include_late_panel, default=True)
+        layout_modes = [x.strip().lower() for x in str(args.a4_layout_modes).split(",") if x.strip()]
+        if not layout_modes:
+            layout_modes = ["iso", "bridge"]
+        layout_modes = [x for x in layout_modes if x in {"iso", "bridge"}] or ["iso", "bridge"]
+        dispersion_modes = [x.strip().lower() for x in str(args.a4_dispersion_modes).split(",") if x.strip()]
+        if not dispersion_modes:
+            dispersion_modes = ["off", "on"]
+        valid_disp = {"off", "on", "debye"}
+        dispersion_modes = [x for x in dispersion_modes if x in valid_disp] or ["off", "on"]
+        include_late_panel_default = _parse_bool(args.a4_include_late_panel, default=True)
         late_offset_m = float(args.a4_late_offset_m)
+        materials_db = str(args.materials_db).strip() if str(args.materials_db).strip() else None
         cid = 0
         for m in mats:
-            for y in yvals:
-                for d in dvals:
-                    for rep_id in range(n_rep):
-                        p = {
-                            "material": m,
-                            "y_plane": float(y),
-                            "distance_m": float(d),
-                            "rep_id": int(rep_id),
-                            "include_late_panel": bool(include_late_panel),
-                            "y_late_offset": late_offset_m,
-                        }
-                        paths = A4_dielectric_plane.run_case(
-                            p,
-                            f_hz,
-                            basis=basis,
-                            los_blocker=bool(los_blocker),
-                            include_late_panel=bool(include_late_panel),
-                            y_late_offset=late_offset_m,
-                        )
-                        out.append(
-                            {
-                                "case_id": str(cid),
-                                "scenario_id": "A4",
-                                "link_id": f"A4_{cid}",
-                                "params": p,
-                                "paths": paths_to_records(paths),
-                                "meta": {
-                                    "d_m": float(d),
-                                    "material_class": m,
-                                    "obstacle_flag": 1,
+            for layout_mode in layout_modes:
+                include_late_panel = bool(layout_mode == "bridge")
+                # Optional legacy override for single-mode sweeps.
+                if len(layout_modes) == 1:
+                    include_late_panel = bool(include_late_panel_default)
+                for disp_mode in dispersion_modes:
+                    for y in yvals:
+                        for d in dvals:
+                            for rep_id in range(n_rep):
+                                p = {
+                                    "material": m,
+                                    "y_plane": float(y),
+                                    "distance_m": float(d),
                                     "rep_id": int(rep_id),
-                                    "los_block_method": "physical_occluder" if bool(los_blocker) else "synthetic_los_off",
-                                    "basis": basis,
-                                },
-                            }
-                        )
-                        cid += 1
+                                    "a4_layout_mode": str(layout_mode),
+                                    "a4_dispersion_mode": str(disp_mode),
+                                    "material_dispersion": str(disp_mode),
+                                    "materials_db": str(materials_db or ""),
+                                    "include_late_panel": bool(include_late_panel),
+                                    "y_late_offset": late_offset_m,
+                                }
+                                paths = A4_dielectric_plane.run_case(
+                                    p,
+                                    f_hz,
+                                    basis=basis,
+                                    los_blocker=bool(los_blocker),
+                                    include_late_panel=bool(include_late_panel),
+                                    y_late_offset=late_offset_m,
+                                    materials_db=materials_db,
+                                    material_dispersion=str(disp_mode),
+                                )
+                                out.append(
+                                    {
+                                        "case_id": str(cid),
+                                        "scenario_id": "A4",
+                                        "link_id": f"A4_{cid}",
+                                        "params": p,
+                                        "paths": paths_to_records(paths),
+                                        "meta": {
+                                            "d_m": float(d),
+                                            "material_class": m,
+                                            "a4_layout_mode": str(layout_mode),
+                                            "a4_dispersion_mode": str(disp_mode),
+                                            "material_dispersion": str(disp_mode),
+                                            "include_late_panel": int(bool(include_late_panel)),
+                                            "obstacle_flag": 1,
+                                            "rep_id": int(rep_id),
+                                            "los_block_method": "physical_occluder" if bool(los_blocker) else "synthetic_los_off",
+                                            "basis": basis,
+                                        },
+                                    }
+                                )
+                                cid += 1
         return out
 
     if s == "A5":
@@ -1111,8 +1141,11 @@ def main() -> None:
     parser.add_argument("--n-rep", type=int, default=5)
     parser.add_argument("--a2-y-list", type=str, default="1.5,2.0,2.5")
     parser.add_argument("--a4-y-list", type=str, default="1.5,2.0,2.5")
+    parser.add_argument("--a4-layout-modes", type=str, default="iso,bridge")
+    parser.add_argument("--a4-dispersion-modes", type=str, default="off,on")
     parser.add_argument("--a4-include-late-panel", type=str, default="true")
     parser.add_argument("--a4-late-offset-m", type=float, default=2.4)
+    parser.add_argument("--materials-db", type=str, default="")
     parser.add_argument("--los-block-mode", type=str, default="occluder", choices=["synthetic", "occluder"])
     parser.add_argument("--a5-stress-mode", type=str, default="geometry", choices=["none", "synthetic", "geometry", "hybrid"])
     parser.add_argument("--a5-scatterer-count", type=int, default=3)

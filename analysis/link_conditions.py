@@ -62,6 +62,10 @@ def build_link_U_from_scenario(
         "stress_semantics",
         "stress_path_structure_active",
         "stress_polarization_mixer_active",
+        "a4_layout_mode",
+        "a4_dispersion_mode",
+        "material_dispersion",
+        "include_late_panel",
         "rep_id",
         "rep_outer",
     ]:
