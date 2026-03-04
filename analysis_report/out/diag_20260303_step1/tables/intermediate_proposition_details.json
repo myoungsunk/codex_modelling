@@ -36,14 +36,14 @@
   "G2": {
     "definition": "A3 even-bounce recovery vs A2 (supplementary only when A6 is absent)",
     "primary_source": "A3_target_window_supplementary_only",
-    "primary_status": "PASS",
+    "primary_status": "WARN",
     "delta_median_db": 7.999999707790597,
     "ks_wasserstein": {
       "ks_stat": 0.75,
       "ks_p": 3.914609188476457e-06,
       "wasserstein": 8.66666630234144
     },
-    "status": "SUPPORTED"
+    "status": "PARTIAL"
   },
   "L1": {
     "definition": "Early/Late leakage separation via XPD_early_ex/XPD_late_ex/L_pol",

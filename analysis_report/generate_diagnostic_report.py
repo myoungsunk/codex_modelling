@@ -1960,7 +1960,10 @@ def _diagnostic_checks(
         a3_evidence_tier = "supplementary"
     else:
         g2_primary_source = "A3_target_window_supplementary_only"
-        g2_primary_status = str(a3_target_status_reporting)
+        if str(a3_target_status_reporting) in {"PASS", "WARN"}:
+            g2_primary_status = "WARN"
+        else:
+            g2_primary_status = str(a3_target_status_reporting)
         a3_evidence_tier = "primary_if_no_A6"
 
     checks["B_time_resolution"] = {

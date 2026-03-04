@@ -298,7 +298,7 @@
     "A3_role": "mechanism",
     "A3_evidence_tier": "primary_if_no_A6",
     "G2_primary_evidence_source": "A3_target_window_supplementary_only",
-    "G2_primary_evidence_status": "PASS",
+    "G2_primary_evidence_status": "WARN",
     "A3_mechanism_status": "WARN",
     "A3_system_early_status": "WARN",
     "A3_reporting_rule": "A3 is mechanism-only/supplementary: use target-window metrics for mechanism context; fixed system early-window dominance is not primary evidence. If A6 is present, use A6 as primary G2 sign evidence.",

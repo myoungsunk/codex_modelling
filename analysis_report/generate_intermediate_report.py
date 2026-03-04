@@ -657,13 +657,14 @@ def main() -> None:
         }
     else:
         g2_ok = bool(np.isfinite(g2_shift) and g2_shift > 0)
+        g2_status = "PARTIAL" if g2_ok else ("INCONCLUSIVE" if np.isfinite(g2_shift) else "INCONCLUSIVE")
         props["G2"] = {
             "definition": "A3 even-bounce recovery vs A2 (supplementary only when A6 is absent)",
             "primary_source": g2_primary_source,
             "primary_status": g2_primary_status,
             "delta_median_db": g2_shift,
             "ks_wasserstein": ks_a3_a2,
-            "status": _status_support(g2_ok, cond_partial=True),
+            "status": g2_status,
         }
 
     # L1/L2/L3
