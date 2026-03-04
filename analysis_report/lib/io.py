@@ -61,7 +61,7 @@ def _read_json(path: Path) -> dict[str, Any]:
 
 def _scenario_from_name(name: str) -> str:
     up = str(name).upper()
-    for s in ["C0", "A2", "A3", "A4", "A5", "B1", "B2", "B3"]:
+    for s in ["C0", "A2", "A3", "A4", "A5", "A6", "B1", "B2", "B3"]:
         if s in up:
             return s
     return "NA"

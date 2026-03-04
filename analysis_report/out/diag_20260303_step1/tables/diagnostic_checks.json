@@ -234,6 +234,10 @@
       },
       "overall_status": "FAIL"
     },
+    "A2A3_sign_stability_raw_status": "FAIL",
+    "A2A3_sign_stability_reporting_status": "FAIL",
+    "A2A3_sign_stability_reporting_note": "A2/A3 early-window sign stability interpreted directly from raw status.",
+    "A3_expected_early_sign_fail_under_mechanism_role": false,
     "A2_target_window_sign": {
       "scenario": "A2",
       "target_n": 1,
@@ -274,31 +278,59 @@
     },
     "A3_target_window_sign_reporting_status": "PASS",
     "A6_parity_benchmark": {
-      "available": false,
-      "status": "INCONCLUSIVE",
+      "available": true,
+      "status": "PASS",
       "sign_metric_for_status": "raw",
-      "n_eval_total": 0,
-      "n_eval_odd": 0,
-      "n_eval_even": 0,
-      "hit_rate_odd": NaN,
-      "hit_rate_even": NaN,
-      "hit_rate_min": NaN,
+      "n_eval_total": 18,
+      "n_eval_odd": 9,
+      "n_eval_even": 9,
+      "hit_rate_odd": 1.0,
+      "hit_rate_even": 1.0,
+      "hit_rate_min": 1.0,
       "odd": {
         "scenario": "A6",
-        "status": "WARN",
-        "reason": "missing run or rows"
+        "target_n": 1,
+        "W_target_s": 3.0000000000000004e-09,
+        "expected_sign": "negative",
+        "n_links": 18,
+        "n_eval": 9,
+        "median_xpd_target_ex_db": -32.934837696767445,
+        "p10_xpd_target_ex_db": -32.934837696767445,
+        "p90_xpd_target_ex_db": -32.934837696767445,
+        "median_xpd_target_raw_db": -8.0,
+        "p10_xpd_target_raw_db": -8.0,
+        "p90_xpd_target_raw_db": -8.0,
+        "expected_sign_hit_rate_ex": 1.0,
+        "expected_sign_hit_rate_raw": 1.0,
+        "sign_metric_for_status": "raw",
+        "expected_sign_hit_rate": 1.0,
+        "status": "PASS"
       },
       "even": {
         "scenario": "A6",
-        "status": "WARN",
-        "reason": "missing run or rows"
+        "target_n": 2,
+        "W_target_s": 3.0000000000000004e-09,
+        "expected_sign": "positive",
+        "n_links": 18,
+        "n_eval": 9,
+        "median_xpd_target_ex_db": -16.93483769676745,
+        "p10_xpd_target_ex_db": -16.93483769676745,
+        "p90_xpd_target_ex_db": -16.93483769676745,
+        "median_xpd_target_raw_db": 8.0,
+        "p10_xpd_target_raw_db": 8.0,
+        "p90_xpd_target_raw_db": 8.0,
+        "expected_sign_hit_rate_ex": 0.0,
+        "expected_sign_hit_rate_raw": 1.0,
+        "sign_metric_for_status": "raw",
+        "expected_sign_hit_rate": 1.0,
+        "status": "PASS"
       },
       "note": "A6 is near-normal parity benchmark; use as primary G2 evidence when available."
     },
     "A3_role": "mechanism_supplementary",
-    "A3_evidence_tier": "primary_if_no_A6",
-    "G2_primary_evidence_source": "A3_target_window_supplementary_only",
-    "G2_primary_evidence_status": "WARN",
+    "A3_evidence_tier": "supplementary",
+    "G2_primary_evidence_source": "A6_near_normal_benchmark",
+    "G2_primary_evidence_status": "PASS",
     "A3_mechanism_status": "WARN",
     "A3_system_early_status": "WARN",
     "A3_reporting_rule": "A3 is mechanism-only/supplementary: use target-window metrics for mechanism context; fixed system early-window dominance is not primary evidence. If A6 is present, use A6 as primary G2 sign evidence.",
@@ -644,7 +676,7 @@
     }
   },
   "E_power_based": {
-    "status": "PASS",
+    "status": "FAIL",
     "used_metrics": [
       "XPD_early_db",
       "XPD_late_db",
@@ -662,7 +694,8 @@
       "IEEE-RHCP"
     ],
     "matrix_source_values": [
-      "A"
+      "A",
+      "J"
     ],
     "force_cp_swap_any_true": false,
     "matrix_source_rule": "Use circular basis for CP interpretation and keep matrix_source fixed (A_f for antenna-embedded, J_f for de-embedded).",

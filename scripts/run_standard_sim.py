@@ -32,7 +32,15 @@ from rt_core.materials import DEFAULT_MATERIAL_SPECS
 from rt_core.tracer import trace_paths
 from rt_io.standard_outputs_hdf5 import export_csv, save_run
 from rt_types.standard_outputs import RayTable, SCHEMA_VERSION, StandardOutputBundle
-from scenarios import A2_pec_plane, A3_corner_2bounce, A4_dielectric_plane, A5_depol_stress, B0_room_box, C0_free_space
+from scenarios import (
+    A2_pec_plane,
+    A3_corner_2bounce,
+    A4_dielectric_plane,
+    A5_depol_stress,
+    A6_cp_parity_benchmark,
+    B0_room_box,
+    C0_free_space,
+)
 from scenarios.common import default_antennas, make_los_blocker_plane, paths_to_records, uwb_frequency
 
 
@@ -482,6 +490,14 @@ def _case_label(scenario_id: str, params: dict[str, Any]) -> str:
             f"_rep={int(p.get('rep_id', 0))}"
             f"_outer={int(p.get('rep_outer', 0))}"
         )
+    if s == "A6":
+        return (
+            f"mode={_sanitize_token(p.get('mode', 'na'))}"
+            f"_target={int(p.get('target_bounce', -1))}"
+            f"_rx=({float(p.get('rx_x', np.nan)):.2f},{float(p.get('rx_y', np.nan)):.2f},{float(p.get('rx_z', np.nan)):.2f})"
+            f"_imax={float(p.get('incidence_max_deg', np.nan)):.1f}"
+            f"_rep={int(p.get('rep_id', 0))}"
+        )
     if s.startswith("B"):
         return f"rx=({float(p.get('rx_x', np.nan)):.2f},{float(p.get('rx_y', np.nan)):.2f})"
     return _sanitize_token(params)
@@ -794,6 +810,22 @@ def _build_scene_snapshot(
                     half_extent_v=0.30,
                 )
             )
+        return np.asarray(tx.position, dtype=float), np.asarray(rx.position, dtype=float), scene
+
+    if s == "A6":
+        mode = str(params.get("mode", "odd")).strip().lower()
+        scene = A6_cp_parity_benchmark.build_scene(mode)
+        if mode == "odd":
+            tx = tx.with_position([2.0, -2.0, 1.5])
+        else:
+            tx = tx.with_position([2.0, 1.0, 1.5])
+        rx = rx.with_position(
+            [
+                float(params.get("rx_x", 2.4)),
+                float(params.get("rx_y", -2.0 if mode == "odd" else 1.0)),
+                float(params.get("rx_z", 1.5)),
+            ]
+        )
         return np.asarray(tx.position, dtype=float), np.asarray(rx.position, dtype=float), scene
 
     if s in {"B1", "B2", "B3"}:
@@ -1193,6 +1225,58 @@ def _build_case_records(
                 cid += 1
         return out
 
+    if s == "A6":
+        cid = 0
+        modes = {m.strip().lower() for m in str(args.a6_modes).split(",") if m.strip()}
+        if not modes:
+            modes = {"odd", "even"}
+        valid_modes = {"odd", "even"}
+        modes = {m for m in modes if m in valid_modes}
+        if not modes:
+            modes = {"odd", "even"}
+        inc_max = float(args.a6_incidence_max_deg)
+        base_params = [p for p in A6_cp_parity_benchmark.build_sweep_params() if str(p.get("mode", "")).lower() in modes]
+        for p0 in base_params:
+            for rep_id in range(n_rep):
+                p = dict(p0)
+                p["rep_id"] = int(rep_id)
+                p["incidence_max_deg"] = float(inc_max)
+                paths = A6_cp_parity_benchmark.run_case(
+                    p,
+                    f_hz,
+                    basis=basis,
+                    antenna_config=dict(antenna_config or {}),
+                    force_cp_swap_on_odd_reflection=bool(force_cp_swap),
+                )
+                tx_pos = np.asarray([2.0, -2.0, 1.5], dtype=float) if str(p.get("mode")).lower() == "odd" else np.asarray([2.0, 1.0, 1.5], dtype=float)
+                rx_pos = np.asarray([float(p.get("rx_x", 2.4)), float(p.get("rx_y", -2.0)), float(p.get("rx_z", 1.5))], dtype=float)
+                out.append(
+                    {
+                        "case_id": str(cid),
+                        "scenario_id": "A6",
+                        "link_id": f"A6_{cid}",
+                        "params": p,
+                        "paths": paths_to_records(paths),
+                        "meta": {
+                            "d_m": float(np.linalg.norm(rx_pos - tx_pos)),
+                            "material_class": "PEC",
+                            "obstacle_flag": 1,
+                            "rep_id": int(rep_id),
+                            "a6_mode": str(p.get("mode", "odd")),
+                            "target_bounce": int(p.get("target_bounce", 1)),
+                            "incidence_max_deg": float(inc_max),
+                            "near_normal_benchmark": 1,
+                            "los_block_method": "synthetic_los_off",
+                            "basis": basis,
+                            "convention": convention,
+                            "matrix_source": matrix_source,
+                            "force_cp_swap_on_odd_reflection": int(bool(force_cp_swap)),
+                        },
+                    }
+                )
+                cid += 1
+        return out
+
     # B1/B2/B3 room-grid style
     kind = s
     x_vals = np.arange(float(args.grid_x_min), float(args.grid_x_max) + 1e-9, float(args.grid_step_m))
@@ -1236,7 +1320,7 @@ def _build_case_records(
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--scenario", required=True, choices=["C0", "A2", "A3", "A4", "A5", "B1", "B2", "B3"])
+    parser.add_argument("--scenario", required=True, choices=["C0", "A2", "A3", "A4", "A5", "A6", "B1", "B2", "B3"])
     parser.add_argument("--basis", type=str, default="circular", choices=["circular", "linear"])
     parser.add_argument("--convention", type=str, default="IEEE-RHCP")
     parser.add_argument("--matrix-source", type=str, default="A", choices=["A", "J", "a", "j"])
@@ -1291,6 +1375,8 @@ def main() -> None:
     parser.add_argument("--a5-diffuse-rays-per-hit", type=int, default=0)
     parser.add_argument("--allow-a5-synthetic-only", action="store_true")
     parser.add_argument("--a5-max-cases", type=int, default=0)
+    parser.add_argument("--a6-incidence-max-deg", type=float, default=15.0)
+    parser.add_argument("--a6-modes", type=str, default="odd,even")
     parser.add_argument("--material-list", type=str, default="")
     parser.add_argument("--stress-flag", action="store_true")
     parser.add_argument("--strict-los-blocked", action="store_true")
@@ -1365,7 +1451,7 @@ def main() -> None:
         ray_rows = add_el_db(ray_rows, f_center_hz=float(args.f_center_hz), method="fspl")
 
         los_link = int(any(int(r.get("los_flag_ray", 0)) == 1 for r in ray_rows))
-        if scenario_id in {"A2", "A3", "A4", "A5"} and bool(args.strict_los_blocked):
+        if scenario_id in {"A2", "A3", "A4", "A5", "A6"} and bool(args.strict_los_blocked):
             if los_link == 1:
                 raise SystemExit(f"LOS blocked check failed: scenario={scenario_id}, link_id={link_id}")
 

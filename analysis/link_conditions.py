@@ -78,6 +78,10 @@ def build_link_U_from_scenario(
         "a4_dispersion_mode",
         "material_dispersion",
         "include_late_panel",
+        "a6_mode",
+        "target_bounce",
+        "incidence_max_deg",
+        "near_normal_benchmark",
         "rep_id",
         "rep_outer",
     ]:

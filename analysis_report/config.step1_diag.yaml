@@ -7,6 +7,7 @@ input_runs:
   - "outputs/step1_diag/A4_bridge"
   - "outputs/step1_diag/A5_base"
   - "outputs/step1_diag/A5_stress"
+  - "outputs/step1_diag/A6"
   - "outputs/step1_diag/B1"
   - "outputs/step1_diag/B2_tuned"
   - "outputs/step1_diag/B3_tuned"

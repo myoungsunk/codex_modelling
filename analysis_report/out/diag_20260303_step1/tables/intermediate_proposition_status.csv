@@ -2,7 +2,7 @@ data_status,definition,proposition,status
 OK,C0 floor distance/yaw sensitivity,M1,SUPPORTED
 OK,Fraction inside/outside floor uncertainty band,M2,SUPPORTED
 OK,A2 odd-bounce increases cross dominance vs C0,G1,SUPPORTED
-OK,A3 even-bounce recovery vs A2 (supplementary only when A6 is absent),G2,PARTIAL
+OK,A6 near-normal parity benchmark as primary G2 evidence; A3 kept as mechanism-only supplementary evidence.,G2,SUPPORTED
 OK,Early/Late leakage separation via XPD_early_ex/XPD_late_ex/L_pol,L1,SUPPORTED
 OK,A5 stress impact on center/tails (response-mode requires geometric path perturbation),L2,SUPPORTED
 OK,Correlation between leakage excess and -EL_proxy,L3,PARTIAL

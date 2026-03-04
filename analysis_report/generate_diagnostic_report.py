@@ -2035,6 +2035,27 @@ def _diagnostic_checks(
             g2_primary_status = str(a3_target_status_reporting)
         a3_evidence_tier = "primary_if_no_A6"
 
+    # Role-aware reporting for A2/A3 early-window sign stability:
+    # when A3 is mechanism/supplementary, early-window sign FAIL is expected
+    # under 1-bounce/2-bounce mixing and should not block reporting.
+    sstab_raw_overall = str(sign_stability.get("overall_status", "WARN")) if isinstance(sign_stability, dict) else "WARN"
+    sstab_reporting = sstab_raw_overall
+    sstab_note = ""
+    sstab_a2 = dict(sign_stability.get("A2", {})) if isinstance(sign_stability, dict) else {}
+    sstab_a3 = dict(sign_stability.get("A3", {})) if isinstance(sign_stability, dict) else {}
+    sstab_a2_status = str(sstab_a2.get("status", "WARN"))
+    sstab_a3_status = str(sstab_a3.get("status", "WARN"))
+    a3_mech_only = a3_role in {"mechanism", "mechanism_only", "supplementary", "candidate"}
+    a3_expected_early_fail = bool(a3_mech_only and sstab_a3_status == "FAIL")
+    if a3_expected_early_fail:
+        sstab_reporting = "PASS" if sstab_a2_status == "PASS" else ("WARN" if sstab_a2_status in {"WARN", "INCONCLUSIVE"} else "FAIL")
+        sstab_note = (
+            "A3 early-window sign FAIL treated as expected under mechanism-supplementary role "
+            "(1-bounce(-) + 2-bounce(+) mixing near ~0 dB); target-window sign remains primary for A3."
+        )
+    else:
+        sstab_note = "A2/A3 early-window sign stability interpreted directly from raw status."
+
     checks["B_time_resolution"] = {
         "freq_source": str(freq_src),
         "BW_Hz": float(bw),
@@ -2066,6 +2087,10 @@ def _diagnostic_checks(
         "W_target_detail": target_stats,
         "W3_te_sweep": wearly_stats,
         "A2A3_sign_stability": sign_stability,
+        "A2A3_sign_stability_raw_status": str(sstab_raw_overall),
+        "A2A3_sign_stability_reporting_status": str(sstab_reporting),
+        "A2A3_sign_stability_reporting_note": str(sstab_note),
+        "A3_expected_early_sign_fail_under_mechanism_role": bool(a3_expected_early_fail),
         "A2_target_window_sign": a2_target_sign,
         "A3_target_window_sign": a3_target_sign,
         "A3_target_window_sign_reporting_status": str(a3_target_status_reporting),
@@ -2952,6 +2977,8 @@ def _build_markdown(
                     "A3_target_sign_hit_rate": _num(dict(b.get("A3_target_window_sign", {})).get("expected_sign_hit_rate", np.nan)),
                     "A3_target_sign_status": dict(b.get("A3_target_window_sign", {})).get("status", ""),
                     "A3_target_sign_status_reporting": b.get("A3_target_window_sign_reporting_status", ""),
+                    "A2A3_sign_stability_raw": b.get("A2A3_sign_stability_raw_status", ""),
+                    "A2A3_sign_stability_reporting": b.get("A2A3_sign_stability_reporting_status", ""),
                     "A6_parity_status": dict(b.get("A6_parity_benchmark", {})).get("status", ""),
                     "A6_hit_rate_odd": _num(dict(b.get("A6_parity_benchmark", {})).get("hit_rate_odd", np.nan)),
                     "A6_hit_rate_even": _num(dict(b.get("A6_parity_benchmark", {})).get("hit_rate_even", np.nan)),
@@ -2987,6 +3014,8 @@ def _build_markdown(
                 "A3_target_sign_hit_rate",
                 "A3_target_sign_status",
                 "A3_target_sign_status_reporting",
+                "A2A3_sign_stability_raw",
+                "A2A3_sign_stability_reporting",
                 "A6_parity_status",
                 "A6_hit_rate_odd",
                 "A6_hit_rate_even",
@@ -3108,8 +3137,9 @@ def _build_markdown(
             lines.append("")
     sstab = b.get("A2A3_sign_stability", {})
     if isinstance(sstab, dict):
-        overall = str(sstab.get("overall_status", "WARN"))
-        lines.append(f"- A2/A3 odd-even sign stability over Te sweep: **{overall}**")
+        overall_raw = str(sstab.get("overall_status", "WARN"))
+        overall_rep = str(b.get("A2A3_sign_stability_reporting_status", overall_raw))
+        lines.append(f"- A2/A3 odd-even sign stability over Te sweep: **{overall_rep}** (raw={overall_raw})")
         lines.append("")
         rows_sign: list[dict[str, Any]] = []
         for sid in ["A2", "A3"]:
@@ -3127,6 +3157,9 @@ def _build_markdown(
             )
         if rows_sign:
             lines.append(report_md.md_table(rows_sign, ["scenario", "expected_sign", "min_hit_rate", "median_hit_rate", "status"]))
+            lines.append("")
+        if str(b.get("A2A3_sign_stability_reporting_note", "")).strip():
+            lines.append(f"- sign-stability reporting note: {b.get('A2A3_sign_stability_reporting_note', '')}")
             lines.append("")
     tw_rows: list[dict[str, Any]] = []
     for k in ["A2_target_window_sign", "A3_target_window_sign"]:

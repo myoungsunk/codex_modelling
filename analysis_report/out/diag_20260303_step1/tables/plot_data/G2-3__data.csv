@@ -1,3 +1,5 @@
 plot_id,series,scenario_id,case_id,link_id,x,y,data,meta
 G2-3,median_xpd_target_ex_db,A2,,,A2,-32.934837696767445,-32.934837696767445,sign_metric=excess;expected_sign_hit_rate=1.0000
 G2-3,median_xpd_target_raw_db,A3,,,A3,8.0,8.0,sign_metric=raw;expected_sign_hit_rate=1.0000
+G2-3,median_xpd_target_raw_db,A6,,,A6,-8.0,-8.0,sign_metric=raw;expected_sign_hit_rate=1.0000
+G2-3,median_xpd_target_raw_db,A6,,,A6,8.0,8.0,sign_metric=raw;expected_sign_hit_rate=1.0000

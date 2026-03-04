@@ -19,8 +19,8 @@
   },
   "M2": {
     "definition": "Fraction inside/outside floor uncertainty band",
-    "inside_ratio": 0.057815845824411134,
-    "outside_ratio": 0.9421841541755889,
+    "inside_ratio": 0.05567010309278351,
+    "outside_ratio": 0.9443298969072165,
     "status": "SUPPORTED"
   },
   "G1": {
@@ -34,16 +34,19 @@
     "status": "SUPPORTED"
   },
   "G2": {
-    "definition": "A3 even-bounce recovery vs A2 (supplementary only when A6 is absent)",
-    "primary_source": "A3_target_window_supplementary_only",
-    "primary_status": "WARN",
-    "delta_median_db": 7.999999707790597,
-    "ks_wasserstein": {
+    "definition": "A6 near-normal parity benchmark as primary G2 evidence; A3 kept as mechanism-only supplementary evidence.",
+    "primary_source": "A6_near_normal_benchmark",
+    "primary_status": "PASS",
+    "A6_hit_rate_odd": 1.0,
+    "A6_hit_rate_even": 1.0,
+    "A6_n_eval_total": 18,
+    "A3_delta_median_db_supplementary": 7.999999707790597,
+    "A3_ks_wasserstein_supplementary": {
       "ks_stat": 0.75,
       "ks_p": 3.914609188476457e-06,
       "wasserstein": 8.66666630234144
     },
-    "status": "PARTIAL"
+    "status": "SUPPORTED"
   },
   "L1": {
     "definition": "Early/Late leakage separation via XPD_early_ex/XPD_late_ex/L_pol",

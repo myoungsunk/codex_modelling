@@ -8,6 +8,7 @@
     "outputs/step1_diag/A4_bridge",
     "outputs/step1_diag/A5_base",
     "outputs/step1_diag/A5_stress",
+    "outputs/step1_diag/A6",
     "outputs/step1_diag/B1",
     "outputs/step1_diag/B2_tuned",
     "outputs/step1_diag/B3_tuned"
@@ -53,9 +54,21 @@
       "A3": "raw",
       "A6": "raw"
     },
-    "te_sweep_ns": [2.0, 3.0, 5.0],
-    "noise_tail_sweep_ns": [30.0, 50.0, 80.0],
-    "threshold_sweep_db": [4.0, 6.0, 8.0],
+    "te_sweep_ns": [
+      2.0,
+      3.0,
+      5.0
+    ],
+    "noise_tail_sweep_ns": [
+      30.0,
+      50.0,
+      80.0
+    ],
+    "threshold_sweep_db": [
+      4.0,
+      6.0,
+      8.0
+    ],
     "tau0_method": "threshold",
     "noise_tail_ns": 50.0,
     "threshold_margin_db": 6.0
@@ -78,7 +91,10 @@
     "debug_rays_k": 20,
     "ray_selection": "top_power",
     "max_cases_per_scenario": 9999,
-    "figure_size": [10, 6],
+    "figure_size": [
+      10,
+      6
+    ],
     "save_format": "png"
   }
 }
