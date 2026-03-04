@@ -620,6 +620,81 @@ def _target_window_stats(
     }
 
 
+def _estimate_target_gap_median(
+    ray_rows: list[dict[str, Any]],
+    *,
+    scenario_id: str,
+    target_n: int,
+) -> float:
+    by_case = _group_rays_by_case(ray_rows, scenario_id)
+    gap_vals: list[float] = []
+    for _, cr in by_case.items():
+        cand = [x for x in cr if int(round(_num(x.get("n_bounce", np.nan)))) == int(target_n)]
+        if not cand:
+            continue
+        m_tar = sorted(cand, key=lambda x: _num(x.get("P_lin", np.nan)), reverse=True)[0]
+        tau_tar = _num(m_tar.get("tau_s", np.nan))
+        if not np.isfinite(tau_tar):
+            continue
+        local_gaps: list[float] = []
+        for r in cr:
+            if r is m_tar:
+                continue
+            tau = _num(r.get("tau_s", np.nan))
+            if np.isfinite(tau):
+                local_gaps.append(abs(float(tau) - float(tau_tar)))
+        if local_gaps:
+            gap_vals.append(float(np.min(np.asarray(local_gaps, dtype=float))))
+    return float(np.nanmedian(np.asarray(gap_vals, dtype=float))) if gap_vals else float("nan")
+
+
+def _resolve_target_window_by_scenario(
+    *,
+    ws: dict[str, Any],
+    ray_rows: list[dict[str, Any]],
+    target_map: dict[str, int],
+    default_w_target_s: float,
+    dt_res_s: float,
+) -> tuple[dict[str, float], dict[str, str]]:
+    out_w = {sid: float(default_w_target_s) for sid in target_map.keys()}
+    out_mode = {sid: "default" for sid in target_map.keys()}
+
+    ns_override = ws.get("target_window_ns_by_scenario", {})
+    if isinstance(ns_override, dict):
+        for k, v in ns_override.items():
+            sid = str(k).upper().strip()
+            vv = _num(v)
+            if sid in out_w and np.isfinite(vv) and vv > 0:
+                out_w[sid] = float(vv) * 1e-9
+                out_mode[sid] = "fixed"
+
+    a3_legacy = _num(ws.get("A3_target_window_ns", np.nan))
+    if np.isfinite(a3_legacy) and a3_legacy > 0:
+        out_w["A3"] = float(a3_legacy) * 1e-9
+        out_mode["A3"] = "fixed"
+
+    mode_cfg = ws.get("target_window_mode_by_scenario", {})
+    mode_map: dict[str, str] = {}
+    if isinstance(mode_cfg, dict):
+        for k, v in mode_cfg.items():
+            mode_map[str(k).upper().strip()] = str(v).lower().strip()
+
+    for sid, tn in target_map.items():
+        if mode_map.get(sid, "") != "adaptive":
+            continue
+        gap_med = _estimate_target_gap_median(ray_rows, scenario_id=sid, target_n=int(tn))
+        w = float(out_w[sid])
+        if np.isfinite(gap_med) and gap_med > 0:
+            # Keep target window below nearest-path median gap to reduce contamination.
+            w = min(w, 0.8 * float(gap_med))
+        if np.isfinite(dt_res_s) and dt_res_s > 0:
+            w = max(w, 2.0 * float(dt_res_s))
+        w = max(w, 0.5e-9)
+        out_w[sid] = float(w)
+        out_mode[sid] = "adaptive"
+    return out_w, out_mode
+
+
 def _dominant_target_tau_by_link(
     ray_rows: list[dict[str, Any]],
     *,
@@ -1379,19 +1454,26 @@ def _diagnostic_checks(
     te_s = float(ws.get("Te_ns", 10.0)) * 1e-9
     tmax_s = float(ws.get("Tmax_ns", 200.0)) * 1e-9
     w_floor_s = float(ws.get("floor_window_ns", max(1.0, 0.5 * float(ws.get("Te_ns", 10.0))))) * 1e-9
-    w_target_s = float(ws.get("target_window_ns", max(2.0, 0.8 * float(ws.get("Te_ns", 10.0))))) * 1e-9
+    w_target_default_s = float(ws.get("target_window_ns", max(2.0, 0.8 * float(ws.get("Te_ns", 10.0))))) * 1e-9
     bw, df, freq_src = _estimate_freq_grid(link_rows, cfg)
     dt_res = 1.0 / bw if bw > 0 else float("nan")
     tau_max = 1.0 / df if df > 0 else float("nan")
 
     floor_stats = _floor_window_contamination(ray_rows, w_floor_s=w_floor_s)
     target_map = {"A2": 1, "A3": 2, "A4": 1, "A5": 2}
+    w_target_s_by_sid, w_target_mode_by_sid = _resolve_target_window_by_scenario(
+        ws=ws,
+        ray_rows=ray_rows,
+        target_map=target_map,
+        default_w_target_s=float(w_target_default_s),
+        dt_res_s=float(dt_res),
+    )
     target_stats = {
         sid: _target_window_stats(
             ray_rows,
             scenario_id=sid,
             target_n=tn,
-            w_target_s=w_target_s,
+            w_target_s=float(w_target_s_by_sid.get(sid, w_target_default_s)),
             te_s=te_s,
             dt_res_s=dt_res,
         )
@@ -1443,7 +1525,7 @@ def _diagnostic_checks(
         runs=runs,
         scenario_id="A2",
         target_n=1,
-        w_target_s=float(w_target_s),
+        w_target_s=float(w_target_s_by_sid.get("A2", w_target_default_s)),
         floor_db=floor_db_used,
         expected_sign=-1,
     )
@@ -1453,7 +1535,7 @@ def _diagnostic_checks(
         runs=runs,
         scenario_id="A3",
         target_n=2,
-        w_target_s=float(w_target_s),
+        w_target_s=float(w_target_s_by_sid.get("A3", w_target_default_s)),
         floor_db=floor_db_used,
         expected_sign=+1,
     )
@@ -1496,7 +1578,10 @@ def _diagnostic_checks(
         "Te_s": float(te_s),
         "Tmax_s": float(tmax_s),
         "W_floor_s": float(w_floor_s),
-        "W_target_s": float(w_target_s),
+        "W_target_s_default": float(w_target_default_s),
+        "W_target_s": float(w_target_default_s),
+        "W_target_s_by_scenario": {k: float(v) for k, v in w_target_s_by_sid.items()},
+        "W_target_mode_by_scenario": {k: str(v) for k, v in w_target_mode_by_sid.items()},
         "W_floor_status": str(floor_stats.get("status", "WARN")),
         "W_floor_C_median_db": float(floor_stats.get("C_floor_median_db", np.nan)),
         "A2_target_in_Wearly_rate": float(target_stats["A2"].get("target_in_Wearly_rate", np.nan)),
@@ -1520,6 +1605,7 @@ def _diagnostic_checks(
         "A3_role": a3_role,
         "A3_mechanism_status": a3_mech_status,
         "A3_system_early_status": a3_early_status,
+        "A3_reporting_rule": "A3 is mechanism-only: report target-window metrics; do not use fixed system early-window dominance as primary evidence.",
         "A5_role": a5_role,
         "A5_target_mode": a5_target_mode,
         "A5_stress_semantics": str(a5_semantics.get("dominant_semantics", "none")),
@@ -2330,6 +2416,9 @@ def _build_markdown(
         )
     )
     lines.append("")
+    if str(b.get("A3_reporting_rule", "")).strip():
+        lines.append(f"- A3 reporting rule: {b.get('A3_reporting_rule', '')}")
+        lines.append("")
     if str(b.get("A5_semantics_note", "")).strip():
         lines.append(f"- A5 semantics note: {b.get('A5_semantics_note', '')}")
         lines.append("")
@@ -2356,6 +2445,26 @@ def _build_markdown(
         lines.append("")
     wtarget = b.get("W_target_detail", {})
     if isinstance(wtarget, dict):
+        wmap = b.get("W_target_s_by_scenario", {})
+        mmap = b.get("W_target_mode_by_scenario", {})
+        if isinstance(wmap, dict) and wmap:
+            wr = []
+            for sid in ["A2", "A3", "A4", "A5"]:
+                if sid not in wmap:
+                    continue
+                wr.append(
+                    {
+                        "scenario": sid,
+                        "W_target_s": _num(wmap.get(sid, np.nan)),
+                        "W_target_ns": _num(wmap.get(sid, np.nan)) * 1e9 if np.isfinite(_num(wmap.get(sid, np.nan))) else np.nan,
+                        "mode": str(mmap.get(sid, "default")) if isinstance(mmap, dict) else "default",
+                    }
+                )
+            if wr:
+                lines.append("- W_target per-scenario configuration")
+                lines.append("")
+                lines.append(report_md.md_table(wr, ["scenario", "W_target_s", "W_target_ns", "mode"]))
+                lines.append("")
         trows = []
         for sid in ["A2", "A3", "A4", "A5"]:
             wsid = wtarget.get(sid, {})

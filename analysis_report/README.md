@@ -55,6 +55,8 @@ python analysis_report/generate_proposition_plot_mapping_detailed.py --run-group
   - `W_floor` (C0): LOS peak 주변 contamination `C_floor`
   - `W_target` (A2-A5): target path 주변 contamination `C_target`
   - `W_early` (B1-B3): `Te` sweep(기본 `2/3/5 ns`) 분리력 `S(Te)`
+  - A3는 `target_window_ns_by_scenario.A3`(또는 `target_window_mode_by_scenario.A3=adaptive`)로 별도 `W_target` 설정 가능
+  - 보고서에서 A3는 mechanism-only로 분리 표기하며, fixed system `W_early` 우세 여부는 보조 진단으로만 사용
 - 진단 C는 endpoint를 분리합니다.
   - `C2-M`(material): primary=`XPD_early_excess`, secondary=`XPD_late_excess`/`L_pol`
   - `C2-S`(stress): primary=`L_pol`, secondary=`rho_early`/`DS`/`XPD_late_excess`, gate=`ΔP_target,total`

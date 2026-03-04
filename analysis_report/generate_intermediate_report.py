@@ -848,6 +848,8 @@ def main() -> None:
         lines.append(f"### {sid}")
         lines.append("")
         lines.append(f"- 의미: {report_md.scenario_meaning(sid)}")
+        if sid == "A3":
+            lines.append("- 보고 규칙: A3는 mechanism-only 시나리오로 `target-window` 지표를 1차로 사용하고 fixed system `W_early` 우세는 보조 진단으로만 사용.")
         lines.append("")
         img = scene_global.get(sid, "")
         if not img:
