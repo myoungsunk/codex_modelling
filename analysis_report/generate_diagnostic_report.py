@@ -1744,6 +1744,75 @@ def _build_a3_geometry_review_rows(
     return sorted(out, key=lambda x: (str(x.get("case_id", "")), str(x.get("case_label", ""))))
 
 
+def _collect_unique_values(rows: list[dict[str, Any]], key: str) -> list[str]:
+    vals = []
+    for r in rows:
+        v = r.get(key, "")
+        if isinstance(v, (dict, list, tuple)):
+            continue
+        s = str(v).strip()
+        if not s or s.lower() == "nan":
+            continue
+        vals.append(s)
+    return sorted(set(vals))
+
+
+def _build_figure_metadata_rows(
+    link_rows: list[dict[str, Any]],
+    idx_rows: list[dict[str, Any]],
+    runs: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    run_by_sid: dict[str, dict[str, Any]] = {}
+    for rr in list(runs or []):
+        sid = str(rr.get("scenario_id", ""))
+        if sid and sid not in run_by_sid:
+            run_by_sid[sid] = dict(rr)
+
+    by_case: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for r in link_rows:
+        by_case.setdefault((str(r.get("scenario_id", "")), str(r.get("case_id", ""))), []).append(r)
+
+    out: list[dict[str, Any]] = []
+    for i in idx_rows:
+        sid = str(i.get("scenario_id", ""))
+        cid = str(i.get("case_id", ""))
+        rows = by_case.get((sid, cid), [])
+        r0 = rows[0] if rows else {}
+        sm = dict(run_by_sid.get(sid, {}).get("summary", {})) if sid in run_by_sid else {}
+        ac = dict(sm.get("antenna_config", {})) if isinstance(sm.get("antenna_config", {}), dict) else {}
+        fcp = _num(r0.get("force_cp_swap_on_odd_reflection", np.nan))
+        if not np.isfinite(fcp):
+            fcp = _num(sm.get("force_cp_swap_on_odd_reflection", np.nan))
+        out.append(
+            {
+                "scenario_id": sid,
+                "case_id": cid,
+                "case_label": str(i.get("case_label", "")),
+                "link_id": str(r0.get("link_id", i.get("link_id", ""))),
+                "scene_png_path": str(i.get("scene_png_path", "")),
+                "basis": str(r0.get("basis", sm.get("basis", ""))),
+                "convention": str(r0.get("convention", sm.get("convention", ""))),
+                "matrix_source": str(r0.get("matrix_source", sm.get("matrix_source", ""))),
+                "force_cp_swap_on_odd_reflection": fcp,
+                "a4_layout_mode": str(r0.get("a4_layout_mode", sm.get("a4_layout_mode", ""))),
+                "a4_dispersion_mode": str(r0.get("a4_dispersion_mode", sm.get("a4_dispersion_mode", ""))),
+                "material_dispersion": str(r0.get("material_dispersion", sm.get("material_dispersion", ""))),
+                "include_late_panel": _num(r0.get("include_late_panel", sm.get("include_late_panel", np.nan))),
+                "stress_mode": str(r0.get("stress_mode", sm.get("stress_mode", ""))),
+                "scatterer_count": _num(r0.get("scatterer_count", sm.get("scatterer_count", np.nan))),
+                "diffuse_enabled": _num(r0.get("diffuse_enabled", sm.get("diffuse_enabled", np.nan))),
+                "diffuse_factor": _num(r0.get("diffuse_factor", sm.get("diffuse_factor", np.nan))),
+                "diffuse_lobe_alpha": _num(r0.get("diffuse_lobe_alpha", sm.get("diffuse_lobe_alpha", np.nan))),
+                "diffuse_rays_per_hit": _num(r0.get("diffuse_rays_per_hit", sm.get("diffuse_rays_per_hit", np.nan))),
+                "tx_cross_pol_leakage_db": _num(r0.get("tx_cross_pol_leakage_db", ac.get("tx_cross_pol_leakage_db", np.nan))),
+                "rx_cross_pol_leakage_db": _num(r0.get("rx_cross_pol_leakage_db", ac.get("rx_cross_pol_leakage_db", np.nan))),
+                "tx_cross_pol_leakage_db_slope_per_ghz": _num(r0.get("tx_cross_pol_leakage_db_slope_per_ghz", ac.get("tx_cross_pol_leakage_db_slope_per_ghz", np.nan))),
+                "rx_cross_pol_leakage_db_slope_per_ghz": _num(r0.get("rx_cross_pol_leakage_db_slope_per_ghz", ac.get("rx_cross_pol_leakage_db_slope_per_ghz", np.nan))),
+            }
+        )
+    return out
+
+
 def _diagnostic_checks(
     link_rows: list[dict[str, Any]],
     ray_rows: list[dict[str, Any]],
@@ -2509,9 +2578,90 @@ def _diagnostic_checks(
         },
     }
 
-    # E power-based only
+    # E power-based only + strict meta-contract checks.
+    basis_vals = _collect_unique_values(link_rows, "basis")
+    conv_vals = _collect_unique_values(link_rows, "convention")
+    msrc_vals = [v.upper() for v in _collect_unique_values(link_rows, "matrix_source")]
+    if not basis_vals:
+        basis_vals = sorted(
+            set(
+                str((dict(r.get("summary", {})).get("basis", "") if isinstance(r, dict) else "")).strip()
+                for r in runs
+                if str((dict(r.get("summary", {})).get("basis", "") if isinstance(r, dict) else "")).strip()
+            )
+        )
+    if not conv_vals:
+        conv_vals = sorted(
+            set(
+                str((dict(r.get("summary", {})).get("convention", "") if isinstance(r, dict) else "")).strip()
+                for r in runs
+                if str((dict(r.get("summary", {})).get("convention", "") if isinstance(r, dict) else "")).strip()
+            )
+        )
+    if not msrc_vals:
+        msrc_vals = sorted(
+            set(
+                str((dict(r.get("summary", {})).get("matrix_source", "") if isinstance(r, dict) else "")).upper().strip()
+                for r in runs
+                if str((dict(r.get("summary", {})).get("matrix_source", "") if isinstance(r, dict) else "")).strip()
+            )
+        )
+    fcp = np.asarray([_num(r.get("force_cp_swap_on_odd_reflection", np.nan)) for r in link_rows], dtype=float)
+    force_cp_any_true = bool(np.any(np.isfinite(fcp) & (np.round(fcp) == 1)))
+    if not np.any(np.isfinite(fcp)):
+        force_cp_any_true = any(
+            bool(dict(r.get("summary", {})).get("force_cp_swap_on_odd_reflection", False))
+            for r in runs
+            if isinstance(r, dict)
+        )
+    meta_contract_ok = (
+        len(basis_vals) == 1
+        and len(conv_vals) == 1
+        and len(msrc_vals) == 1
+        and msrc_vals[0] in {"A", "J"}
+    )
+    if meta_contract_ok and (not force_cp_any_true):
+        e_status = "PASS"
+    elif meta_contract_ok:
+        e_status = "WARN"
+    else:
+        e_status = "FAIL"
+
+    c0_rows = scenario_rows.get("C0", [])
+    tx_leak = np.asarray([_num(r.get("tx_cross_pol_leakage_db", np.nan)) for r in c0_rows], dtype=float)
+    rx_leak = np.asarray([_num(r.get("rx_cross_pol_leakage_db", np.nan)) for r in c0_rows], dtype=float)
+    c0_floor = np.asarray([_num(r.get("XPD_early_db", np.nan)) for r in c0_rows], dtype=float)
+    tx_med = float(np.nanmedian(tx_leak)) if np.any(np.isfinite(tx_leak)) else float("nan")
+    rx_med = float(np.nanmedian(rx_leak)) if np.any(np.isfinite(rx_leak)) else float("nan")
+    if not np.isfinite(tx_med) or not np.isfinite(rx_med):
+        tx_runs = []
+        rx_runs = []
+        for rr in runs:
+            sm = dict(rr.get("summary", {})) if isinstance(rr, dict) else {}
+            ac = dict(sm.get("antenna_config", {})) if isinstance(sm.get("antenna_config", {}), dict) else {}
+            txv = _num(ac.get("tx_cross_pol_leakage_db", np.nan))
+            rxv = _num(ac.get("rx_cross_pol_leakage_db", np.nan))
+            if np.isfinite(txv):
+                tx_runs.append(float(txv))
+            if np.isfinite(rxv):
+                rx_runs.append(float(rxv))
+        if (not np.isfinite(tx_med)) and tx_runs:
+            tx_med = float(np.median(np.asarray(tx_runs, dtype=float)))
+        if (not np.isfinite(rx_med)) and rx_runs:
+            rx_med = float(np.median(np.asarray(rx_runs, dtype=float)))
+    c0_floor_med = float(np.nanmedian(c0_floor)) if np.any(np.isfinite(c0_floor)) else float("nan")
+    # Heuristic sanity target for coupling-limited floor.
+    coupling_floor_nominal_db = float(min(tx_med, rx_med)) if np.isfinite(tx_med) and np.isfinite(rx_med) else float("nan")
+    coupling_floor_delta_db = float(c0_floor_med - coupling_floor_nominal_db) if np.isfinite(c0_floor_med) and np.isfinite(coupling_floor_nominal_db) else float("nan")
+    if np.isfinite(coupling_floor_delta_db) and abs(coupling_floor_delta_db) <= 10.0:
+        coupling_status = "PASS"
+    elif np.isfinite(coupling_floor_delta_db):
+        coupling_status = "WARN"
+    else:
+        coupling_status = "INCONCLUSIVE"
+
     checks["E_power_based"] = {
-        "status": "PASS",
+        "status": str(e_status),
         "used_metrics": [
             "XPD_early_db",
             "XPD_late_db",
@@ -2522,6 +2672,21 @@ def _diagnostic_checks(
             "EL_proxy_db",
             "LOSflag",
         ],
+        "basis_values": basis_vals,
+        "convention_values": conv_vals,
+        "matrix_source_values": msrc_vals,
+        "force_cp_swap_any_true": bool(force_cp_any_true),
+        "matrix_source_rule": "Use circular basis for CP interpretation and keep matrix_source fixed (A_f for antenna-embedded, J_f for de-embedded).",
+        "main_result_rule": "force_cp_swap_on_odd_reflection must be false for main-result evidence.",
+        "coupling_floor_check": {
+            "status": str(coupling_status),
+            "c0_xpd_floor_median_db": float(c0_floor_med),
+            "tx_cross_pol_leakage_median_db": float(tx_med),
+            "rx_cross_pol_leakage_median_db": float(rx_med),
+            "coupling_floor_nominal_db": float(coupling_floor_nominal_db),
+            "delta_c0_minus_nominal_db": float(coupling_floor_delta_db),
+            "note": "Heuristic sanity check only; measured C0 floor should be reviewed against configured antenna coupling/leakage model.",
+        },
         "note": "No complex-phase fields are used by this report pipeline.",
         "a5_stress_semantics": str(a5_semantics.get("dominant_semantics", "none")),
         "a5_contamination_response_ready": bool(a5_semantics.get("contamination_response_ready", False)),
@@ -2656,6 +2821,8 @@ def _build_markdown(
         scen_counts[str(r.get("scenario_id", "NA"))] = int(scen_counts.get(str(r.get("scenario_id", "NA")), 0) + 1)
     rows = [{"scenario": s, "n_links": n} for s, n in sorted(scen_counts.items())]
     lines.append(report_md.md_table(rows, ["scenario", "n_links"]))
+    lines.append("")
+    lines.append("- Figure metadata: [figure_metadata.csv](tables/figure_metadata.csv)")
     lines.append("")
     lines.append("## Floor Reference")
     lines.append("")
@@ -3285,13 +3452,32 @@ def _build_markdown(
     lines.append("")
     lines.append(f"- Status: **{e.get('status', 'PASS')}**")
     lines.append(f"- Note: {e.get('note', '')}")
+    lines.append(f"- basis values: `{e.get('basis_values', [])}`")
+    lines.append(f"- convention values: `{e.get('convention_values', [])}`")
+    lines.append(f"- matrix_source values: `{e.get('matrix_source_values', [])}`")
+    lines.append(f"- force_cp_swap_on_odd_reflection(any): `{e.get('force_cp_swap_any_true', False)}`")
+    if str(e.get("matrix_source_rule", "")).strip():
+        lines.append(f"- matrix_source rule: {e.get('matrix_source_rule', '')}")
+    if str(e.get("main_result_rule", "")).strip():
+        lines.append(f"- main-result rule: {e.get('main_result_rule', '')}")
     used = e.get("used_metrics", [])
     if isinstance(used, list):
         lines.append("- Used metrics: " + ", ".join(str(x) for x in used))
+    cfc = e.get("coupling_floor_check", {})
+    if isinstance(cfc, dict):
+        lines.append(
+            f"- C0 coupling-floor sanity: status={cfc.get('status', 'INCONCLUSIVE')}, "
+            f"C0 floor={_num(cfc.get('c0_xpd_floor_median_db', np.nan)):.3f} dB, "
+            f"nominal={_num(cfc.get('coupling_floor_nominal_db', np.nan)):.3f} dB, "
+            f"delta={_num(cfc.get('delta_c0_minus_nominal_db', np.nan)):.3f} dB"
+        )
+        if str(cfc.get("note", "")).strip():
+            lines.append(f"- coupling-floor note: {cfc.get('note', '')}")
     lines.append(f"- A5 stress semantics: `{e.get('a5_stress_semantics', 'none')}`")
     lines.append(f"- A5 contamination-response ready: `{e.get('a5_contamination_response_ready', False)}`")
     if str(e.get("a5_semantics_note", "")).strip():
         lines.append(f"- A5 semantics note: {e.get('a5_semantics_note', '')}")
+    lines.append("- Figure metadata table: [figure_metadata.csv](tables/figure_metadata.csv)")
     lines.append("")
 
     lines.append("## Scenario Sections")
@@ -3418,6 +3604,7 @@ def main() -> None:
         scene_map=scene_map,
     )
     a3_review_rows = _build_a3_geometry_review_rows(idx_rows, scene_map=scene_map, ray_rows=ray_rows)
+    figure_meta_rows = _build_figure_metadata_rows(link_rows, idx_rows, runs=runs)
 
     # checks
     checks = _diagnostic_checks(
@@ -3475,6 +3662,7 @@ def main() -> None:
     # save tables/json
     _write_rows_csv(tab_dir / "diagnostic_link_rows.csv", link_rows)
     _write_rows_csv(tab_dir / "diagnostic_ray_rows.csv", ray_rows)
+    _write_rows_csv(tab_dir / "figure_metadata.csv", figure_meta_rows)
     _write_rows_csv_with_columns(
         tab_dir / "target_level.csv",
         target_level_rows,

@@ -131,11 +131,11 @@ See `docs/dualcp_proxy_model.md` for floor->metrics->conditional-fit->bridge det
 Run standardized A/B/C/U outputs (HDF5 + CSV) for each scenario:
 
 ```bash
-python3 scripts/run_standard_sim.py --scenario C0 --out-h5 outputs/std_c0.h5 --out-dir outputs/std_c0
-python3 scripts/run_standard_sim.py --scenario A2 --out-h5 outputs/std_a2.h5 --out-dir outputs/std_a2 --strict-los-blocked
-python3 scripts/run_standard_sim.py --scenario A3 --out-h5 outputs/std_a3.h5 --out-dir outputs/std_a3 --strict-los-blocked
-python3 scripts/run_standard_sim.py --scenario A4 --out-h5 outputs/std_a4.h5 --out-dir outputs/std_a4 --material-list glass,wood --a4-layout-modes iso,bridge --a4-dispersion-modes off,on
-python3 scripts/run_standard_sim.py --scenario A5 --out-h5 outputs/std_a5.h5 --out-dir outputs/std_a5 --stress-flag --strict-los-blocked
+python3 scripts/run_standard_sim.py --scenario C0 --out-h5 outputs/std_c0.h5 --out-dir outputs/std_c0 --basis circular --convention IEEE-RHCP --matrix-source A --force-cp-swap-on-odd-reflection false
+python3 scripts/run_standard_sim.py --scenario A2 --out-h5 outputs/std_a2.h5 --out-dir outputs/std_a2 --strict-los-blocked --basis circular --convention IEEE-RHCP --matrix-source A --force-cp-swap-on-odd-reflection false
+python3 scripts/run_standard_sim.py --scenario A3 --out-h5 outputs/std_a3.h5 --out-dir outputs/std_a3 --strict-los-blocked --basis circular --convention IEEE-RHCP --matrix-source A --force-cp-swap-on-odd-reflection false
+python3 scripts/run_standard_sim.py --scenario A4 --out-h5 outputs/std_a4.h5 --out-dir outputs/std_a4 --material-list glass,wood --a4-layout-modes iso,bridge --a4-dispersion-modes off,on --basis circular --convention IEEE-RHCP --matrix-source A --force-cp-swap-on-odd-reflection false
+python3 scripts/run_standard_sim.py --scenario A5 --out-h5 outputs/std_a5.h5 --out-dir outputs/std_a5 --stress-flag --strict-los-blocked --a5-stress-mode geometry --a5-scatterer-count 3 --a5-diffuse-enabled false --basis circular --convention IEEE-RHCP --matrix-source A --force-cp-swap-on-odd-reflection false
 python3 scripts/run_standard_sim.py --scenario B1 --out-h5 outputs/std_b1.h5 --out-dir outputs/std_b1
 python3 scripts/run_standard_sim.py --scenario B2 --out-h5 outputs/std_b2.h5 --out-dir outputs/std_b2
 python3 scripts/run_standard_sim.py --scenario B3 --out-h5 outputs/std_b3.h5 --out-dir outputs/std_b3
