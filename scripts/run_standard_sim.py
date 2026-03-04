@@ -999,6 +999,25 @@ def _build_case_records(args: argparse.Namespace, f_hz: np.ndarray) -> list[dict
             params = params[: int(args.a5_max_cases)]
         stress_on = bool(args.stress_flag)
         stress_mode = str(args.a5_stress_mode) if stress_on else "none"
+        stress_mode_norm = str(stress_mode).lower().strip()
+        if stress_on and stress_mode_norm == "synthetic" and not bool(getattr(args, "allow_a5_synthetic_only", False)):
+            raise SystemExit(
+                "A5 synthetic-only stress mode is disabled by default because it keeps delay/path topology fixed. "
+                "Use --a5-stress-mode hybrid|geometry for stress-response, or pass --allow-a5-synthetic-only to override."
+            )
+        if stress_on and stress_mode_norm in {"geometry", "hybrid"} and int(args.a5_scatterer_count) <= 0:
+            raise SystemExit(
+                "A5 stress-response mode requires --a5-scatterer-count > 0 "
+                "(otherwise geometry/delay structure is unchanged)."
+            )
+        stress_path_structure_active = int(stress_on and stress_mode_norm in {"geometry", "hybrid"} and int(args.a5_scatterer_count) > 0)
+        stress_pol_mixer_active = int(stress_on and stress_mode_norm in {"synthetic", "hybrid"})
+        if not stress_on or stress_mode_norm == "none":
+            stress_semantics = "off"
+        elif stress_path_structure_active == 1:
+            stress_semantics = "response"
+        else:
+            stress_semantics = "polarization_only"
         for rep_outer in range(n_rep):
             for p0 in params:
                 p = dict(p0)
@@ -1027,6 +1046,9 @@ def _build_case_records(args: argparse.Namespace, f_hz: np.ndarray) -> list[dict
                             "human_flag": int(stress_on),
                             "obstacle_flag": 1,
                             "stress_mode": str(stress_mode),
+                            "stress_path_structure_active": int(stress_path_structure_active),
+                            "stress_polarization_mixer_active": int(stress_pol_mixer_active),
+                            "stress_semantics": str(stress_semantics),
                             "los_block_method": "physical_occluder" if bool(los_blocker) else "synthetic_los_off",
                             "basis": basis,
                         },
@@ -1094,6 +1116,7 @@ def main() -> None:
     parser.add_argument("--los-block-mode", type=str, default="occluder", choices=["synthetic", "occluder"])
     parser.add_argument("--a5-stress-mode", type=str, default="hybrid", choices=["none", "synthetic", "geometry", "hybrid"])
     parser.add_argument("--a5-scatterer-count", type=int, default=3)
+    parser.add_argument("--allow-a5-synthetic-only", action="store_true")
     parser.add_argument("--a5-max-cases", type=int, default=0)
     parser.add_argument("--material-list", type=str, default="")
     parser.add_argument("--stress-flag", action="store_true")
