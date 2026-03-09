@@ -60,6 +60,7 @@
   - `tables/target_level.csv`
   - `tables/floor_reference_used.json`
   - `tables/intermediate_proposition_status.csv`
+  - `tables/intermediate_proposition_details.json`
   - `tables/proposition_plot_mapping.csv`
   - `tables/proposition_plot_mapping_detailed.csv`
 
