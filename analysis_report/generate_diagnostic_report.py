@@ -1800,10 +1800,25 @@ def _make_scene_plots(
                 sc, _ = scene_lib.build_fallback_scene_from_link_row(case_rows[0])
             if sc is not None:
                 rx_points = []
+                support_mask = []
                 for rr in case_rows:
                     rx_points.append((_num(rr.get("rx_x", np.nan)), _num(rr.get("rx_y", np.nan))))
+                    vals = [
+                        _num(rr.get("XPD_early_excess_db", np.nan)),
+                        _num(rr.get("rho_early_lin", np.nan)),
+                        _num(rr.get("L_pol_db", np.nan)),
+                        _num(rr.get("delay_spread_rms_s", np.nan)),
+                        _num(rr.get("early_energy_fraction", np.nan)),
+                    ]
+                    support_mask.append(bool(all(np.isfinite(v) for v in vals)))
                 out_png = out_fig_dir / f"{scenario_id}__GLOBAL__scene.png"
-                scene_lib.plot_scene_global(sc, rx_points=rx_points, out_png=out_png, figure_size=figure_size)
+                scene_lib.plot_scene_global(
+                    sc,
+                    rx_points=rx_points,
+                    support_mask=support_mask,
+                    out_png=out_png,
+                    figure_size=figure_size,
+                )
                 first_scene_by_scenario[scenario_id] = str(out_png)
 
     return index_rows, first_scene_by_scenario, warns, warn_cases
@@ -2642,15 +2657,47 @@ def _diagnostic_checks(
     hole_analysis = _d3_hole_analysis(strata_counts, strata_counts_selected)
 
     # Priority-3: per-scenario room summary export
+    # Scene-purpose contract:
+    # - B1: good-condition baseline
+    # - B2: contamination onset
+    # - B3: high-risk tail
+    # Keep legacy strata status as a separate field for backward compatibility.
     b_per_scenario: list[dict[str, Any]] = []
     for sid in ["B1", "B2", "B3"]:
         s_rows = [r for r in b_rows if str(r.get("scenario_id", "")) == sid]
+        n_total = int(len(s_rows))
         sq1, sq2 = _el_q1_q2(s_rows)
         scounts = _strata_counts(s_rows, q1=float(sq1), q2=float(sq2))
         sviable = [k for k in _strata_base_bins() if int(scounts.get(k, 0)) > 0]
         smin_all = int(min(int(scounts.get(k, 0)) for k in _strata_base_bins())) if _strata_base_bins() else 0
         smin_viable = int(min(int(scounts.get(k, 0)) for k in sviable)) if sviable else 0
         sqna = int(scounts.get("LOS0_qNA", 0) + scounts.get("LOS1_qNA", 0))
+        xpd_vals = np.asarray([_num(r.get("XPD_early_excess_db", np.nan)) for r in s_rows], dtype=float)
+        rho_vals = np.asarray([_num(r.get("rho_early_lin", np.nan)) for r in s_rows], dtype=float)
+        lpol_vals = np.asarray([_num(r.get("L_pol_db", np.nan)) for r in s_rows], dtype=float)
+        ds_vals_ns = np.asarray([_num(r.get("delay_spread_rms_s", np.nan)) * 1e9 for r in s_rows], dtype=float)
+        ef_vals = np.asarray([_num(r.get("early_energy_fraction", np.nan)) for r in s_rows], dtype=float)
+        xpd_fin = xpd_vals[np.isfinite(xpd_vals)]
+        rho_fin = rho_vals[np.isfinite(rho_vals)]
+        lpol_fin = lpol_vals[np.isfinite(lpol_vals)]
+        ds_fin = ds_vals_ns[np.isfinite(ds_vals_ns)]
+        ef_fin = ef_vals[np.isfinite(ef_vals)]
+        support_core = int(len(xpd_fin))
+        support_core_rate = float(support_core / n_total) if n_total > 0 else float("nan")
+        support_risk = int(np.sum(np.isfinite(xpd_vals) & np.isfinite(rho_vals) & np.isfinite(lpol_vals) & np.isfinite(ds_vals_ns) & np.isfinite(ef_vals)))
+        support_risk_rate = float(support_risk / n_total) if n_total > 0 else float("nan")
+        xpd_neg_tail_frac = float(np.mean(xpd_fin < -30.0)) if len(xpd_fin) else float("nan")
+        xpd_median = float(np.median(xpd_fin)) if len(xpd_fin) else float("nan")
+        xpd_q75 = float(np.percentile(xpd_fin, 75.0)) if len(xpd_fin) else float("nan")
+        xpd_q90 = float(np.percentile(xpd_fin, 90.0)) if len(xpd_fin) else float("nan")
+        xpd_neg_tail_frac0 = float(np.mean(xpd_fin < 0.0)) if len(xpd_fin) else float("nan")
+        rho_q75 = float(np.percentile(rho_fin, 75.0)) if len(rho_fin) else float("nan")
+        rho_q90 = float(np.percentile(rho_fin, 90.0)) if len(rho_fin) else float("nan")
+        ds_q75 = float(np.percentile(ds_fin, 75.0)) if len(ds_fin) else float("nan")
+        ds_q90 = float(np.percentile(ds_fin, 90.0)) if len(ds_fin) else float("nan")
+        lpol_q75 = float(np.percentile(lpol_fin, 75.0)) if len(lpol_fin) else float("nan")
+        lpol_q90 = float(np.percentile(lpol_fin, 90.0)) if len(lpol_fin) else float("nan")
+        ef_median = float(np.median(ef_fin)) if len(ef_fin) else float("nan")
         if len(sviable) == 0:
             s_status = "FAIL"
         elif smin_viable >= 3 and sqna == 0:
@@ -2663,15 +2710,293 @@ def _diagnostic_checks(
             {
                 "scenario_id": sid,
                 "status": s_status,
-                "n_rows": int(len(s_rows)),
+                "n_rows": n_total,
                 "q1_db": float(sq1) if np.isfinite(sq1) else float("nan"),
                 "q2_db": float(sq2) if np.isfinite(sq2) else float("nan"),
                 "min_strata_all_n": int(smin_all),
                 "min_strata_viable_n": int(smin_viable),
                 "qna_total": int(sqna),
+                "support_core_n": int(support_core),
+                "support_core_rate": float(support_core_rate),
+                "support_risk_n": int(support_risk),
+                "support_risk_rate": float(support_risk_rate),
+                "support_rate": float(support_risk_rate),
+                "xpd_early_ex_median_db": float(xpd_median),
+                "xpd_early_ex_q75_db": float(xpd_q75),
+                "xpd_early_ex_q90_db": float(xpd_q90),
+                "neg_tail_rate_xpd_early_ex_lt_0": float(xpd_neg_tail_frac0),
+                "xpd_early_ex_neg_tail_frac_lt_m30": float(xpd_neg_tail_frac),
+                "rho_early_q75_lin": float(rho_q75),
+                "rho_early_q90_lin": float(rho_q90),
+                "ds_q75_ns": float(ds_q75),
+                "ds_q90_ns": float(ds_q90),
+                "l_pol_q75_db": float(lpol_q75),
+                "l_pol_q90_db": float(lpol_q90),
+                "early_fraction_median": float(ef_median),
+                "scene_axis": "",
+                "status_strata_legacy": s_status,
+                "objective_rule": "",
+                "objective_hits": 0,
+                "objective_total": 0,
+                "objective_details": {},
                 "strata_counts": scounts,
             }
         )
+
+    # Scene-level one-line judgement (purpose-oriented, not per-metric fail counting)
+    # Primary: XPD_early_ex, rho_early, early_fraction
+    # Secondary: L_pol, DS
+    # B2/B3 comparison basis: EL-conditioned (fallback to matched d-range when EL overlap is insufficient).
+    b_sid_map = {str(r.get("scenario_id", "")): r for r in b_per_scenario}
+
+    def _assign_scene_status(row: dict[str, Any], *, status: str, axis: str, hits: int, total: int, rule: str, details: dict[str, Any]) -> None:
+        row["status"] = str(status)
+        row["scene_axis"] = str(axis)
+        row["objective_hits"] = int(hits)
+        row["objective_total"] = int(total)
+        row["objective_rule"] = str(rule)
+        row["objective_details"] = dict(details)
+
+    def _rows_by_sid(sid: str) -> list[dict[str, Any]]:
+        return [r for r in b_rows if str(r.get("scenario_id", "")) == sid]
+
+    def _metric_val(row: dict[str, Any], metric: str) -> float:
+        if metric == "xpd":
+            return _num(row.get("XPD_early_excess_db", np.nan))
+        if metric == "rho":
+            return _num(row.get("rho_early_lin", np.nan))
+        if metric == "ef":
+            return _num(row.get("early_energy_fraction", np.nan))
+        if metric == "lpol":
+            return _num(row.get("L_pol_db", np.nan))
+        if metric == "ds_ns":
+            return _num(row.get("delay_spread_rms_s", np.nan)) * 1e9
+        return float("nan")
+
+    def _common_range(rows_a: list[dict[str, Any]], rows_b: list[dict[str, Any]], key: str) -> tuple[float, float] | None:
+        a = np.asarray([_num(r.get(key, np.nan)) for r in rows_a], dtype=float)
+        b = np.asarray([_num(r.get(key, np.nan)) for r in rows_b], dtype=float)
+        a = a[np.isfinite(a)]
+        b = b[np.isfinite(b)]
+        if len(a) == 0 or len(b) == 0:
+            return None
+        lo = max(float(np.min(a)), float(np.min(b)))
+        hi = min(float(np.max(a)), float(np.max(b)))
+        if (not np.isfinite(lo)) or (not np.isfinite(hi)) or hi <= lo:
+            return None
+        return float(lo), float(hi)
+
+    def _metric_in_range(rows_in: list[dict[str, Any]], metric: str, range_key: str, lo: float, hi: float) -> np.ndarray:
+        vals = []
+        for rr in rows_in:
+            rv = _num(rr.get(range_key, np.nan))
+            if not np.isfinite(rv):
+                continue
+            if rv < lo or rv > hi:
+                continue
+            mv = _metric_val(rr, metric)
+            if np.isfinite(mv):
+                vals.append(float(mv))
+        return np.asarray(vals, dtype=float)
+
+    def _direction_support_ratio(
+        rows_a: list[dict[str, Any]],
+        rows_b: list[dict[str, Any]],
+        *,
+        metric: str,
+        expect: str,
+        prefer_key: str = "EL_proxy_db",
+        fallback_key: str = "d_m",
+        n_bins: int = 3,
+        min_bin_n: int = 3,
+    ) -> tuple[float, float, int, str]:
+        basis_key = str(prefer_key)
+        cr = _common_range(rows_a, rows_b, prefer_key)
+        if cr is None:
+            cr = _common_range(rows_a, rows_b, fallback_key)
+            basis_key = str(fallback_key)
+        if cr is None:
+            return float("nan"), float("nan"), 0, "none"
+        lo, hi = cr
+        va_all = _metric_in_range(rows_a, metric, basis_key, lo, hi)
+        vb_all = _metric_in_range(rows_b, metric, basis_key, lo, hi)
+        delta_med = float(np.median(va_all) - np.median(vb_all)) if len(va_all) and len(vb_all) else float("nan")
+        edges = np.linspace(lo, hi, int(max(2, n_bins + 1)))
+        good = 0
+        total = 0
+        for i in range(len(edges) - 1):
+            l = float(edges[i])
+            h = float(edges[i + 1])
+            va = _metric_in_range(rows_a, metric, basis_key, l, h)
+            vb = _metric_in_range(rows_b, metric, basis_key, l, h)
+            if len(va) < int(min_bin_n) or len(vb) < int(min_bin_n):
+                continue
+            d = float(np.median(va) - np.median(vb))
+            ok = (d < 0.0) if str(expect) == "lt" else (d > 0.0)
+            good += int(ok)
+            total += 1
+        ratio = float(good / total) if total > 0 else float("nan")
+        return ratio, delta_med, total, basis_key
+
+    # B1: good-condition baseline (absolute criteria, not strict B1-vs-B2 ordering)
+    if "B1" in b_sid_map:
+        r1 = b_sid_map["B1"]
+        # Heuristic absolute gates for practical baseline judgement.
+        # XPD sign remains a hard semantic gate for "good CP baseline".
+        b1_rho_q75_max = 6.0
+        b1_ef_median_min = 0.65
+        c_xpd = bool(_num(r1.get("xpd_early_ex_median_db", np.nan)) > 0.0)
+        c_rho = bool(_num(r1.get("rho_early_q75_lin", np.nan)) <= b1_rho_q75_max)
+        c_ef = bool(_num(r1.get("early_fraction_median", np.nan)) >= b1_ef_median_min)
+        c_sup = bool(_num(r1.get("support_rate", np.nan)) >= 0.90)
+        hits = int(c_xpd) + int(c_rho) + int(c_ef) + int(c_sup)
+        # Keep XPD sign as semantic gate for PASS, but avoid over-failing practical scenes.
+        if hits >= 3 and c_xpd:
+            st = "PASS"
+        elif hits >= 2:
+            st = "WARN"
+        else:
+            st = "FAIL"
+        _assign_scene_status(
+            r1,
+            status=st,
+            axis="good_condition_baseline",
+            hits=hits,
+            total=4,
+            rule="absolute baseline: median(XPD_early_ex)>0 (PASS gate) + rho_q75<=6 + early_fraction_median>=0.65 + support_rate>=0.9",
+            details={
+                "xpd_positive": c_xpd,
+                "rho_q75_le_6": c_rho,
+                "early_fraction_median_ge_0p65": c_ef,
+                "support_rate_ge_0p9": c_sup,
+            },
+        )
+
+    # B2: transition zone (distribution shift, not whole-scene strict ordering)
+    if "B2" in b_sid_map and "B1" in b_sid_map:
+        b2_rows = _rows_by_sid("B2")
+        b1_rows = _rows_by_sid("B1")
+        rx_ratio, rx_dmed, rx_bins, rx_basis = _direction_support_ratio(b2_rows, b1_rows, metric="xpd", expect="lt")
+        rr_ratio, rr_dmed, rr_bins, rr_basis = _direction_support_ratio(b2_rows, b1_rows, metric="rho", expect="gt")
+        re_ratio, re_dmed, re_bins, re_basis = _direction_support_ratio(b2_rows, b1_rows, metric="ef", expect="lt")
+        h_x = bool((np.isfinite(rx_dmed) and rx_dmed < 0.0) or (np.isfinite(rx_ratio) and rx_ratio >= 0.50))
+        h_r = bool((np.isfinite(rr_dmed) and rr_dmed > 0.0) or (np.isfinite(rr_ratio) and rr_ratio >= 0.50))
+        h_e = bool((np.isfinite(re_dmed) and re_dmed < 0.0) or (np.isfinite(re_ratio) and re_ratio >= 0.50))
+        hits = int(h_x) + int(h_r) + int(h_e)
+        eval_bins_total = int(rx_bins) + int(rr_bins) + int(re_bins)
+        if eval_bins_total <= 0:
+            st = "FAIL"
+        elif hits >= 2:
+            st = "PASS"
+        else:
+            st = "WARN"
+        _assign_scene_status(
+            b_sid_map["B2"],
+            status=st,
+            axis="contamination_onset",
+            hits=hits,
+            total=3,
+            rule="transition-zone shift (EL-conditioned/matched-range): ΔXPD<0, Δrho>0, Δearly_fraction<0 중 2개 이상; FAIL only when comparison bins unavailable",
+            details={
+                "xpd_ratio_worse_bins": rx_ratio,
+                "xpd_delta_common_median": rx_dmed,
+                "xpd_eval_bins": int(rx_bins),
+                "xpd_basis": rx_basis,
+                "rho_ratio_worse_bins": rr_ratio,
+                "rho_delta_common_median": rr_dmed,
+                "rho_eval_bins": int(rr_bins),
+                "rho_basis": rr_basis,
+                "ef_ratio_worse_bins": re_ratio,
+                "ef_delta_common_median": re_dmed,
+                "ef_eval_bins": int(re_bins),
+                "ef_basis": re_basis,
+                "hit_xpd_shift": h_x,
+                "hit_rho_shift": h_r,
+                "hit_ef_shift": h_e,
+                "eval_bins_total": int(eval_bins_total),
+            },
+        )
+
+    # B3: high-risk region (risk-tail expansion, not worst median)
+    if "B3" in b_sid_map and "B2" in b_sid_map:
+        b3_rows = _rows_by_sid("B3")
+        b2_rows = _rows_by_sid("B2")
+        cr = _common_range(b3_rows, b2_rows, "EL_proxy_db")
+        basis_key = "EL_proxy_db"
+        if cr is None:
+            cr = _common_range(b3_rows, b2_rows, "d_m")
+            basis_key = "d_m"
+        c_tail = False
+        c_rho = False
+        c_ef = False
+        tail_b2 = float("nan")
+        tail_b3 = float("nan")
+        rho_q75_b2 = float("nan")
+        rho_q75_b3 = float("nan")
+        ef_med_b2 = float("nan")
+        ef_med_b3 = float("nan")
+        if cr is not None:
+            lo, hi = cr
+            x2 = _metric_in_range(b2_rows, "xpd", basis_key, lo, hi)
+            x3 = _metric_in_range(b3_rows, "xpd", basis_key, lo, hi)
+            r2v = _metric_in_range(b2_rows, "rho", basis_key, lo, hi)
+            r3v = _metric_in_range(b3_rows, "rho", basis_key, lo, hi)
+            e2v = _metric_in_range(b2_rows, "ef", basis_key, lo, hi)
+            e3v = _metric_in_range(b3_rows, "ef", basis_key, lo, hi)
+            if len(x2) and len(x3):
+                tail_b2 = float(np.mean(x2 < 0.0))
+                tail_b3 = float(np.mean(x3 < 0.0))
+                c_tail = bool(tail_b3 > tail_b2)
+            if len(r2v) and len(r3v):
+                rho_q75_b2 = float(np.percentile(r2v, 75.0))
+                rho_q75_b3 = float(np.percentile(r3v, 75.0))
+                c_rho = bool(rho_q75_b3 > rho_q75_b2)
+            if len(e2v) and len(e3v):
+                ef_med_b2 = float(np.median(e2v))
+                ef_med_b3 = float(np.median(e3v))
+                c_ef = bool(ef_med_b3 < ef_med_b2)
+        c_sup = bool(_num(b_sid_map["B3"].get("support_rate", np.nan)) < _num(b_sid_map["B2"].get("support_rate", np.nan)))
+        c_ds = bool(_num(b_sid_map["B3"].get("ds_q75_ns", np.nan)) > _num(b_sid_map["B2"].get("ds_q75_ns", np.nan)))
+        hits = int(c_tail) + int(c_rho) + int(c_ef) + int(c_sup)
+        n_primary_available = int(np.isfinite(tail_b2) and np.isfinite(tail_b3)) + int(np.isfinite(rho_q75_b2) and np.isfinite(rho_q75_b3)) + int(np.isfinite(ef_med_b2) and np.isfinite(ef_med_b3)) + int(np.isfinite(_num(b_sid_map["B2"].get("support_rate", np.nan))) and np.isfinite(_num(b_sid_map["B3"].get("support_rate", np.nan))))
+        if n_primary_available < 2:
+            st = "FAIL"
+        elif hits >= 3:
+            st = "PASS"
+        else:
+            st = "WARN"
+        _assign_scene_status(
+            b_sid_map["B3"],
+            status=st,
+            axis="high_risk_tail",
+            hits=hits,
+            total=4,
+            rule="risk-zone pattern: neg_tail(<0)↑, rho_q75↑, early_fraction_median↓, support_rate↓ 중 3개 이상; FAIL only when primary comparison support is insufficient (DS_q75↑는 보조)",
+            details={
+                "comparison_basis": basis_key,
+                "neg_tail_rate_lt0_B2": tail_b2,
+                "neg_tail_rate_lt0_B3": tail_b3,
+                "neg_tail_rate_lt0_increase": c_tail,
+                "rho_q75_B2": rho_q75_b2,
+                "rho_q75_B3": rho_q75_b3,
+                "rho_q75_increase": c_rho,
+                "early_fraction_median_B2": ef_med_b2,
+                "early_fraction_median_B3": ef_med_b3,
+                "early_fraction_median_decrease": c_ef,
+                "support_rate_B2": float(_num(b_sid_map["B2"].get("support_rate", np.nan))),
+                "support_rate_B3": float(_num(b_sid_map["B3"].get("support_rate", np.nan))),
+                "support_rate_decrease": c_sup,
+                "secondary_ds_q75_increase_vs_B2": c_ds,
+                "primary_available_count": int(n_primary_available),
+            },
+        )
+
+    scene_status_counts = {"PASS": 0, "WARN": 0, "FAIL": 0}
+    for rr in b_per_scenario:
+        st = str(rr.get("status", "WARN")).upper()
+        if st not in scene_status_counts:
+            st = "WARN"
+        scene_status_counts[st] = int(scene_status_counts.get(st, 0) + 1)
 
     # Keep legacy correlation field for backward compatibility
     los = np.asarray([_num(r.get("LOSflag", np.nan)) for r in rows_el_global], dtype=float)
@@ -2749,6 +3074,11 @@ def _diagnostic_checks(
         # D3 detail
         "D3": {
             "status": d3_status,
+            "status_scene_objective": "FAIL" if scene_status_counts.get("FAIL", 0) > 0 else ("WARN" if scene_status_counts.get("WARN", 0) > 0 else "PASS"),
+            "scene_status_counts": scene_status_counts,
+            "scene_fail_count": int(scene_status_counts.get("FAIL", 0)),
+            "scene_warn_count": int(scene_status_counts.get("WARN", 0)),
+            "scene_pass_count": int(scene_status_counts.get("PASS", 0)),
             "n_rows": int(len(b_rows)),
             "q1_db": float(q1) if np.isfinite(q1) else float("nan"),
             "q2_db": float(q2) if np.isfinite(q2) else float("nan"),
@@ -3704,12 +4034,57 @@ def _build_markdown(
             lines.append("")
         per_sid_rows = d3.get("per_scenario_summary", [])
         if isinstance(per_sid_rows, list) and per_sid_rows:
-            lines.append("- D3 per-scenario summary (B1/B2/B3)")
+            lines.append("- D3 per-scenario summary (B1/B2/B3, scene-purpose one-line judgement)")
+            lines.append("")
+            scene_counts = d3.get("scene_status_counts", {})
+            if isinstance(scene_counts, dict):
+                lines.append(
+                    f"- Scene-status counts: PASS={int(scene_counts.get('PASS', 0))}, "
+                    f"WARN={int(scene_counts.get('WARN', 0))}, FAIL={int(scene_counts.get('FAIL', 0))} "
+                    "(fail count is per-scenario objective, not per-metric sum)"
+                )
+                lines.append("")
+            lines.append(
+                report_md.md_table(
+                    per_sid_rows,
+                    [
+                        "scenario_id",
+                        "scene_axis",
+                        "status",
+                        "objective_hits",
+                        "objective_total",
+                        "support_rate",
+                        "neg_tail_rate_xpd_early_ex_lt_0",
+                        "rho_early_q75_lin",
+                        "early_fraction_median",
+                    ],
+                )
+            )
+            lines.append("")
+            lines.append("- D3 detailed support/tail summary (secondary evidence)")
             lines.append("")
             lines.append(
                 report_md.md_table(
                     per_sid_rows,
-                    ["scenario_id", "status", "n_rows", "q1_db", "q2_db", "min_strata_all_n", "min_strata_viable_n", "qna_total"],
+                    [
+                        "scenario_id",
+                        "support_core_n",
+                        "support_core_rate",
+                        "support_risk_n",
+                        "support_risk_rate",
+                        "xpd_early_ex_median_db",
+                        "xpd_early_ex_q75_db",
+                        "xpd_early_ex_q90_db",
+                        "xpd_early_ex_neg_tail_frac_lt_m30",
+                        "rho_early_q75_lin",
+                        "rho_early_q90_lin",
+                        "ds_q75_ns",
+                        "ds_q90_ns",
+                        "l_pol_q75_db",
+                        "l_pol_q90_db",
+                        "early_fraction_median",
+                        "status_strata_legacy",
+                    ],
                 )
             )
             lines.append("")
