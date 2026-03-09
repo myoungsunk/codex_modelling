@@ -65,7 +65,13 @@ python analysis_report/generate_proposition_plot_mapping_detailed.py --run-group
   - `A4_bridge`: L2-M secondary (`late_panel=true`, `dispersion=on`)
   - `A5_pair`: L2-S proxy stress response (synthetic primary, geometric sensitivity)
   - `A2_on/A3_on/A4_on`: LOS-on observability bridge set
-  - `B1/B2/B3`: R1/R2 real-space leverage (support count mandatory)
+  - `B1/B2/B3`: R1/R2 coverage-aware leverage map (viable strata + support count mandatory, no absolute universal-map claim)
+- 표준 리포팅 규칙:
+  - G2 sign-off는 `A6` target-window raw sign(odd/even) 기준을 1차로 사용
+  - `A3`는 메커니즘 보조 증거로만 보고
+  - A4는 반드시 `A4_iso`(primary: `include_late_panel=false`)와 `A4_bridge`(secondary: `include_late_panel=true`)로 분리 표기
+  - dispersion claim은 `A4_bridge`에서 `material_dispersion=on|debye` 데이터가 있을 때만 허용
+  - B1/B2/B3 기반 R1/R2는 structural-hole을 반영한 `coverage-aware leverage map`으로만 해석하고, absolute universal map 주장은 금지
 - `scene_debug.json`이 없으면 해당 케이스 scene plot은 WARN으로 보고서에 기록됩니다.
 - 진단 B는 목적별 3-window를 분리해 계산합니다.
   - `W_floor` (C0): LOS peak 주변 contamination `C_floor`

@@ -1726,13 +1726,13 @@ def _specs() -> list[PlotSpec]:
         PlotSpec("L3-2", "L3", "A3/A4/B", "EL bins", "conditional boxplot", "nonparametric monotonicity", "L3-2__el_bin_conditional_box.png"),
         PlotSpec("L3-3", "L3", "stage1 fit", "EL,fitted mean", "residualized effect", "mu(U) visualization", "L3-3__residualized_effect_fit_ci.png"),
         # R
-        PlotSpec("R1-1", "R1", "B1/B2/B3", "x,y,XPD_early_ex", "heatmap facet", "spatial pattern", "R1-1__B123_heatmap_xpd_early_ex.png"),
-        PlotSpec("R1-2", "R1", "B1/B2/B3", "x,y,rho_early(linear)", "heatmap facet", "cross contamination map", "R1-2__B123_heatmap_rho_early.png"),
-        PlotSpec("R1-3", "R1", "B1/B2/B3", "x,y,L_pol", "heatmap facet", "early-late structure map", "R1-3__B123_heatmap_lpol.png"),
+        PlotSpec("R1-1", "R1", "B1/B2/B3", "x,y,XPD_early_ex", "heatmap facet", "coverage-aware spatial pattern", "R1-1__B123_heatmap_xpd_early_ex.png"),
+        PlotSpec("R1-2", "R1", "B1/B2/B3", "x,y,rho_early(linear)", "heatmap facet", "coverage-aware contamination map", "R1-2__B123_heatmap_rho_early.png"),
+        PlotSpec("R1-3", "R1", "B1/B2/B3", "x,y,L_pol", "heatmap facet", "coverage-aware early-late structure map", "R1-3__B123_heatmap_lpol.png"),
         PlotSpec("R1-4", "R1", "B pooled", "LOS/NLOS grouped metrics", "grouped CDF/box", "group difference", "R1-4__los_nlos_grouped_metrics.png"),
         PlotSpec("R2-1", "R2", "B pooled", "XPD_early_ex,DS", "XPD vs DS", "useful/risky relation", "R2-1__xpd_early_ex_vs_ds_B123.png"),
         PlotSpec("R2-2", "R2", "B pooled", "rho_early(linear),DS", "rho(linear) vs DS", "contamination relation", "R2-2__rho_early_vs_ds_B123.png"),
-        PlotSpec("R2-3", "R2", "B pooled", "XPD,DS,L_pol", "quadrant plot", "useful vs risky regions", "R2-3__quadrant_useful_vs_risky.png"),
+        PlotSpec("R2-3", "R2", "B pooled", "XPD,DS,L_pol", "quadrant plot", "coverage-aware useful vs risky regions", "R2-3__quadrant_useful_vs_risky.png"),
         PlotSpec("R2-4", "R2", "B pooled", "early_fraction,XPD", "early fraction vs XPD", "early concentration link", "R2-4__early_fraction_vs_xpd_early_ex.png"),
         # P
         PlotSpec("P1-1", "P1", "A3/A4/B", "observed,predicted", "CDF overlay", "conditional>constant", "P1-1__observed_vs_predicted_cdf_overlay.png"),
@@ -2428,7 +2428,7 @@ def main() -> None:
     lines.append("## 0) 공통 플롯 규칙 요약")
     lines.append("- 공통 지표: XPD_floor, XPD_target_ex, XPD_early_ex, XPD_late_ex, rho_early, L_pol, DS, EL_proxy")
     lines.append("- window 규칙: W_floor(C0), W_target(A2/A3/A4), W_early/B, W_late")
-    lines.append("- 시나리오 역할: C0=floor, A2=odd, A3=even-mechanism, A4=material, A5=stress-response, B1/B2/B3=real-space")
+    lines.append("- 시나리오 역할: C0=floor, A2=odd, A3=even-mechanism, A4=material, A5=stress-response, B1/B2/B3=coverage-aware leverage map")
     lines.append("")
     total = len(rows_out)
     ready = sum(1 for r in rows_out if r["plot_ready"] == "READY")

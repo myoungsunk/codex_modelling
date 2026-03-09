@@ -718,7 +718,7 @@ def main() -> None:
     ks_los = stats_lib.ks_wasserstein(_arr(los, "XPD_early_excess_db"), _arr(nlos, "XPD_early_excess_db"))
     r1_ok = bool(len(b_rows) > 0 and len(los) > 0 and len(nlos) > 0)
     props["R1"] = {
-        "definition": "Room-space LOS/NLOS and heatmap consistency",
+        "definition": "Coverage-aware room-space leverage map (LOS/NLOS + heatmap; viable strata only, not universal)",
         "n_b_rows": int(len(b_rows)),
         "n_los": int(len(los)),
         "n_nlos": int(len(nlos)),
@@ -735,7 +735,7 @@ def main() -> None:
     )
     r2_ok = bool(np.isfinite(sp_ds.get("rho", np.nan)))
     props["R2"] = {
-        "definition": "DS/early-fraction relation with leakage",
+        "definition": "Coverage-aware DS/early relation leverage map (B1/B2/B3 viable strata subset)",
         "spearman_ds_vs_xpd": sp_ds,
         "status": _status_support(r2_ok, cond_partial=bool(all_non_c0)),
     }

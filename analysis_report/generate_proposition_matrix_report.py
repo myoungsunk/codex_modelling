@@ -67,6 +67,8 @@ def _status_to_pass_fail(s: str) -> str:
     up = str(s).upper()
     if up in {"PASS", "FAIL", "PARTIAL"}:
         return up
+    if up in {"WARN", "INCONCLUSIVE"}:
+        return "PARTIAL"
     if up == "SUPPORTED":
         return "PASS"
     if up == "PARTIAL":
@@ -88,6 +90,83 @@ def _first_row(rows: list[dict[str, str]], **conds: str) -> dict[str, str] | Non
 
 def _rows_by(rows: list[dict[str, str]], key: str, value: str) -> list[dict[str, str]]:
     return [r for r in rows if str(r.get(key, "")) == str(value)]
+
+
+def _target_sign_status_from_raw_hit(hit_raw: float) -> str:
+    if np.isfinite(hit_raw) and hit_raw >= 0.8:
+        return "PASS"
+    if np.isfinite(hit_raw) and hit_raw >= 0.6:
+        return "PARTIAL"
+    if np.isfinite(hit_raw):
+        return "FAIL"
+    return "PARTIAL"
+
+
+def _target_sign_status_from_raw_hits(hits_raw: list[float]) -> str:
+    arr = np.asarray([float(x) for x in hits_raw if np.isfinite(float(x))], dtype=float)
+    if len(arr) == 0:
+        return "PARTIAL"
+    v = float(np.min(arr))
+    return _target_sign_status_from_raw_hit(v)
+
+
+def _load_target_window_sign_rows(path: Path) -> dict[str, list[dict[str, str]]]:
+    if not path.exists():
+        return {}
+    rows = _read_csv(path)
+    out: dict[str, list[dict[str, str]]] = {}
+    for r in rows:
+        sid = str(r.get("scenario", "")).upper().strip()
+        if sid in {"A2", "A3", "A6"}:
+            out.setdefault(sid, []).append(dict(r))
+    return out
+
+
+def _pick_target_row(rows: list[dict[str, str]], target_n: int) -> dict[str, str] | None:
+    for r in rows:
+        tn = _to_float(r.get("target_n"))
+        if np.isfinite(tn) and int(round(tn)) == int(target_n):
+            return r
+    return None
+
+
+def _ensure_target_window_raw_plot(
+    out_png: Path,
+    rows: list[dict[str, str]],
+    labels: list[str],
+    title_prefix: str,
+) -> str | None:
+    from matplotlib import pyplot as plt
+
+    if not rows or len(rows) != len(labels):
+        return None
+    med_raw = [_to_float(r.get("median_xpd_target_raw_db")) for r in rows]
+    hit_raw = [_to_float(r.get("expected_sign_hit_rate_raw")) for r in rows]
+
+    out = out_png
+    out.parent.mkdir(parents=True, exist_ok=True)
+    fig, axs = plt.subplots(1, 2, figsize=(9.0, 4.0))
+    ax0, ax1 = axs
+    colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#9467bd"][: len(labels)]
+    ax0.bar(labels, med_raw, color=colors)
+    ax0.axhline(0.0, color="k", lw=1.0, alpha=0.5)
+    ax0.set_title(f"{title_prefix}: target-window raw median")
+    ax0.set_ylabel("median XPD_target_raw (dB)")
+    ax0.grid(True, axis="y", alpha=0.25)
+
+    ax1.bar(labels, hit_raw, color=colors)
+    ax1.axhline(0.8, color="#2ca02c", lw=1.2, ls="--", label="PASS >= 0.8")
+    ax1.axhline(0.6, color="#bcbd22", lw=1.2, ls="--", label="WARN >= 0.6")
+    ax1.set_ylim(0.0, 1.05)
+    ax1.set_title(f"{title_prefix}: expected-sign hit rate (raw)")
+    ax1.set_ylabel("hit rate")
+    ax1.grid(True, axis="y", alpha=0.25)
+    ax1.legend(fontsize=8, loc="lower right")
+
+    fig.tight_layout()
+    fig.savefig(out, dpi=140)
+    plt.close(fig)
+    return out.name
 
 
 def _ensure_m2_ratio_plot(fig_dir: Path, details: dict[str, Any]) -> str | None:
@@ -113,6 +192,26 @@ def _ensure_m2_ratio_plot(fig_dir: Path, details: dict[str, Any]) -> str | None:
     fig.savefig(out, dpi=140)
     plt.close(fig)
     return out.name
+
+
+def _a4_branch(row: dict[str, str]) -> str:
+    layout = str(row.get("a4_layout_mode", "")).strip().lower()
+    inc = _to_float(row.get("include_late_panel"))
+    if not np.isfinite(inc):
+        # Fallback heuristic from layout when include_late_panel is missing.
+        if layout == "bridge":
+            return "bridge"
+        if layout == "iso":
+            return "iso"
+        return "other"
+    return "bridge" if int(round(inc)) == 1 else "iso"
+
+
+def _a4_dispersion_on(row: dict[str, str]) -> bool:
+    d0 = str(row.get("a4_dispersion_mode", "")).strip().lower()
+    d1 = str(row.get("material_dispersion", "")).strip().lower()
+    d = d0 or d1
+    return d in {"on", "debye"}
 
 
 def _ensure_g1_pdp_and_tap(fig_dir: Path, index_rows: list[dict[str, str]]) -> list[str]:
@@ -227,19 +326,37 @@ def _ensure_l1_scatter(fig_dir: Path, link_rows: list[dict[str, str]]) -> str | 
     return out.name
 
 
-def _ensure_l2_plots(fig_dir: Path, link_rows: list[dict[str, str]]) -> list[str]:
+def _ensure_l2_plots(fig_dir: Path, link_rows: list[dict[str, str]]) -> tuple[list[str], dict[str, Any]]:
     made: list[str] = []
-    # A4 material-wise CDF
+    meta: dict[str, Any] = {}
+    # A4 material-wise CDF: split iso(primary) vs bridge(secondary)
     a4 = _rows_by(link_rows, "scenario_id", "A4")
-    by_mat: dict[str, list[float]] = {}
-    for r in a4:
+    a4_iso = [r for r in a4 if _a4_branch(r) == "iso"]
+    a4_bridge = [r for r in a4 if _a4_branch(r) == "bridge"]
+    meta["a4_iso_n"] = int(len(a4_iso))
+    meta["a4_bridge_n"] = int(len(a4_bridge))
+    meta["a4_bridge_dispersion_on_n"] = int(sum(1 for r in a4_bridge if _a4_dispersion_on(r)))
+
+    by_mat_iso: dict[str, list[float]] = {}
+    for r in a4_iso:
         m = str(r.get("material_class", "NA"))
-        by_mat.setdefault(m, []).append(_to_float(r.get("XPD_early_excess_db")))
-    by_mat = {k: _finite(v) for k, v in by_mat.items() if len(_finite(v)) >= 3}
-    if by_mat:
-        out1 = fig_dir / "L2__A4_material_xpd_early_ex_cdf.png"
-        plot_multi_cdf(by_mat, out1, "L2-M: material effect (A4)", "XPD_early_ex (dB)")
+        by_mat_iso.setdefault(m, []).append(_to_float(r.get("XPD_early_excess_db")))
+    by_mat_iso = {k: _finite(v) for k, v in by_mat_iso.items() if len(_finite(v)) >= 3}
+    if by_mat_iso:
+        out1 = fig_dir / "L2__A4_iso_material_xpd_early_ex_cdf.png"
+        plot_multi_cdf(by_mat_iso, out1, "L2-M primary: material effect (A4_iso)", "XPD_early_ex (dB)")
         made.append(out1.name)
+
+    by_mat_bridge: dict[str, list[float]] = {}
+    for r in a4_bridge:
+        m = str(r.get("material_class", "NA"))
+        by_mat_bridge.setdefault(m, []).append(_to_float(r.get("XPD_early_excess_db")))
+    by_mat_bridge = {k: _finite(v) for k, v in by_mat_bridge.items() if len(_finite(v)) >= 3}
+    if by_mat_bridge:
+        out1b = fig_dir / "L2__A4_bridge_material_xpd_early_ex_cdf.png"
+        plot_multi_cdf(by_mat_bridge, out1b, "L2-M secondary: bridge effect (A4_bridge)", "XPD_early_ex (dB)")
+        made.append(out1b.name)
+
     # A5 base vs stress CDF (L_pol)
     a5 = _rows_by(link_rows, "scenario_id", "A5")
     base: list[float] = []
@@ -260,7 +377,7 @@ def _ensure_l2_plots(fig_dir: Path, link_rows: list[dict[str, str]]) -> list[str
             "L_pol (dB)",
         )
         made.append(out2.name)
-    return made
+    return made, meta
 
 
 def _ensure_r2_ds_vs_rho(fig_dir: Path, link_rows: list[dict[str, str]]) -> str | None:
@@ -341,14 +458,13 @@ def _specs() -> list[PropositionSpec]:
         PropositionSpec("M2", "C0 + 전체 시나리오", "XPD_excess, Delta_floor", "inside/outside floor band ratio", "채널 주장 구간/불확실 구간 분리", [
             "M2__inside_outside_ratio.png",
         ]),
-        PropositionSpec("G1", "A2 odd + LOS 차단", "co/cross PDP, XPD_early_ex, rho_early", "PDP overlay + tap-wise XPD + 분포", "odd에서 early cross 우세", [
-            "A2A3C0__ALL__xpd_early_ex_cdf.png",
+        PropositionSpec("G1", "A2 odd target-window sign", "target-window raw sign, co/cross PDP", "A2 target-window raw sign + PDP/tap sanity", "raw target-window sign<0 (A2)", [
+            "G1__A2_target_window_raw_sign_summary.png",
             "G1__A2_case0__pdp_overlay.png",
             "G1__A2_case0__tap_xpd_tau.png",
         ]),
-        PropositionSpec("G2", "A3 even + LOS 차단", "co/cross PDP, XPD_early_ex, rho_early", "A2 대비 CDF/box", "A3가 A2 대비 반대방향", [
-            "A2A3__ALL__xpd_early_ex_box.png",
-            "A2A3__ALL__xpd_early_ex_cdf.png",
+        PropositionSpec("G2", "A6 core theorem (odd/even) raw sign", "target-window raw sign (A6 target_n=1,2)", "A6 odd/even target-window raw sign", "A6 odd<0 & even>0 with raw hit-rate PASS", [
+            "G2__A6_target_window_raw_sign_summary.png",
         ]),
         PropositionSpec("G3", "A2/A3 + A4/A5", "XPD_ex 분산/꼬리", "조건별 CDF + 분산 비교", "완전분리 아님 + 조건별 변동", [
             "G3__xpd_early_ex__scenario_cdf.png",
@@ -358,19 +474,20 @@ def _specs() -> list[PropositionSpec]:
             "ALL__early_late_ex_box.png",
             "L1__early_vs_late_ex_scatter.png",
         ]),
-        PropositionSpec("L2", "A4 material / A5 stress", "material/stress label + XPD_ex", "material/stress CDF + effect size", "재질/스트레스에 따라 평균/분산 이동", [
-            "L2__A4_material_xpd_early_ex_cdf.png",
+        PropositionSpec("L2", "A4_iso(primary) + A4_bridge(secondary) / A5 stress", "A4 branch label(include_late_panel, dispersion) + stress label + XPD_ex", "A4_iso/A4_bridge material CDF + A5 stress CDF", "primary는 A4_iso로 판정, A4_bridge는 보조(지연/dispersion) 증거", [
+            "L2__A4_iso_material_xpd_early_ex_cdf.png",
+            "L2__A4_bridge_material_xpd_early_ex_cdf.png",
             "L2__A5_base_vs_stress_lpol_cdf.png",
         ]),
         PropositionSpec("L3", "통제+room + EL proxy", "EL, XPD_ex", "scatter + Spearman", "EL 증가에 따라 XPD/XPR 감소 단조", [
             "ALL__xpd_early_ex_vs_el_proxy.png",
         ]),
-        PropositionSpec("R1", "room grid LOS/NLOS", "Z 맵(XPD_ex, rho, L_pol, DS)", "heatmap + LOS/NLOS CDF", "공간 분포 + LOS/NLOS 차이", [
+        PropositionSpec("R1", "room grid LOS/NLOS (coverage-aware leverage)", "Z 맵(XPD_ex, rho, L_pol, DS) + viable strata support", "heatmap + LOS/NLOS CDF", "공간 분포 + LOS/NLOS 차이(viable strata 기준, universal claim 금지)", [
             "B__ALL__heatmap_xpd_early_ex.png",
             "B__ALL__heatmap_lpol.png",
             "B__ALL__los_nlos_xpd_ex_cdf.png",
         ]),
-        PropositionSpec("R2", "room grid + 지표 연결", "Z와 DS/early집중도", "DS vs XPD_ex, DS vs rho", "유효조건 영역 분리", [
+        PropositionSpec("R2", "room grid + 지표 연결 (coverage-aware leverage)", "Z와 DS/early집중도 + viable strata support", "DS vs XPD_ex, DS vs rho", "유효조건 영역 분리(coverage-aware map)", [
             "ALL__ds_vs_xpd_early_ex.png",
             "R2__ds_vs_rho_early_db.png",
         ]),
@@ -419,15 +536,51 @@ def main() -> None:
         )
     _ensure_m2_ratio_plot(figs, details)
     g1_created = _ensure_g1_pdp_and_tap(figs, index_rows)
+    target_sign_rows = _load_target_window_sign_rows(tables / "A3_target_window_sign.csv")
+    a2_rows = target_sign_rows.get("A2", [])
+    a3_rows = target_sign_rows.get("A3", [])
+    a6_rows = target_sign_rows.get("A6", [])
+    a2_row = _pick_target_row(a2_rows, 1) or (a2_rows[0] if a2_rows else None)
+    a3_row = _pick_target_row(a3_rows, 2) or (a3_rows[0] if a3_rows else None)
+    a6_odd_row = _pick_target_row(a6_rows, 1)
+    a6_even_row = _pick_target_row(a6_rows, 2)
+    use_a6_g2 = (a6_odd_row is not None) and (a6_even_row is not None)
+
+    g1_sign_plot = _ensure_target_window_raw_plot(
+        figs / "G1__A2_target_window_raw_sign_summary.png",
+        [a2_row] if a2_row is not None else [],
+        ["A2(n=1)"],
+        "G1",
+    )
+    g2_target_plot_name = "G2__A6_target_window_raw_sign_summary.png" if use_a6_g2 else "G2__A3_target_window_raw_sign_summary.png"
+    g2_plot_rows = [a6_odd_row, a6_even_row] if use_a6_g2 else ([a3_row] if a3_row is not None else [])
+    g2_plot_labels = ["A6 odd(n=1)", "A6 even(n=2)"] if use_a6_g2 else ["A3(n=2)"]
+    g2_target_plot = _ensure_target_window_raw_plot(
+        figs / g2_target_plot_name,
+        g2_plot_rows,
+        g2_plot_labels,
+        "G2",
+    )
     g3_created, g3_info = _ensure_g3_plots(figs, link_rows, delta_floor_db)
     _ensure_l1_scatter(figs, link_rows)
-    l2_created = _ensure_l2_plots(figs, link_rows)
+    l2_created, l2_meta = _ensure_l2_plots(figs, link_rows)
     _ensure_r2_ds_vs_rho(figs, link_rows)
     p_created = _ensure_p1_p2_plots(figs, details)
 
     # Build status map
     status_map = {str(r.get("proposition", "")): str(r.get("status", "")) for r in status_rows}
     status_map["G3"] = g3_info.get("status", "FAIL")
+    if a2_row is not None:
+        status_map["G1"] = _target_sign_status_from_raw_hit(_to_float(a2_row.get("expected_sign_hit_rate_raw")))
+    if use_a6_g2:
+        status_map["G2"] = _target_sign_status_from_raw_hits(
+            [
+                _to_float(a6_odd_row.get("expected_sign_hit_rate_raw")),
+                _to_float(a6_even_row.get("expected_sign_hit_rate_raw")),
+            ]
+        )
+    elif a3_row is not None:
+        status_map["G2"] = _target_sign_status_from_raw_hit(_to_float(a3_row.get("expected_sign_hit_rate_raw")))
 
     # Force-resolve dynamic plot names for G1 generated case
     g1_required = [name for name in g1_created if name.endswith(".png")]
@@ -439,9 +592,20 @@ def main() -> None:
     # Produce mapping rows
     rows_out: list[dict[str, Any]] = []
     for spec in _specs():
+        experiment = spec.experiment
+        required_data = spec.required_data
+        key_tests = spec.key_tests
+        criterion = spec.criterion
         req = list(spec.required_plots)
         if spec.pid == "G1":
-            req = ["A2A3C0__ALL__xpd_early_ex_cdf.png"] + g1_required
+            req = [g1_sign_plot or "G1__A2_target_window_raw_sign_summary.png"] + g1_required
+        if spec.pid == "G2":
+            req = [g2_target_plot or g2_target_plot_name]
+            if not use_a6_g2:
+                experiment = "A3 even target-window sign (fallback)"
+                required_data = "target-window raw sign (A3 target_n=2)"
+                key_tests = "A3 target-window raw sign"
+                criterion = "raw target-window sign>0 (A3)"
         exists = []
         missing = []
         for fn in req:
@@ -465,13 +629,44 @@ def main() -> None:
                 f"delta_floor={_to_float(g3_info.get('delta_floor_db')):.3f} dB, "
                 f"iqr_overlap={g3_info.get('iqr_overlap_exists')}"
             )
+        if spec.pid == "G1" and a2_row is not None:
+            rr = a2_row
+            notes = (
+                f"target(raw) median={_to_float(rr.get('median_xpd_target_raw_db')):.3f} dB, "
+                f"hit_rate_raw={_to_float(rr.get('expected_sign_hit_rate_raw')):.3f}, "
+                "PASS>=0.8/WARN>=0.6"
+            )
+        if spec.pid == "G2":
+            if use_a6_g2:
+                odd_med = _to_float(a6_odd_row.get("median_xpd_target_raw_db"))
+                odd_hit = _to_float(a6_odd_row.get("expected_sign_hit_rate_raw"))
+                even_med = _to_float(a6_even_row.get("median_xpd_target_raw_db"))
+                even_hit = _to_float(a6_even_row.get("expected_sign_hit_rate_raw"))
+                min_hit = float(np.min(np.asarray([odd_hit, even_hit], dtype=float)))
+                notes = (
+                    f"A6 odd median={odd_med:.3f} dB (hit={odd_hit:.3f}), "
+                    f"even median={even_med:.3f} dB (hit={even_hit:.3f}), "
+                    f"min_hit_raw={min_hit:.3f}, PASS>=0.8/WARN>=0.6"
+                )
+            elif a3_row is not None:
+                notes = (
+                    f"fallback A3 target(raw) median={_to_float(a3_row.get('median_xpd_target_raw_db')):.3f} dB, "
+                    f"hit_rate_raw={_to_float(a3_row.get('expected_sign_hit_rate_raw')):.3f}, "
+                    "PASS>=0.8/WARN>=0.6"
+                )
+        if spec.pid == "L2":
+            notes = (
+                f"A4_iso_n={int(l2_meta.get('a4_iso_n', 0))}, "
+                f"A4_bridge_n={int(l2_meta.get('a4_bridge_n', 0))}, "
+                f"A4_bridge_dispersion_on_n={int(l2_meta.get('a4_bridge_dispersion_on_n', 0))}"
+            )
         rows_out.append(
             {
                 "proposition": spec.pid,
-                "experiment": spec.experiment,
-                "required_data": spec.required_data,
-                "key_tests": spec.key_tests,
-                "criterion": spec.criterion,
+                "experiment": experiment,
+                "required_data": required_data,
+                "key_tests": key_tests,
+                "criterion": criterion,
                 "pass_fail": pstatus,
                 "plot_ready": plot_status,
                 "plot_files_found": "; ".join(exists),
@@ -548,7 +743,10 @@ def main() -> None:
 
     print(f"[OK] Wrote: {out_csv}")
     print(f"[OK] Wrote: {md}")
-    print(f"[INFO] Supplementary plots created: {len(g1_created) + len(g3_created) + len(l2_created) + len(p_created) + 3}")
+    print(
+        "[INFO] Supplementary plots created: "
+        f"{len(g1_created) + len(g3_created) + len(l2_created) + len(p_created) + (1 if g2_target_plot else 0) + 3}"
+    )
 
 
 if __name__ == "__main__":

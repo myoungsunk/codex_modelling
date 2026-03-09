@@ -298,7 +298,18 @@ def _build_final_markdown(
         f"- A3-A2 early delta_median={_fmt(c.get('A3_minus_A2_delta_median_db', np.nan),3)} dB "
         f"(ratio={_fmt(c.get('ratio_to_floor', np.nan),3)}, C1={c.get('C1_status','NA')})"
     )
-    lines.append(f"- Material primary span={_fmt(c.get('C2M_primary_span_db', np.nan),3)} dB ({c.get('C2M_primary_status','NA')})")
+    lines.append(
+        f"- A4_iso primary span={_fmt(c.get('C2M_primary_span_db', np.nan),3)} dB "
+        f"({c.get('C2M_primary_status','NA')}, n={int(_num(c.get('A4_iso_n', np.nan))) if np.isfinite(_num(c.get('A4_iso_n', np.nan))) else 'nan'})"
+    )
+    lines.append(
+        f"- A4_bridge secondary span={_fmt(c.get('C2M_bridge_primary_span_db', np.nan),3)} dB "
+        f"({c.get('C2M_bridge_primary_status','NA')}, n={int(_num(c.get('A4_bridge_n', np.nan))) if np.isfinite(_num(c.get('A4_bridge_n', np.nan))) else 'nan'})"
+    )
+    lines.append(
+        f"- A4_bridge dispersion_on count={int(_num(c.get('A4_bridge_dispersion_on_n', np.nan))) if np.isfinite(_num(c.get('A4_bridge_dispersion_on_n', np.nan))) else 'nan'} "
+        f"(claim_ready={c.get('A4_dispersion_claim_ready','NA')})"
+    )
     lines.append(
         f"- Stress primary effect ΔL_pol={_fmt(c.get('C2S_delta_lpol_db', np.nan),3)} dB "
         f"({c.get('C2S_primary_status','NA')}, C2S={c.get('C2S_status','NA')})"
@@ -338,6 +349,7 @@ def _build_final_markdown(
     lines.append("### Reporting rule")
     lines.append("- `LOS0_q3`는 sampling hole이 아닌 structural hole로 명시")
     lines.append("- D3 평가는 all-theoretical strata가 아니라 viable strata 기준으로 보고")
+    lines.append("- B1/B2/B3 기반 R1/R2 결과는 `coverage-aware leverage map`으로만 보고(absolute universal map 주장 금지)")
     lines.append("")
 
     lines.append("## E. Model-Form Consistency")
@@ -367,10 +379,10 @@ def _build_final_markdown(
     lines.append("| A4_bridge | material effect secondary | WARN | L2-M bridge/late sensitivity | primary material claim |")
     lines.append("| A4_on | bridge observability | WARN | LOS-on bridge check | L2-M sign-off |")
     lines.append("| A5_pair | proxy stress response | PASS | L2-S primary (synthetic) + geometric sensitivity | faithful rough/human solver claim |")
-    lines.append(f"| B1 | LOS real-space baseline | {b_per.get('B1',{}).get('status','NA')} | leverage baseline | strict full-strata claim |")
-    lines.append(f"| B2 | partition NLOS | {b_per.get('B2',{}).get('status','NA')} | contamination / NLOS comparison | none |")
-    lines.append(f"| B3 | corner high-EL NLOS | {b_per.get('B3',{}).get('status','NA')} | high-EL / structural stress region | none |")
-    lines.append(f"| B-all | real-space identifiability set | {d3.get('status','NA')} | stage1 EL fit / leverage map | strict full-strata claim |")
+    lines.append(f"| B1 | LOS real-space anchor | {b_per.get('B1',{}).get('status','NA')} | coverage-aware leverage baseline | absolute universal map claim |")
+    lines.append(f"| B2 | partition NLOS | {b_per.get('B2',{}).get('status','NA')} | coverage-aware contamination/NLOS leverage | absolute universal map claim |")
+    lines.append(f"| B3 | corner high-EL NLOS | {b_per.get('B3',{}).get('status','NA')} | coverage-aware high-EL stress leverage | absolute universal map claim |")
+    lines.append(f"| B-all | real-space identifiability set | {d3.get('status','NA')} | stage1 EL fit / coverage-aware leverage map | strict full-strata + universal map claim |")
     lines.append("")
 
     lines.append("## Final Measurement Readiness Decision")
@@ -387,6 +399,7 @@ def _build_final_markdown(
     lines.append("3. Document `LOS0_q3` as structural hole")
     lines.append("4. Keep `qNA_total = 0` in frozen diagnostic output")
     lines.append("5. Archive per-scenario summary (`B_per_scenario_summary.csv`)")
+    lines.append("6. Document B1/B2/B3 interpretation as coverage-aware leverage map (not absolute universal map)")
     lines.append("")
     lines.append("### Measurement may proceed because")
     lines.append("- Calibration floor is stable")

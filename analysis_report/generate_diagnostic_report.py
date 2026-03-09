@@ -139,6 +139,31 @@ def _link_params(row: dict[str, Any]) -> dict[str, Any]:
     return lp if isinstance(lp, dict) else {}
 
 
+def _a4_branch(row: dict[str, Any]) -> str:
+    layout = str(row.get("a4_layout_mode", "")).strip().lower()
+    if not layout:
+        layout = str(_link_params(row).get("a4_layout_mode", "")).strip().lower()
+    inc = _num(row.get("include_late_panel", np.nan))
+    if not np.isfinite(inc):
+        inc = _num(_link_params(row).get("include_late_panel", np.nan))
+    if np.isfinite(inc):
+        return "bridge" if int(round(inc)) == 1 else "iso"
+    if layout == "bridge":
+        return "bridge"
+    if layout == "iso":
+        return "iso"
+    return "other"
+
+
+def _a4_dispersion_on(row: dict[str, Any]) -> bool:
+    mode = str(row.get("a4_dispersion_mode", "")).strip().lower()
+    if not mode:
+        mode = str(row.get("material_dispersion", "")).strip().lower()
+    if not mode:
+        mode = str(_link_params(row).get("a4_dispersion_mode", _link_params(row).get("material_dispersion", ""))).strip().lower()
+    return mode in {"on", "debye"}
+
+
 def _c0_repeat_delta(link_rows: list[dict[str, Any]]) -> float:
     by_key: dict[tuple[float, float, float], list[float]] = {}
     for r in link_rows:
@@ -2214,19 +2239,39 @@ def _diagnostic_checks(
     dmed = metrics_lib.delta_median(a3, a2, "XPD_early_excess_db")
     c1_status, ratio = _judge_vs_delta(float(dmed), float(delta_ref))
 
-    a4 = scenario_rows.get("A4", [])
-    by_mat: dict[str, list[dict[str, Any]]] = {}
-    for r in a4:
-        by_mat.setdefault(str(r.get("material_class", "NA")), []).append(r)
-    a4_early_meds = {k: _median(v, "XPD_early_excess_db") for k, v in sorted(by_mat.items())}
-    a4_late_meds = {k: _median(v, "XPD_late_excess_db") for k, v in sorted(by_mat.items())}
-    a4_lpol_meds = {k: _median(v, "L_pol_db") for k, v in sorted(by_mat.items())}
-    a4_primary_span = _safe_span(list(a4_early_meds.values()))
-    a4_late_span = _safe_span(list(a4_late_meds.values()))
-    a4_lpol_span = _safe_span(list(a4_lpol_meds.values()))
-    c2m_primary_status, c2m_primary_ratio = _judge_vs_delta(float(a4_primary_span), float(delta_ref))
-    c2m_late_status, c2m_late_ratio = _judge_vs_delta(float(a4_late_span), float(delta_ref))
-    c2m_lpol_status, c2m_lpol_ratio = _judge_vs_delta(float(a4_lpol_span), float(delta_ref))
+    a4_all = scenario_rows.get("A4", [])
+    a4_iso = [r for r in a4_all if _a4_branch(r) == "iso"]
+    a4_bridge = [r for r in a4_all if _a4_branch(r) == "bridge"]
+    a4_bridge_disp_on_n = int(sum(1 for r in a4_bridge if _a4_dispersion_on(r)))
+
+    def _medians_by_material(rows_in: list[dict[str, Any]], key: str) -> dict[str, float]:
+        by_mat_local: dict[str, list[dict[str, Any]]] = {}
+        for rr in rows_in:
+            by_mat_local.setdefault(str(rr.get("material_class", "NA")), []).append(rr)
+        return {k: _median(v, key) for k, v in sorted(by_mat_local.items())}
+
+    # Primary material effect uses A4_iso only (late-panel off).
+    a4_iso_early_meds = _medians_by_material(a4_iso, "XPD_early_excess_db")
+    a4_iso_late_meds = _medians_by_material(a4_iso, "XPD_late_excess_db")
+    a4_iso_lpol_meds = _medians_by_material(a4_iso, "L_pol_db")
+    a4_iso_primary_span = _safe_span(list(a4_iso_early_meds.values()))
+    a4_iso_late_span = _safe_span(list(a4_iso_late_meds.values()))
+    a4_iso_lpol_span = _safe_span(list(a4_iso_lpol_meds.values()))
+
+    # Secondary bridge effect uses A4_bridge (late-panel on).
+    a4_bridge_early_meds = _medians_by_material(a4_bridge, "XPD_early_excess_db")
+    a4_bridge_late_meds = _medians_by_material(a4_bridge, "XPD_late_excess_db")
+    a4_bridge_lpol_meds = _medians_by_material(a4_bridge, "L_pol_db")
+    a4_bridge_primary_span = _safe_span(list(a4_bridge_early_meds.values()))
+    a4_bridge_late_span = _safe_span(list(a4_bridge_late_meds.values()))
+    a4_bridge_lpol_span = _safe_span(list(a4_bridge_lpol_meds.values()))
+
+    c2m_primary_status, c2m_primary_ratio = _judge_vs_delta(float(a4_iso_primary_span), float(delta_ref))
+    c2m_late_status, c2m_late_ratio = _judge_vs_delta(float(a4_iso_late_span), float(delta_ref))
+    c2m_lpol_status, c2m_lpol_ratio = _judge_vs_delta(float(a4_iso_lpol_span), float(delta_ref))
+    c2m_bridge_status, c2m_bridge_ratio = _judge_vs_delta(float(a4_bridge_primary_span), float(delta_ref))
+    c2m_bridge_late_status, c2m_bridge_late_ratio = _judge_vs_delta(float(a4_bridge_late_span), float(delta_ref))
+    c2m_bridge_lpol_status, c2m_bridge_lpol_ratio = _judge_vs_delta(float(a4_bridge_lpol_span), float(delta_ref))
     a4_target = target_stats.get("A4", {})
     a4_target_c = float(_num(a4_target.get("C_target_median_db", np.nan)))
     a4_target_exists = float(_num(a4_target.get("target_exists_rate", np.nan)))
@@ -2354,28 +2399,50 @@ def _diagnostic_checks(
         "ratio_to_floor": ratio,
         "C1_status": c1_status,
         # Backward-compatible legacy keys
-        "A4_material_shift_late_excess_db": float(a4_late_span),
+        "A4_material_shift_late_excess_db": float(a4_iso_late_span),
         "A5_stress_delta_late_excess_db": d_stress,
         "A5_stress_var_ratio": var_ratio,
         "C2_status": c2_status,
         # C2-M detailed
+        "C2M_primary_subset": "A4_iso(include_late_panel=0)",
+        "C2M_secondary_subset": "A4_bridge(include_late_panel=1)",
         "C2M_primary_metric": "XPD_early_excess_db",
-        "C2M_primary_span_db": float(a4_primary_span),
+        "C2M_primary_span_db": float(a4_iso_primary_span),
         "C2M_primary_ratio_to_delta": float(c2m_primary_ratio),
         "C2M_primary_status": str(c2m_primary_status),
-        "C2M_secondary_late_span_db": float(a4_late_span),
+        "C2M_secondary_late_span_db": float(a4_iso_late_span),
         "C2M_secondary_late_ratio_to_delta": float(c2m_late_ratio),
         "C2M_secondary_late_status": str(c2m_late_status),
-        "C2M_secondary_lpol_span_db": float(a4_lpol_span),
+        "C2M_secondary_lpol_span_db": float(a4_iso_lpol_span),
         "C2M_secondary_lpol_ratio_to_delta": float(c2m_lpol_ratio),
         "C2M_secondary_lpol_status": str(c2m_lpol_status),
+        "C2M_bridge_primary_span_db": float(a4_bridge_primary_span),
+        "C2M_bridge_primary_ratio_to_delta": float(c2m_bridge_ratio),
+        "C2M_bridge_primary_status": str(c2m_bridge_status),
+        "C2M_bridge_late_span_db": float(a4_bridge_late_span),
+        "C2M_bridge_late_ratio_to_delta": float(c2m_bridge_late_ratio),
+        "C2M_bridge_late_status": str(c2m_bridge_late_status),
+        "C2M_bridge_lpol_span_db": float(a4_bridge_lpol_span),
+        "C2M_bridge_lpol_ratio_to_delta": float(c2m_bridge_lpol_ratio),
+        "C2M_bridge_lpol_status": str(c2m_bridge_lpol_status),
+        "A4_iso_n": int(len(a4_iso)),
+        "A4_bridge_n": int(len(a4_bridge)),
+        "A4_bridge_dispersion_on_n": int(a4_bridge_disp_on_n),
+        "A4_dispersion_claim_ready": bool(a4_bridge_disp_on_n > 0),
         "C2M_status": str(c2m_status),
         "A4_target_C_median_db": a4_target_c,
         "A4_target_exists_rate": a4_target_exists,
         "A4_target_gate_status": "PASS" if a4_target_ok else "WARN",
-        "A4_material_medians_early_ex": a4_early_meds,
-        "A4_material_medians_late_ex": a4_late_meds,
-        "A4_material_medians_lpol": a4_lpol_meds,
+        "A4_iso_material_medians_early_ex": a4_iso_early_meds,
+        "A4_iso_material_medians_late_ex": a4_iso_late_meds,
+        "A4_iso_material_medians_lpol": a4_iso_lpol_meds,
+        "A4_bridge_material_medians_early_ex": a4_bridge_early_meds,
+        "A4_bridge_material_medians_late_ex": a4_bridge_late_meds,
+        "A4_bridge_material_medians_lpol": a4_bridge_lpol_meds,
+        # Backward-compatibility aliases (kept for existing downstream readers).
+        "A4_material_medians_early_ex": a4_iso_early_meds,
+        "A4_material_medians_late_ex": a4_iso_late_meds,
+        "A4_material_medians_lpol": a4_iso_lpol_meds,
         # C2-S detailed
         "C2S_primary_metric": "L_pol_db",
         "C2S_delta_lpol_db": float(d_lpol),

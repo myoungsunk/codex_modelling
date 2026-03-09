@@ -145,6 +145,10 @@ python3 scripts/run_standard_sim.py --scenario B2 --out-h5 outputs/std_b2.h5 --o
 python3 scripts/run_standard_sim.py --scenario B3 --out-h5 outputs/std_b3.h5 --out-dir outputs/std_b3
 ```
 
+Reporting rule: use `A6` as the primary G2 (odd/even sign) evidence in standard reports; keep `A3` as supplementary mechanism evidence.
+For A4 reporting, split `A4_iso` (primary material reflection, `include_late_panel=false`) and `A4_bridge` (secondary delayed effect, `include_late_panel=true`); make dispersion claims only when bridge runs include `material_dispersion=on|debye`.
+For B1/B2/B3 reporting, interpret R1/R2 as a `coverage-aware leverage map` over viable strata; do not claim an absolute universal map while structural holes remain.
+
 Generate success checks + plots:
 
 ```bash
