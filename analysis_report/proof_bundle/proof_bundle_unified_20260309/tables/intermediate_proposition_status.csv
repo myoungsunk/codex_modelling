@@ -1,0 +1,12 @@
+data_status,definition,proposition,status
+OK,C0 floor distance/yaw sensitivity,M1,SUPPORTED
+OK,Fraction inside/outside floor uncertainty band,M2,SUPPORTED
+OK,A2 odd-bounce increases cross dominance vs C0,G1,SUPPORTED
+OK,A6 near-normal parity benchmark as primary G2 evidence; A3 kept as mechanism-only supplementary evidence.,G2,SUPPORTED
+OK,Early/Late leakage separation via XPD_early_ex/XPD_late_ex/L_pol,L1,SUPPORTED
+OK,A5 stress impact on center/tails (response-mode requires geometric path perturbation),L2,SUPPORTED
+OK,Correlation between leakage excess and -EL_proxy,L3,SUPPORTED
+OK,"Coverage-aware room-space leverage map (LOS/NLOS + heatmap; viable strata only, not universal)",R1,SUPPORTED
+OK,Coverage-aware DS/early relation leverage map (B1/B2/B3 viable strata subset),R2,SUPPORTED
+OK,"Two-stage model (EL first, then mechanism effects) vs constant baseline",P1,SUPPORTED
+OK,Stage-1 EL coefficient sign stability under subsampling,P2,PARTIAL
