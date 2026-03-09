@@ -1,0 +1,7 @@
+hole_type,pool_n,selected_n,status,strata
+none,8,,PASS,LOS0_q1
+none,4,,PASS,LOS0_q2
+structural_hole,0,,FAIL,LOS0_q3
+none,17,,PASS,LOS1_q1
+none,23,,PASS,LOS1_q2
+none,23,,PASS,LOS1_q3

@@ -159,6 +159,7 @@ def run_case(
     diffuse_config: dict[str, Any] | None = None,
     even_path_policy: str = "canonical",
     even_layout: str = "localized",
+    los_enabled_override: bool | None = None,
 ):
     tx, rx = default_antennas(basis=basis, **(antenna_config or {}))
     mode = str(params["mode"])
@@ -173,36 +174,41 @@ def run_case(
 
     rx = rx.with_position([params["rx_x"], params["rx_y"], params["rx_z"]])
 
+    los_enabled = bool(los_enabled_override) if los_enabled_override is not None else False
     paths = trace_paths(
         scene,
         tx,
         rx,
         f_hz,
         max_bounce=max_bounce,
-        los_enabled=False,
+        los_enabled=bool(los_enabled),
         force_cp_swap_on_odd_reflection=force_cp_swap_on_odd_reflection,
         **dict(diffuse_config or {}),
     )
 
-    # Keep only target bounce and near-normal incidence paths.
+    # Keep only target bounce (near-normal) plus LOS path when bridge mode is on.
     max_theta = float(np.deg2rad(params.get("incidence_max_deg", 15.0)))
-    out = []
+    out_target = []
+    out_los = []
     for p in paths:
+        if int(p.bounce_count) == 0:
+            out_los.append(p)
+            continue
         if int(p.bounce_count) != target_bounce:
             continue
         if p.incidence_angles and max(float(a) for a in p.incidence_angles) > max_theta:
             continue
-        out.append(p)
+        out_target.append(p)
 
     # For A6 even-bounce benchmark, two symmetric 2-bounce solutions may coexist.
     # Default to a single canonical path to avoid equal-length dual-path ambiguity.
     mode_l = str(mode).strip().lower()
     pol = str(even_path_policy).strip().lower()
-    if mode_l == "even" and len(out) > 1 and pol in {"canonical", "dominant"}:
+    if mode_l == "even" and len(out_target) > 1 and pol in {"canonical", "dominant"}:
         if pol == "canonical":
-            canon = [p for p in out if list(getattr(p, "surface_ids", [])) == [302, 303]]
+            canon = [p for p in out_target if list(getattr(p, "surface_ids", [])) == [302, 303]]
             if canon:
-                out = canon
+                out_target = canon
             else:
                 # Fallback to dominant path if canonical ordering not found.
                 pol = "dominant"
@@ -214,6 +220,8 @@ def run_case(
                 p_lin = float(np.nanmean(np.abs(af) ** 2))
                 return p_lin
 
-            j = int(np.argmax([_path_power_key(p) for p in out]))
-            out = [out[j]]
-    return out
+            j = int(np.argmax([_path_power_key(p) for p in out_target]))
+            out_target = [out_target[j]]
+    if bool(los_enabled):
+        return out_los + out_target
+    return out_target

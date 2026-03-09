@@ -1,0 +1,883 @@
+{
+  "A1_los_blocked": [
+    {
+      "scenario": "A2",
+      "los_rays": 0,
+      "status": "PASS"
+    },
+    {
+      "scenario": "A3",
+      "los_rays": 0,
+      "status": "PASS"
+    },
+    {
+      "scenario": "A4",
+      "los_rays": 0,
+      "status": "PASS"
+    },
+    {
+      "scenario": "A5",
+      "los_rays": 0,
+      "status": "PASS"
+    }
+  ],
+  "A2_target_bounce": [
+    {
+      "scenario": "A2",
+      "target_n": 1,
+      "hit": 4,
+      "total": 4,
+      "rate": 1.0,
+      "status": "PASS"
+    },
+    {
+      "scenario": "A3",
+      "target_n": 2,
+      "hit": 12,
+      "total": 12,
+      "rate": 1.0,
+      "status": "PASS"
+    }
+  ],
+  "A3_coord_sanity": {
+    "status": "WARN",
+    "note": "Coordinate penetration sanity needs scenario geometry file review; not inferable from standard outputs only."
+  },
+  "A5_stress_semantics": {
+    "status": "PASS",
+    "n_a5_rows": 60,
+    "n_stress_rows": 30,
+    "n_response": 30,
+    "n_polarization_only": 0,
+    "n_off": 0,
+    "n_unknown": 0,
+    "dominant_semantics": "response",
+    "contamination_response_ready": true,
+    "note": "Geometric path-structure stress is active; delay/path contamination-response interpretation is valid."
+  },
+  "B_time_resolution": {
+    "freq_source": "link_rows.xpd_floor_freq_hz[C0]",
+    "BW_Hz": 4000000000.0,
+    "df_Hz": 31496062.992126465,
+    "dt_res_s": 2.5e-10,
+    "tau_max_s": 3.1749999999999513e-08,
+    "Te_s": 3.0000000000000004e-09,
+    "Tmax_s": 3.0000000000000004e-08,
+    "W_floor_s": 1.5000000000000002e-09,
+    "W_target_s_default": 3.0000000000000004e-09,
+    "W_target_s": 3.0000000000000004e-09,
+    "W_target_s_by_scenario": {
+      "A2": 3.0000000000000004e-09,
+      "A3": 6.000000000000001e-09,
+      "A4": 3.0000000000000004e-09,
+      "A5": 3.0000000000000004e-09
+    },
+    "W_target_mode_by_scenario": {
+      "A2": "default",
+      "A3": "fixed",
+      "A4": "default",
+      "A5": "default"
+    },
+    "W_floor_status": "PASS",
+    "W_floor_C_median_db": -237.22802601555316,
+    "A2_target_in_Wearly_rate": 1.0,
+    "A3_target_in_Wearly_rate": 0.16666666666666666,
+    "A2_C_target_median_db": -230.44046925747102,
+    "A3_C_target_median_db": -227.78368053976737,
+    "B2_min_delay_gap_median_s": 1.0332879774460265e-09,
+    "B2_status": "PASS",
+    "B3_status": "PASS",
+    "W3_status": "WARN",
+    "W3_best_te_ns": 2.0,
+    "W3_best_S_xpd_early": 0.7365062324859474,
+    "W3_best_S_rho_early_db": 0.7365062324859469,
+    "W3_best_S_l_pol": 0.6411035591883218,
+    "W_floor_detail": {
+      "n_cases": 9,
+      "W_floor_s": 1.5000000000000002e-09,
+      "C_floor_median_db": -237.22802601555316,
+      "C_floor_p95_db": -232.79105102322603,
+      "rate_below_m10_db": 1.0,
+      "rate_below_m15_db": 1.0,
+      "status": "PASS"
+    },
+    "W_target_detail": {
+      "A2": {
+        "scenario": "A2",
+        "target_n": 1,
+        "W_target_s": 3.0000000000000004e-09,
+        "target_exists_rate": 1.0,
+        "target_in_Wearly_rate": 1.0,
+        "target_is_first_rate": 1.0,
+        "C_target_median_db": -230.44046925747102,
+        "C_target_p95_db": -229.11532874169185,
+        "target_gap_median_s": NaN,
+        "status": "PASS"
+      },
+      "A3": {
+        "scenario": "A3",
+        "target_n": 2,
+        "W_target_s": 6.000000000000001e-09,
+        "target_exists_rate": 1.0,
+        "target_in_Wearly_rate": 0.16666666666666666,
+        "target_is_first_rate": 0.0,
+        "C_target_median_db": -227.78368053976737,
+        "C_target_p95_db": 0.6609606559383652,
+        "target_gap_median_s": 4.670400255246654e-09,
+        "status": "WARN"
+      },
+      "A4": {
+        "scenario": "A4",
+        "target_n": 1,
+        "W_target_s": 3.0000000000000004e-09,
+        "target_exists_rate": 1.0,
+        "target_in_Wearly_rate": 1.0,
+        "target_is_first_rate": 1.0,
+        "C_target_median_db": -220.74983673337698,
+        "C_target_p95_db": -216.072215247589,
+        "target_gap_median_s": 1.1363101084895525e-08,
+        "status": "PASS"
+      },
+      "A5": {
+        "scenario": "A5",
+        "target_n": 2,
+        "W_target_s": 3.0000000000000004e-09,
+        "target_exists_rate": 1.0,
+        "target_in_Wearly_rate": 0.2,
+        "target_is_first_rate": 0.06666666666666667,
+        "C_target_median_db": 0.0,
+        "C_target_p95_db": 3.230592744044125,
+        "target_gap_median_s": 0.0,
+        "status": "FAIL"
+      }
+    },
+    "W3_te_sweep": {
+      "status": "WARN",
+      "n_links_used": 75,
+      "scores": [
+        {
+          "Te_ns": 2.0,
+          "S_xpd_early": 0.7365062324859474,
+          "S_rho_early_db": 0.7365062324859469,
+          "S_l_pol": 0.6411035591883218
+        },
+        {
+          "Te_ns": 3.0,
+          "S_xpd_early": 0.725639575887391,
+          "S_rho_early_db": 0.7256395758873909,
+          "S_l_pol": 0.6336451664247518
+        },
+        {
+          "Te_ns": 5.0,
+          "S_xpd_early": 0.6269527647827924,
+          "S_rho_early_db": 0.6269527647827924,
+          "S_l_pol": 0.441932777175683
+        }
+      ],
+      "best_te_ns": 2.0,
+      "best_S_xpd_early": 0.7365062324859474,
+      "best_S_rho_early_db": 0.7365062324859469,
+      "best_S_l_pol": 0.6411035591883218
+    },
+    "A2A3_sign_stability": {
+      "A2": {
+        "expected_sign": "negative",
+        "min_hit_rate": 1.0,
+        "median_hit_rate": 1.0,
+        "per_te": [
+          {
+            "Te_ns": 2.0,
+            "n": 4,
+            "median_xpd_early_ex_db": -33.06286481744288,
+            "expected_sign_hit_rate": 1.0
+          },
+          {
+            "Te_ns": 3.0,
+            "n": 4,
+            "median_xpd_early_ex_db": -33.06286481744288,
+            "expected_sign_hit_rate": 1.0
+          },
+          {
+            "Te_ns": 5.0,
+            "n": 4,
+            "median_xpd_early_ex_db": -33.06286481744288,
+            "expected_sign_hit_rate": 1.0
+          }
+        ],
+        "status": "PASS"
+      },
+      "A3": {
+        "expected_sign": "positive",
+        "min_hit_rate": 0.0,
+        "median_hit_rate": 0.0,
+        "per_te": [
+          {
+            "Te_ns": 2.0,
+            "n": 12,
+            "median_xpd_early_ex_db": -33.06286481744288,
+            "expected_sign_hit_rate": 0.0
+          },
+          {
+            "Te_ns": 3.0,
+            "n": 12,
+            "median_xpd_early_ex_db": -33.06286481744288,
+            "expected_sign_hit_rate": 0.0
+          },
+          {
+            "Te_ns": 5.0,
+            "n": 12,
+            "median_xpd_early_ex_db": -26.26322214034979,
+            "expected_sign_hit_rate": 0.0
+          }
+        ],
+        "status": "FAIL"
+      },
+      "overall_status": "FAIL"
+    },
+    "A2A3_sign_stability_raw_status": "FAIL",
+    "A2A3_sign_stability_reporting_status": "FAIL",
+    "A2A3_sign_stability_reporting_note": "A2/A3 early-window sign stability interpreted directly from raw status.",
+    "A3_expected_early_sign_fail_under_mechanism_role": false,
+    "A2_target_window_sign": {
+      "scenario": "A2",
+      "target_n": 1,
+      "W_target_s": 3.0000000000000004e-09,
+      "expected_sign": "negative",
+      "n_links": 4,
+      "n_eval": 4,
+      "median_xpd_target_ex_db": -33.06286481744288,
+      "p10_xpd_target_ex_db": -33.06286481744288,
+      "p90_xpd_target_ex_db": -33.06286481744288,
+      "median_xpd_target_raw_db": -8.0,
+      "p10_xpd_target_raw_db": -8.0,
+      "p90_xpd_target_raw_db": -8.0,
+      "expected_sign_hit_rate_ex": 1.0,
+      "expected_sign_hit_rate_raw": 1.0,
+      "sign_metric_for_status": "excess",
+      "expected_sign_hit_rate": 1.0,
+      "status": "PASS"
+    },
+    "A3_target_window_sign": {
+      "scenario": "A3",
+      "target_n": 2,
+      "W_target_s": 6.000000000000001e-09,
+      "expected_sign": "positive",
+      "n_links": 12,
+      "n_eval": 12,
+      "median_xpd_target_ex_db": -17.06286481744288,
+      "p10_xpd_target_ex_db": -25.49457248101578,
+      "p90_xpd_target_ex_db": -17.06286481744288,
+      "median_xpd_target_raw_db": 8.0,
+      "p10_xpd_target_raw_db": -0.43170766357290297,
+      "p90_xpd_target_raw_db": 8.0,
+      "expected_sign_hit_rate_ex": 0.0,
+      "expected_sign_hit_rate_raw": 0.6666666666666666,
+      "sign_metric_for_status": "raw",
+      "expected_sign_hit_rate": 0.6666666666666666,
+      "status": "WARN"
+    },
+    "A3_target_window_sign_reporting_status": "WARN",
+    "A6_parity_benchmark": {
+      "available": true,
+      "status": "PASS",
+      "sign_metric_for_status": "raw",
+      "n_eval_total": 100,
+      "n_eval_odd": 50,
+      "n_eval_even": 50,
+      "hit_rate_odd": 1.0,
+      "hit_rate_even": 1.0,
+      "hit_rate_min": 1.0,
+      "odd": {
+        "scenario": "A6",
+        "target_n": 1,
+        "W_target_s": 3.0000000000000004e-09,
+        "expected_sign": "negative",
+        "n_links": 100,
+        "n_eval": 50,
+        "median_xpd_target_ex_db": -33.06286481744288,
+        "p10_xpd_target_ex_db": -33.06286481744288,
+        "p90_xpd_target_ex_db": -33.06286481744288,
+        "median_xpd_target_raw_db": -8.0,
+        "p10_xpd_target_raw_db": -8.0,
+        "p90_xpd_target_raw_db": -8.0,
+        "expected_sign_hit_rate_ex": 1.0,
+        "expected_sign_hit_rate_raw": 1.0,
+        "sign_metric_for_status": "raw",
+        "expected_sign_hit_rate": 1.0,
+        "status": "PASS"
+      },
+      "even": {
+        "scenario": "A6",
+        "target_n": 2,
+        "W_target_s": 3.0000000000000004e-09,
+        "expected_sign": "positive",
+        "n_links": 100,
+        "n_eval": 50,
+        "median_xpd_target_ex_db": -17.06286481744288,
+        "p10_xpd_target_ex_db": -17.06286481744288,
+        "p90_xpd_target_ex_db": -17.06286481744288,
+        "median_xpd_target_raw_db": 8.0,
+        "p10_xpd_target_raw_db": 8.0,
+        "p90_xpd_target_raw_db": 8.000000000000002,
+        "expected_sign_hit_rate_ex": 0.0,
+        "expected_sign_hit_rate_raw": 1.0,
+        "sign_metric_for_status": "raw",
+        "expected_sign_hit_rate": 1.0,
+        "status": "PASS"
+      },
+      "case_set_compare": {
+        "available_sets": [
+          "full",
+          "minimal"
+        ],
+        "per_set": {
+          "full": {
+            "status": "PASS",
+            "hit_rate_min": 1.0,
+            "odd": {
+              "scenario": "A6",
+              "target_n": 1,
+              "W_target_s": 3.0000000000000004e-09,
+              "expected_sign": "negative",
+              "n_links": 90,
+              "n_eval": 45,
+              "median_xpd_target_ex_db": -33.06286481744288,
+              "p10_xpd_target_ex_db": -33.06286481744288,
+              "p90_xpd_target_ex_db": -33.06286481744288,
+              "median_xpd_target_raw_db": -8.0,
+              "p10_xpd_target_raw_db": -8.0,
+              "p90_xpd_target_raw_db": -8.0,
+              "expected_sign_hit_rate_ex": 1.0,
+              "expected_sign_hit_rate_raw": 1.0,
+              "sign_metric_for_status": "raw",
+              "expected_sign_hit_rate": 1.0,
+              "status": "PASS"
+            },
+            "even": {
+              "scenario": "A6",
+              "target_n": 2,
+              "W_target_s": 3.0000000000000004e-09,
+              "expected_sign": "positive",
+              "n_links": 90,
+              "n_eval": 45,
+              "median_xpd_target_ex_db": -17.06286481744288,
+              "p10_xpd_target_ex_db": -17.06286481744288,
+              "p90_xpd_target_ex_db": -17.06286481744288,
+              "median_xpd_target_raw_db": 8.0,
+              "p10_xpd_target_raw_db": 8.0,
+              "p90_xpd_target_raw_db": 8.000000000000002,
+              "expected_sign_hit_rate_ex": 0.0,
+              "expected_sign_hit_rate_raw": 1.0,
+              "sign_metric_for_status": "raw",
+              "expected_sign_hit_rate": 1.0,
+              "status": "PASS"
+            }
+          },
+          "minimal": {
+            "status": "PASS",
+            "hit_rate_min": 1.0,
+            "odd": {
+              "scenario": "A6",
+              "target_n": 1,
+              "W_target_s": 3.0000000000000004e-09,
+              "expected_sign": "negative",
+              "n_links": 10,
+              "n_eval": 5,
+              "median_xpd_target_ex_db": -33.06286481744288,
+              "p10_xpd_target_ex_db": -33.06286481744288,
+              "p90_xpd_target_ex_db": -33.06286481744288,
+              "median_xpd_target_raw_db": -8.0,
+              "p10_xpd_target_raw_db": -8.0,
+              "p90_xpd_target_raw_db": -8.0,
+              "expected_sign_hit_rate_ex": 1.0,
+              "expected_sign_hit_rate_raw": 1.0,
+              "sign_metric_for_status": "raw",
+              "expected_sign_hit_rate": 1.0,
+              "status": "PASS"
+            },
+            "even": {
+              "scenario": "A6",
+              "target_n": 2,
+              "W_target_s": 3.0000000000000004e-09,
+              "expected_sign": "positive",
+              "n_links": 10,
+              "n_eval": 5,
+              "median_xpd_target_ex_db": -17.06286481744288,
+              "p10_xpd_target_ex_db": -17.06286481744288,
+              "p90_xpd_target_ex_db": -17.06286481744288,
+              "median_xpd_target_raw_db": 8.0,
+              "p10_xpd_target_raw_db": 8.0,
+              "p90_xpd_target_raw_db": 8.0,
+              "expected_sign_hit_rate_ex": 0.0,
+              "expected_sign_hit_rate_raw": 1.0,
+              "sign_metric_for_status": "raw",
+              "expected_sign_hit_rate": 1.0,
+              "status": "PASS"
+            }
+          }
+        },
+        "full_vs_minimal": {
+          "odd": {
+            "n_eval_full": 45,
+            "n_eval_minimal": 5,
+            "median_raw_full_db": -8.0,
+            "median_raw_minimal_db": -8.0,
+            "delta_raw_minimal_minus_full_db": 0.0,
+            "median_ex_full_db": -33.06286481744288,
+            "median_ex_minimal_db": -33.06286481744288,
+            "delta_ex_minimal_minus_full_db": 0.0,
+            "hit_rate_full": 1.0,
+            "hit_rate_minimal": 1.0,
+            "delta_hit_rate_minimal_minus_full": 0.0
+          },
+          "even": {
+            "n_eval_full": 45,
+            "n_eval_minimal": 5,
+            "median_raw_full_db": 8.0,
+            "median_raw_minimal_db": 8.0,
+            "delta_raw_minimal_minus_full_db": 0.0,
+            "median_ex_full_db": -17.06286481744288,
+            "median_ex_minimal_db": -17.06286481744288,
+            "delta_ex_minimal_minus_full_db": 0.0,
+            "hit_rate_full": 1.0,
+            "hit_rate_minimal": 1.0,
+            "delta_hit_rate_minimal_minus_full": 0.0
+          }
+        }
+      },
+      "note": "A6 is near-normal parity benchmark; use as primary G2 evidence when available."
+    },
+    "A3_role": "mechanism_supplementary",
+    "A3_evidence_tier": "supplementary",
+    "G2_primary_evidence_source": "A6_near_normal_benchmark",
+    "G2_primary_evidence_status": "PASS",
+    "A3_mechanism_status": "PASS",
+    "A3_system_early_status": "FAIL",
+    "A3_reporting_rule": "A3 is mechanism-only/supplementary: use target-window metrics for mechanism context; fixed system early-window dominance is not primary evidence. If A6 is present, use A6 as primary G2 sign evidence.",
+    "A5_role": "stress_response_proxy",
+    "A5_target_mode": "contamination_response",
+    "A5_stress_semantics": "response",
+    "A5_contamination_response_ready": true,
+    "A5_semantics_note": "Geometric path-structure stress is active; delay/path contamination-response interpretation is valid."
+  },
+  "C_effect_vs_floor": {
+    "floor_delta_db": 0.4494336842076283,
+    "repeat_delta_db": NaN,
+    "delta_ref_db": 0.4494336842076283,
+    "A3_minus_A2_delta_median_db": 9.833969727424119e-08,
+    "ratio_to_floor": 2.1880802603306975e-07,
+    "C1_status": "FAIL",
+    "A4_material_shift_late_excess_db": 0.0,
+    "A5_stress_delta_late_excess_db": 0.0,
+    "A5_stress_var_ratio": 200500123382330.38,
+    "C2_status": "WARN",
+    "C2M_primary_subset": "A4_iso(include_late_panel=0)",
+    "C2M_secondary_subset": "A4_bridge(include_late_panel=1)",
+    "C2M_primary_metric": "XPD_early_excess_db",
+    "C2M_primary_span_db": 0.8013676545419273,
+    "C2M_primary_ratio_to_delta": 1.783060955822157,
+    "C2M_primary_status": "WARN",
+    "C2M_secondary_late_span_db": 0.0,
+    "C2M_secondary_late_ratio_to_delta": 0.0,
+    "C2M_secondary_late_status": "FAIL",
+    "C2M_secondary_lpol_span_db": 0.8013676545419268,
+    "C2M_secondary_lpol_ratio_to_delta": 1.7830609558221562,
+    "C2M_secondary_lpol_status": "WARN",
+    "C2M_bridge_primary_span_db": 0.09851466905207218,
+    "C2M_bridge_primary_ratio_to_delta": 0.21919734215239775,
+    "C2M_bridge_primary_status": "FAIL",
+    "C2M_bridge_late_span_db": 0.17796807270455872,
+    "C2M_bridge_late_ratio_to_delta": 0.3959829424408284,
+    "C2M_bridge_late_status": "FAIL",
+    "C2M_bridge_lpol_span_db": 0.3673244373255009,
+    "C2M_bridge_lpol_ratio_to_delta": 0.817305089121458,
+    "C2M_bridge_lpol_status": "FAIL",
+    "A4_iso_n": 12,
+    "A4_bridge_n": 12,
+    "A4_bridge_dispersion_on_n": 6,
+    "A4_dispersion_claim_ready": true,
+    "C2M_status": "WARN",
+    "A4_target_C_median_db": -220.74983673337698,
+    "A4_target_exists_rate": 1.0,
+    "A4_target_gate_status": "PASS",
+    "A4_iso_material_medians_early_ex": {
+      "glass": -27.846079605571482,
+      "gypsum": -27.486236876113992,
+      "wood": -27.044711951029555
+    },
+    "A4_iso_material_medians_late_ex": {
+      "glass": -25.06286481744288,
+      "gypsum": -25.06286481744288,
+      "wood": -25.06286481744288
+    },
+    "A4_iso_material_medians_lpol": {
+      "glass": -2.7832147881286016,
+      "gypsum": -2.4233720586711156,
+      "wood": -1.9818471335866747
+    },
+    "A4_bridge_material_medians_early_ex": {
+      "glass": -27.429207407264023,
+      "gypsum": -27.527722076316095,
+      "wood": -27.478576033098758
+    },
+    "A4_bridge_material_medians_late_ex": {
+      "glass": -27.885040428765937,
+      "gypsum": -27.797400121464904,
+      "wood": -27.975368194169462
+    },
+    "A4_bridge_material_medians_lpol": {
+      "glass": 0.0881965670740894,
+      "gypsum": 0.32715795019161464,
+      "wood": 0.4555210043995903
+    },
+    "A4_material_medians_early_ex": {
+      "glass": -27.846079605571482,
+      "gypsum": -27.486236876113992,
+      "wood": -27.044711951029555
+    },
+    "A4_material_medians_late_ex": {
+      "glass": -25.06286481744288,
+      "gypsum": -25.06286481744288,
+      "wood": -25.06286481744288
+    },
+    "A4_material_medians_lpol": {
+      "glass": -2.7832147881286016,
+      "gypsum": -2.4233720586711156,
+      "wood": -1.9818471335866747
+    },
+    "C2S_primary_metric": "L_pol_db",
+    "C2S_delta_lpol_db": 0.5725698496019198,
+    "C2S_primary_status": "FAIL",
+    "C2S_status": "FAIL",
+    "C2S_delta_rho_early_lin": -0.1404771992321412,
+    "C2S_delta_ds_s": 1.6543612251060553e-23,
+    "C2S_delta_late_ex_db": 0.0,
+    "C2S_late_ex_var_ratio": 200500123382330.38,
+    "C2S_gate_delta_p_target_db": 0.0,
+    "C2S_gate_status": "PASS",
+    "C2S_semantics_gate_status": "PASS",
+    "C2S_semantics": "response",
+    "C2S_semantics_note": "Geometric path-structure stress is active; delay/path contamination-response interpretation is valid.",
+    "C2S_gate_pair_count": 30
+  },
+  "D_identifiability": {
+    "EL_iqr_db": 7.709492814640768,
+    "corr_d_vs_LOS": -0.5173379283811036,
+    "strata_counts": {
+      "LOS0_q1": 8,
+      "LOS0_q2": 4,
+      "LOS0_q3": 0,
+      "LOS1_q1": 17,
+      "LOS1_q2": 23,
+      "LOS1_q3": 23,
+      "LOS0_qNA": 0,
+      "LOS1_qNA": 0
+    },
+    "min_strata_n": 4,
+    "status": "FAIL",
+    "D1": {
+      "status": "WARN",
+      "global": {
+        "status": "PASS",
+        "subset": [
+          "A3",
+          "A4",
+          "B1",
+          "B2",
+          "B3"
+        ],
+        "EL_iqr_db": 7.709492814640768,
+        "el_bins_low_mid_high": {
+          "low": 43,
+          "mid": 35,
+          "high": 33
+        },
+        "min_bin_n": 33,
+        "n_rows": 111
+      },
+      "A2_isolation": {
+        "status": "PASS",
+        "n_rows": 4,
+        "EL_std_db": 7.105427357601002e-15,
+        "target": "small EL variation is desired for parity isolation"
+      },
+      "A5_isolation": {
+        "status": "FAIL",
+        "role": "stress_response_proxy",
+        "n_base": 30,
+        "n_stress": 30,
+        "delta_median_EL_stress_minus_base_db": 0.0,
+        "target": "response mode: L_pol decrease is primary, EL shift can be non-zero"
+      }
+    },
+    "D2": {
+      "status": "FAIL",
+      "material_x_angle_status": "PASS",
+      "material_x_angle_groups_good": 3,
+      "material_x_angle_groups_total": 3,
+      "material_x_angle_coverage": {
+        "glass": {
+          "low": 0,
+          "mid": 4,
+          "high": 4,
+          "NA": 0
+        },
+        "wood": {
+          "low": 0,
+          "mid": 4,
+          "high": 4,
+          "NA": 0
+        },
+        "gypsum": {
+          "low": 0,
+          "mid": 4,
+          "high": 4,
+          "NA": 0
+        }
+      },
+      "stress_x_angle_status": "FAIL",
+      "stress_x_angle_groups_good": 0,
+      "stress_x_angle_groups_total": 2,
+      "stress_x_angle_coverage": {
+        "base": {
+          "low": 30,
+          "mid": 0,
+          "high": 0,
+          "NA": 0
+        },
+        "stress": {
+          "low": 30,
+          "mid": 0,
+          "high": 0,
+          "NA": 0
+        }
+      },
+      "design_status": "WARN",
+      "stage1": {
+        "status": "WARN",
+        "n_rows": 111,
+        "design_rank": 8,
+        "design_cols": 8,
+        "condition_number": 138.10888197074607,
+        "vif_threshold": 5.0,
+        "vif": {
+          "EL_proxy_db": 6.264445154804771,
+          "d_m": 5.253737187589305
+        },
+        "vif_warnings": {
+          "EL_proxy_db": 6.264445154804771,
+          "d_m": 5.253737187589305
+        }
+      },
+      "stage2": {
+        "status": "PASS",
+        "n_rows": 175,
+        "design_rank": 5,
+        "design_cols": 5,
+        "condition_number": 16.29093614874941,
+        "vif_threshold": 5.0,
+        "vif": {},
+        "vif_warnings": {}
+      },
+      "design_rank": 8,
+      "design_cols": 8,
+      "condition_number": 138.10888197074607,
+      "vif_threshold": 5.0,
+      "vif": {
+        "stage1": {
+          "EL_proxy_db": 6.264445154804771,
+          "d_m": 5.253737187589305
+        },
+        "stage2": {}
+      },
+      "vif_warnings": {
+        "stage1": {
+          "EL_proxy_db": 6.264445154804771,
+          "d_m": 5.253737187589305
+        },
+        "stage2": {}
+      }
+    },
+    "D3": {
+      "status": "PASS",
+      "n_rows": 75,
+      "q1_db": 2.3206036243777945,
+      "q2_db": 4.190098339356254,
+      "all_6_bins": [
+        "LOS0_q1",
+        "LOS0_q2",
+        "LOS0_q3",
+        "LOS1_q1",
+        "LOS1_q2",
+        "LOS1_q3"
+      ],
+      "viable_bins": [
+        "LOS0_q1",
+        "LOS0_q2",
+        "LOS1_q1",
+        "LOS1_q2",
+        "LOS1_q3"
+      ],
+      "min_strata_all_n": 0,
+      "min_strata_viable_n": 4,
+      "qna_total": 0,
+      "strata_counts": {
+        "LOS0_q1": 8,
+        "LOS0_q2": 4,
+        "LOS0_q3": 0,
+        "LOS1_q1": 17,
+        "LOS1_q2": 23,
+        "LOS1_q3": 23,
+        "LOS0_qNA": 0,
+        "LOS1_qNA": 0
+      },
+      "selected_rows_n": 0,
+      "strata_counts_selected": {},
+      "hole_analysis": [
+        {
+          "strata": "LOS0_q1",
+          "pool_n": 8,
+          "selected_n": "",
+          "hole_type": "none",
+          "status": "PASS"
+        },
+        {
+          "strata": "LOS0_q2",
+          "pool_n": 4,
+          "selected_n": "",
+          "hole_type": "none",
+          "status": "PASS"
+        },
+        {
+          "strata": "LOS0_q3",
+          "pool_n": 0,
+          "selected_n": "",
+          "hole_type": "structural_hole",
+          "status": "FAIL"
+        },
+        {
+          "strata": "LOS1_q1",
+          "pool_n": 17,
+          "selected_n": "",
+          "hole_type": "none",
+          "status": "PASS"
+        },
+        {
+          "strata": "LOS1_q2",
+          "pool_n": 23,
+          "selected_n": "",
+          "hole_type": "none",
+          "status": "PASS"
+        },
+        {
+          "strata": "LOS1_q3",
+          "pool_n": 23,
+          "selected_n": "",
+          "hole_type": "none",
+          "status": "PASS"
+        }
+      ],
+      "per_scenario_summary": [
+        {
+          "scenario_id": "B1",
+          "status": "FAIL",
+          "n_rows": 25,
+          "q1_db": 2.4952931314875553,
+          "q2_db": 4.195205549293248,
+          "min_strata_all_n": 0,
+          "min_strata_viable_n": 1,
+          "qna_total": 0,
+          "strata_counts": {
+            "LOS0_q1": 1,
+            "LOS0_q2": 0,
+            "LOS0_q3": 0,
+            "LOS1_q1": 7,
+            "LOS1_q2": 9,
+            "LOS1_q3": 8,
+            "LOS0_qNA": 0,
+            "LOS1_qNA": 0
+          }
+        },
+        {
+          "scenario_id": "B2",
+          "status": "PASS",
+          "n_rows": 25,
+          "q1_db": 2.4992860345072074,
+          "q2_db": 4.190098339356254,
+          "min_strata_all_n": 0,
+          "min_strata_viable_n": 3,
+          "qna_total": 0,
+          "strata_counts": {
+            "LOS0_q1": 3,
+            "LOS0_q2": 3,
+            "LOS0_q3": 0,
+            "LOS1_q1": 6,
+            "LOS1_q2": 6,
+            "LOS1_q3": 7,
+            "LOS0_qNA": 0,
+            "LOS1_qNA": 0
+          }
+        },
+        {
+          "scenario_id": "B3",
+          "status": "FAIL",
+          "n_rows": 25,
+          "q1_db": 1.5549896299028718,
+          "q2_db": 4.195205549293248,
+          "min_strata_all_n": 0,
+          "min_strata_viable_n": 1,
+          "qna_total": 0,
+          "strata_counts": {
+            "LOS0_q1": 4,
+            "LOS0_q2": 1,
+            "LOS0_q3": 0,
+            "LOS1_q1": 4,
+            "LOS1_q2": 8,
+            "LOS1_q3": 8,
+            "LOS0_qNA": 0,
+            "LOS1_qNA": 0
+          }
+        }
+      ]
+    }
+  },
+  "E_power_based": {
+    "status": "FAIL",
+    "used_metrics": [
+      "XPD_early_db",
+      "XPD_late_db",
+      "rho_early_lin",
+      "L_pol_db",
+      "delay_spread_rms_s",
+      "early_energy_fraction",
+      "EL_proxy_db",
+      "LOSflag"
+    ],
+    "basis_values": [
+      "circular"
+    ],
+    "convention_values": [
+      "IEEE-RHCP"
+    ],
+    "matrix_source_values": [
+      "A",
+      "J"
+    ],
+    "force_cp_swap_any_true": false,
+    "matrix_source_rule": "Use circular basis for CP interpretation and keep matrix_source fixed (A_f for antenna-embedded, J_f for de-embedded).",
+    "main_result_rule": "force_cp_swap_on_odd_reflection must be false for main-result evidence.",
+    "coupling_floor_check": {
+      "status": "PASS",
+      "c0_xpd_floor_median_db": 25.06286481744288,
+      "tx_cross_pol_leakage_median_db": 35.0,
+      "rx_cross_pol_leakage_median_db": 35.0,
+      "coupling_floor_nominal_db": 35.0,
+      "delta_c0_minus_nominal_db": -9.937135182557121,
+      "note": "Heuristic sanity check only; measured C0 floor should be reviewed against configured antenna coupling/leakage model."
+    },
+    "note": "No complex-phase fields are used by this report pipeline.",
+    "a5_stress_semantics": "response",
+    "a5_contamination_response_ready": true,
+    "a5_semantics_note": "Geometric path-structure stress is active; delay/path contamination-response interpretation is valid."
+  }
+}

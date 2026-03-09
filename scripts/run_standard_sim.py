@@ -48,12 +48,14 @@ SCENARIO_ALIAS_TO_BASE: dict[str, str] = {
     "A2_ON": "A2",
     "A3_ON": "A3",
     "A4_ON": "A4",
+    "A6_ON": "A6",
 }
 
 SCENARIO_ALIAS_CANONICAL: dict[str, str] = {
     "A2_ON": "A2_on",
     "A3_ON": "A3_on",
     "A4_ON": "A4_on",
+    "A6_ON": "A6_on",
 }
 
 
@@ -1300,6 +1302,7 @@ def _build_case_records(
                     force_cp_swap_on_odd_reflection=bool(force_cp_swap),
                     even_path_policy=str(args.a6_even_path_policy),
                     even_layout=str(args.a6_even_layout),
+                    los_enabled_override=los_enabled_override,
                 )
                 tx_pos = np.asarray([2.0, -2.0, 1.5], dtype=float) if str(p.get("mode")).lower() == "odd" else np.asarray([2.0, 1.0, 1.5], dtype=float)
                 rx_pos = np.asarray([float(p.get("rx_x", 2.4)), float(p.get("rx_y", -2.0)), float(p.get("rx_z", 1.5))], dtype=float)
@@ -1322,7 +1325,7 @@ def _build_case_records(
                             "a6_even_layout": str(args.a6_even_layout),
                             "incidence_max_deg": float(inc_max),
                             "near_normal_benchmark": 1,
-                            "los_block_method": "synthetic_los_off",
+                            "los_block_method": str(los_block_method),
                             "basis": basis,
                             "convention": convention,
                             "matrix_source": matrix_source,
@@ -1379,7 +1382,7 @@ def main() -> None:
     parser.add_argument(
         "--scenario",
         required=True,
-        choices=["C0", "A2", "A3", "A4", "A5", "A6", "B1", "B2", "B3", "A2_on", "A3_on", "A4_on"],
+        choices=["C0", "A2", "A3", "A4", "A5", "A6", "B1", "B2", "B3", "A2_on", "A3_on", "A4_on", "A6_on"],
     )
     parser.add_argument("--basis", type=str, default="circular", choices=["circular", "linear"])
     parser.add_argument("--convention", type=str, default="IEEE-RHCP")

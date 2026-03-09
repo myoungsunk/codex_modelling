@@ -17,6 +17,7 @@ _SCENARIO_MEANING: dict[str, str] = {
     "A4_ON": "LOS-on bridge observability counterpart of A4 material branch; direct LOS under material contrast.",
     "A5": "Proxy stress response pair (A5_pair): synthetic is primary, geometric is sensitivity check.",
     "A6": "Near-normal PEC parity benchmark; primary G2 sign evidence.",
+    "A6_ON": "LOS-on bridge observability counterpart of A6 parity benchmark; direct LOS + odd/even coexistence check.",
     "B1": "Room grid LOS anchor for coverage-aware leverage mapping (viable strata only; not universal).",
     "B2": "Room grid with partition obstacle for coverage-aware NLOS leverage mapping (structural-hole aware).",
     "B3": "Room grid corner-obstacle stress region for coverage-aware leverage mapping (structural-hole aware).",
@@ -38,7 +39,7 @@ def final_structure_rows() -> list[dict[str, str]]:
         {"unit": "A4_iso", "role": "L2-M primary", "notes": "late_panel=false, dispersion=off"},
         {"unit": "A4_bridge", "role": "L2-M secondary", "notes": "late_panel=true, dispersion=on"},
         {"unit": "A5_pair", "role": "L2-S proxy stress-response", "notes": "synthetic primary, geometric sensitivity"},
-        {"unit": "A2_on/A3_on/A4_on", "role": "bridge observability set", "notes": "LOS-on contrast bridge"},
+        {"unit": "A2_on/A3_on/A4_on/A6_on", "role": "bridge observability set", "notes": "LOS-on contrast bridge"},
         {"unit": "B1/B2/B3", "role": "R1/R2 coverage-aware leverage map", "notes": "viable strata/support count required; no universal claim"},
     ]
 
