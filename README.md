@@ -167,6 +167,8 @@ Use `--only A6_off,A6_on` for partial reruns and `--tag <name>` when you need pa
 
 Reporting rule: use `A6` as the primary G2 (odd/even sign) evidence in standard reports; keep `A3` as supplementary mechanism evidence.
 For A4 reporting, split `A4_iso` (primary material reflection, `include_late_panel=false`) and `A4_bridge` (secondary delayed effect, `include_late_panel=true`); make dispersion claims only when bridge runs include `material_dispersion=on|debye`.
+Treat `A3_supp`/`A4_bridge` WARN as scope-control (role lock), not as a weakness to be upgraded to PASS.
+Use `A5_pair` only for paired contamination-response interpretation.
 For B1/B2/B3 reporting, interpret R1/R2 as a `coverage-aware leverage map` over viable strata; do not claim an absolute universal map while structural holes remain.
 
 Generate success checks + plots:
