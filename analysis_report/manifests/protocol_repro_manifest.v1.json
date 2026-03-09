@@ -1,0 +1,306 @@
+{
+  "manifest_id": "protocol_repro_v1",
+  "description": "Reproducible protocol alias manifest for _off/_on/_iso/_bridge/_pair scenario units.",
+  "output_root": "outputs/protocol_repro_v1",
+  "run_group": "diag_protocol_repro_v1",
+  "common_args": [
+    "--basis",
+    "circular",
+    "--convention",
+    "IEEE-RHCP",
+    "--force-cp-swap-on-odd-reflection",
+    "false"
+  ],
+  "runs": [
+    {
+      "id": "C0",
+      "scenario": "C0",
+      "args": [
+        "--matrix-source",
+        "A",
+        "--n-rep",
+        "3",
+        "--dist-list",
+        "1,2,3",
+        "--yaw-list=-10,0,10",
+        "--pitch-list",
+        "0"
+      ]
+    },
+    {
+      "id": "A2_off",
+      "scenario": "A2_off",
+      "args": [
+        "--matrix-source",
+        "A",
+        "--strict-los-blocked",
+        "--n-rep",
+        "1",
+        "--dist-list",
+        "4,6",
+        "--a2-y-list",
+        "1.5,2.5"
+      ]
+    },
+    {
+      "id": "A6_off",
+      "scenario": "A6_off",
+      "args": [
+        "--matrix-source",
+        "J",
+        "--strict-los-blocked",
+        "--n-rep",
+        "1",
+        "--a6-modes",
+        "odd,even",
+        "--a6-case-set",
+        "both",
+        "--a6-even-layout",
+        "localized",
+        "--a6-even-path-policy",
+        "canonical",
+        "--a6-incidence-max-deg",
+        "15"
+      ]
+    },
+    {
+      "id": "A3_supp",
+      "scenario": "A3_supp",
+      "args": [
+        "--matrix-source",
+        "A",
+        "--strict-los-blocked",
+        "--n-rep",
+        "1"
+      ]
+    },
+    {
+      "id": "A4_iso",
+      "scenario": "A4_iso",
+      "args": [
+        "--matrix-source",
+        "A",
+        "--strict-los-blocked",
+        "--n-rep",
+        "1",
+        "--material-list",
+        "glass,wood,concrete",
+        "--a4-y-list",
+        "1.5,2.5",
+        "--dist-list",
+        "6.0",
+        "--a4-dispersion-modes",
+        "off,on"
+      ]
+    },
+    {
+      "id": "A4_bridge",
+      "scenario": "A4_bridge",
+      "args": [
+        "--matrix-source",
+        "A",
+        "--strict-los-blocked",
+        "--n-rep",
+        "1",
+        "--material-list",
+        "glass,wood,concrete",
+        "--a4-y-list",
+        "1.5,2.5",
+        "--dist-list",
+        "6.0",
+        "--a4-dispersion-modes",
+        "off,on"
+      ]
+    },
+    {
+      "id": "A5_pair",
+      "scenario": "A5_pair",
+      "args": [
+        "--matrix-source",
+        "A",
+        "--strict-los-blocked",
+        "--n-rep",
+        "1",
+        "--a5-stress-mode",
+        "geometry",
+        "--a5-scatterer-count",
+        "3",
+        "--a5-diffuse-enabled",
+        "false"
+      ]
+    },
+    {
+      "id": "A2_on",
+      "scenario": "A2_on",
+      "args": [
+        "--matrix-source",
+        "A",
+        "--n-rep",
+        "1",
+        "--dist-list",
+        "4,6",
+        "--a2-y-list",
+        "1.5,2.5"
+      ]
+    },
+    {
+      "id": "A6_on",
+      "scenario": "A6_on",
+      "args": [
+        "--matrix-source",
+        "J",
+        "--n-rep",
+        "1",
+        "--a6-modes",
+        "odd,even",
+        "--a6-case-set",
+        "both",
+        "--a6-even-layout",
+        "localized",
+        "--a6-even-path-policy",
+        "canonical",
+        "--a6-incidence-max-deg",
+        "15"
+      ]
+    },
+    {
+      "id": "A3_on",
+      "scenario": "A3_on",
+      "args": [
+        "--matrix-source",
+        "A",
+        "--n-rep",
+        "1"
+      ]
+    },
+    {
+      "id": "A4_on",
+      "scenario": "A4_on",
+      "args": [
+        "--matrix-source",
+        "A",
+        "--n-rep",
+        "1",
+        "--material-list",
+        "glass,wood,concrete",
+        "--a4-y-list",
+        "1.5,2.5",
+        "--dist-list",
+        "6.0",
+        "--a4-dispersion-modes",
+        "off,on"
+      ]
+    },
+    {
+      "id": "B1",
+      "scenario": "B1",
+      "args": [
+        "--matrix-source",
+        "A"
+      ]
+    },
+    {
+      "id": "B2",
+      "scenario": "B2",
+      "args": [
+        "--matrix-source",
+        "A"
+      ]
+    },
+    {
+      "id": "B3",
+      "scenario": "B3",
+      "args": [
+        "--matrix-source",
+        "A"
+      ]
+    }
+  ],
+  "analysis_report_template": {
+    "scenario_map": {},
+    "scenario_roles": {
+      "C0": "calibration_only",
+      "A2": "odd_isolation",
+      "A2_on": "odd_bridge_observability",
+      "A3": "mechanism_supplementary",
+      "A3_on": "even_bridge_observability",
+      "A4": "material_effect",
+      "A4_on": "material_bridge_observability",
+      "A5": "stress_response_proxy",
+      "A6": "g2_primary_benchmark",
+      "A6_on": "g2_bridge_observability",
+      "B1": "realspace_los",
+      "B2": "realspace_partition_nlos",
+      "B3": "realspace_corner_nlos"
+    },
+    "floor_policy": {
+      "mode": "from_C0",
+      "calibration_json": "",
+      "delta_method": "p5_p95"
+    },
+    "windows": {
+      "Te_ns": 3.0,
+      "Tmax_ns": 30.0,
+      "floor_window_ns": 1.5,
+      "target_window_ns": 3.0,
+      "target_window_ns_by_scenario": {
+        "A3": 6.0,
+        "A6": 3.0,
+        "A6_on": 3.0
+      },
+      "target_window_mode_by_scenario": {
+        "A3": "fixed",
+        "A6": "fixed",
+        "A6_on": "fixed"
+      },
+      "target_sign_metric_by_scenario": {
+        "A2": "excess",
+        "A3": "raw",
+        "A6": "raw",
+        "A6_on": "raw"
+      },
+      "te_sweep_ns": [
+        2.0,
+        3.0,
+        5.0
+      ],
+      "noise_tail_sweep_ns": [
+        30.0,
+        50.0,
+        80.0
+      ],
+      "threshold_sweep_db": [
+        4.0,
+        6.0,
+        8.0
+      ],
+      "tau0_method": "threshold",
+      "noise_tail_ns": 50.0,
+      "threshold_margin_db": 6.0
+    },
+    "measurement_sweep": {
+      "BW_Hz": 1000000000.0,
+      "df_Hz": 1000000.0
+    },
+    "plots": {
+      "max_links_for_pdp_examples": 3,
+      "pdp_example_selection": "highest_energy"
+    },
+    "stats": {
+      "alpha": 0.05,
+      "bootstrap_n": 1000
+    },
+    "scene_plots": {
+      "enabled": true,
+      "source": "scene_debug_json",
+      "debug_rays_k": 20,
+      "ray_selection": "top_power",
+      "max_cases_per_scenario": 9999,
+      "figure_size": [
+        10,
+        6
+      ],
+      "save_format": "png"
+    }
+  }
+}

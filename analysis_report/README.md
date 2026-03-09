@@ -64,7 +64,7 @@ python analysis_report/generate_proposition_plot_mapping_detailed.py --run-group
   - `A4_iso`: L2-M primary (`late_panel=false`, `dispersion=off`)
   - `A4_bridge`: L2-M secondary (`late_panel=true`, `dispersion=on`)
   - `A5_pair`: L2-S proxy stress response (synthetic primary, geometric sensitivity)
-  - `A2_on/A3_on/A4_on`: LOS-on observability bridge set
+  - `A2_on/A3_on/A4_on/A6_on`: LOS-on observability bridge set
   - `B1/B2/B3`: R1/R2 coverage-aware leverage map (viable strata + support count mandatory, no absolute universal-map claim)
 - 표준 리포팅 규칙:
   - G2 sign-off는 `A6` target-window raw sign(odd/even) 기준을 1차로 사용
@@ -90,3 +90,13 @@ python analysis_report/generate_proposition_plot_mapping_detailed.py --run-group
   - `analysis_report/out/<run_group>/final_diagnostic_decision.md`
   - `analysis_report/out/<run_group>/scenario_space_plots.md`
   - `analysis_report/out/<run_group>/figures/<scenario>__ALL__scene_montage.png`
+
+## Reproducibility Manifest
+- 고정 프로토콜 manifest: `analysis_report/manifests/protocol_repro_manifest.v1.json`
+- 실행 wrapper:
+```bash
+python3 scripts/run_protocol_manifest.py \
+  --manifest analysis_report/manifests/protocol_repro_manifest.v1.json \
+  --output-root outputs/protocol_repro_v1 \
+  --analysis-config-out analysis_report/config.protocol_repro_v1.json
+```

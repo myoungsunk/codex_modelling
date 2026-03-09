@@ -44,18 +44,98 @@ from scenarios import (
 from scenarios.common import default_antennas, make_los_blocker_plane, paths_to_records, uwb_frequency
 
 
-SCENARIO_ALIAS_TO_BASE: dict[str, str] = {
-    "A2_ON": "A2",
-    "A3_ON": "A3",
-    "A4_ON": "A4",
-    "A6_ON": "A6",
-}
+SCENARIO_CHOICES = [
+    "C0",
+    "A2",
+    "A2_off",
+    "A2_on",
+    "A3",
+    "A3_supp",
+    "A3_on",
+    "A4",
+    "A4_iso",
+    "A4_bridge",
+    "A4_on",
+    "A5",
+    "A5_pair",
+    "A6",
+    "A6_off",
+    "A6_on",
+    "B1",
+    "B2",
+    "B3",
+]
 
-SCENARIO_ALIAS_CANONICAL: dict[str, str] = {
-    "A2_ON": "A2_on",
-    "A3_ON": "A3_on",
-    "A4_ON": "A4_on",
-    "A6_ON": "A6_on",
+
+SCENARIO_PRESETS: dict[str, dict[str, Any]] = {
+    "A2_OFF": {
+        "base": "A2",
+        "output": "A2",
+        "variant": "A2_off",
+        "los_block_mode": "occluder",
+    },
+    "A2_ON": {
+        "base": "A2",
+        "output": "A2_on",
+        "variant": "A2_on",
+        "los_block_mode": "none",
+    },
+    "A3_SUPP": {
+        "base": "A3",
+        "output": "A3",
+        "variant": "A3_supp",
+        "los_block_mode": "occluder",
+    },
+    "A3_ON": {
+        "base": "A3",
+        "output": "A3_on",
+        "variant": "A3_on",
+        "los_block_mode": "none",
+    },
+    "A4_ISO": {
+        "base": "A4",
+        "output": "A4",
+        "variant": "A4_iso",
+        "los_block_mode": "occluder",
+        "a4_layout_modes": "iso",
+        "a4_include_late_panel": "false",
+        "a4_dispersion_modes": "off,on",
+    },
+    "A4_BRIDGE": {
+        "base": "A4",
+        "output": "A4",
+        "variant": "A4_bridge",
+        "los_block_mode": "occluder",
+        "a4_layout_modes": "bridge",
+        "a4_include_late_panel": "true",
+        "a4_dispersion_modes": "off,on",
+    },
+    "A4_ON": {
+        "base": "A4",
+        "output": "A4_on",
+        "variant": "A4_on",
+        "los_block_mode": "none",
+        "a4_layout_modes": "iso,bridge",
+    },
+    "A5_PAIR": {
+        "base": "A5",
+        "output": "A5",
+        "variant": "A5_pair",
+        "los_block_mode": "occluder",
+        "a5_pair_mode": True,
+    },
+    "A6_OFF": {
+        "base": "A6",
+        "output": "A6",
+        "variant": "A6_off",
+        "los_block_mode": "synthetic",
+    },
+    "A6_ON": {
+        "base": "A6",
+        "output": "A6_on",
+        "variant": "A6_on",
+        "los_block_mode": "none",
+    },
 }
 
 
@@ -63,25 +143,36 @@ def _scenario_key(s: str) -> str:
     return str(s).strip().upper()
 
 
+def _scenario_preset(s: str) -> dict[str, Any]:
+    return dict(SCENARIO_PRESETS.get(_scenario_key(s), {}))
+
+
 def _scenario_base_id(s: str) -> str:
-    return SCENARIO_ALIAS_TO_BASE.get(_scenario_key(s), _scenario_key(s))
+    preset = _scenario_preset(s)
+    return str(preset.get("base", _scenario_key(s)))
 
 
 def _scenario_canonical_id(s: str) -> str:
-    key = _scenario_key(s)
-    return SCENARIO_ALIAS_CANONICAL.get(key, key)
+    preset = _scenario_preset(s)
+    return str(preset.get("output", _scenario_key(s)))
+
+
+def _scenario_variant_id(s: str) -> str:
+    preset = _scenario_preset(s)
+    return str(preset.get("variant", _scenario_canonical_id(s)))
 
 
 def _resolve_los_control(scenario_id: str, los_block_mode: str) -> tuple[str, bool, bool | None, str]:
-    base = _scenario_base_id(scenario_id)
-    if _scenario_key(scenario_id) in SCENARIO_ALIAS_TO_BASE:
-        # Bridge aliases force LOS-on (no blocker) to test observability with direct path present.
-        return base, False, True, "los_on_bridge"
+    preset = _scenario_preset(scenario_id)
+    base = str(preset.get("base", _scenario_base_id(scenario_id)))
+    mode_raw = preset.get("los_block_mode", los_block_mode)
+    mode = str(mode_raw).lower().strip()
 
-    mode = str(los_block_mode).lower().strip()
     if mode == "occluder":
         return base, True, None, "physical_occluder"
     if mode == "none":
+        if str(_scenario_variant_id(scenario_id)).lower().endswith("_on"):
+            return base, False, True, "los_on_bridge"
         return base, False, True, "los_on"
     return base, False, False, "synthetic_los_off"
 
@@ -974,9 +1065,12 @@ def _build_case_records(
     *,
     antenna_config: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
-    scenario_out = _scenario_canonical_id(str(args.scenario))
+    scenario_req = str(args.scenario)
+    scenario_preset = _scenario_preset(scenario_req)
+    scenario_out = _scenario_canonical_id(scenario_req)
+    scenario_variant = _scenario_variant_id(scenario_req)
     s, los_blocker, los_enabled_override, los_block_method = _resolve_los_control(
-        scenario_out, str(args.los_block_mode)
+        scenario_req, str(args.los_block_mode)
     )
     basis = str(args.basis)
     convention = str(args.convention)
@@ -1013,6 +1107,7 @@ def _build_case_records(
                                     "pitch_deg": pit,
                                     "rep_id": int(rep_id),
                                     "material_class": "free_space",
+                                    "protocol_variant": str(scenario_variant),
                                     "basis": basis,
                                     "convention": convention,
                                     "matrix_source": matrix_source,
@@ -1056,6 +1151,7 @@ def _build_case_records(
                                 "material_class": "PEC",
                                 "obstacle_flag": 1,
                                 "rep_id": int(rep_id),
+                                "protocol_variant": str(scenario_variant),
                                 "los_block_method": str(los_block_method),
                                 "basis": basis,
                                 "convention": convention,
@@ -1096,6 +1192,7 @@ def _build_case_records(
                             "material_class": "PEC",
                             "obstacle_flag": 1,
                             "rep_id": int(rep_id),
+                            "protocol_variant": str(scenario_variant),
                             "los_block_method": str(los_block_method),
                             "basis": basis,
                             "convention": convention,
@@ -1111,16 +1208,19 @@ def _build_case_records(
         mats = [m.strip() for m in str(args.material_list).split(",") if m.strip()] or list(DEFAULT_MATERIAL_SPECS.keys())
         yvals = _parse_float_list(args.a4_y_list, [1.5, 2.0, 2.5])
         dvals = _parse_float_list(args.dist_list, [6.0])
-        layout_modes = [x.strip().lower() for x in str(args.a4_layout_modes).split(",") if x.strip()]
+        layout_modes_raw = str(scenario_preset.get("a4_layout_modes", args.a4_layout_modes))
+        layout_modes = [x.strip().lower() for x in layout_modes_raw.split(",") if x.strip()]
         if not layout_modes:
             layout_modes = ["iso", "bridge"]
         layout_modes = [x for x in layout_modes if x in {"iso", "bridge"}] or ["iso", "bridge"]
-        dispersion_modes = [x.strip().lower() for x in str(args.a4_dispersion_modes).split(",") if x.strip()]
+        dispersion_modes_raw = str(scenario_preset.get("a4_dispersion_modes", args.a4_dispersion_modes))
+        dispersion_modes = [x.strip().lower() for x in dispersion_modes_raw.split(",") if x.strip()]
         if not dispersion_modes:
             dispersion_modes = ["off", "on"]
         valid_disp = {"off", "on", "debye"}
         dispersion_modes = [x for x in dispersion_modes if x in valid_disp] or ["off", "on"]
-        include_late_panel_default = _parse_bool(args.a4_include_late_panel, default=True)
+        include_late_panel_raw = scenario_preset.get("a4_include_late_panel", args.a4_include_late_panel)
+        include_late_panel_default = _parse_bool(include_late_panel_raw, default=True)
         late_offset_m = float(args.a4_late_offset_m)
         materials_db = str(args.materials_db).strip() if str(args.materials_db).strip() else None
         cid = 0
@@ -1176,6 +1276,7 @@ def _build_case_records(
                                             "materials_db": str(materials_db or ""),
                                             "obstacle_flag": 1,
                                             "rep_id": int(rep_id),
+                                            "protocol_variant": str(scenario_variant),
                                             "los_block_method": str(los_block_method),
                                             "basis": basis,
                                             "convention": convention,
@@ -1192,21 +1293,12 @@ def _build_case_records(
         params = A5_depol_stress.build_sweep_params()
         if int(args.a5_max_cases) > 0:
             params = params[: int(args.a5_max_cases)]
-        stress_on = bool(args.stress_flag)
-        stress_mode = str(args.a5_stress_mode) if stress_on else "none"
-        stress_mode_norm = str(stress_mode).lower().strip()
-        if stress_on and stress_mode_norm == "synthetic" and not bool(getattr(args, "allow_a5_synthetic_only", False)):
-            raise SystemExit(
-                "A5 synthetic-only stress mode is disabled by default because it keeps delay/path topology fixed. "
-                "Use --a5-stress-mode hybrid|geometry for stress-response, or pass --allow-a5-synthetic-only to override."
-            )
-        if stress_on and stress_mode_norm in {"geometry", "hybrid"} and int(args.a5_scatterer_count) <= 0:
-            raise SystemExit(
-                "A5 stress-response mode requires --a5-scatterer-count > 0 "
-                "(otherwise geometry/delay structure is unchanged)."
-            )
-        stress_path_structure_active = int(stress_on and stress_mode_norm in {"geometry", "hybrid"} and int(args.a5_scatterer_count) > 0)
-        stress_pol_mixer_active = int(stress_on and stress_mode_norm in {"synthetic", "hybrid"})
+        pair_mode = bool(scenario_preset.get("a5_pair_mode", False))
+        if pair_mode:
+            variants: list[tuple[str, bool]] = [("base", False), ("stress", True)]
+        else:
+            stress_on_single = bool(args.stress_flag)
+            variants = [("stress", True)] if stress_on_single else [("base", False)]
         a5_diffuse_enabled = bool(_parse_bool(args.a5_diffuse_enabled, default=False))
         a5_diffuse_config = {
             "diffuse_enabled": bool(a5_diffuse_enabled),
@@ -1214,61 +1306,79 @@ def _build_case_records(
             "diffuse_lobe_alpha": float(args.a5_diffuse_lobe_alpha),
             "diffuse_rays_per_hit": int(args.a5_diffuse_rays_per_hit),
         }
-        if not stress_on or stress_mode_norm == "none":
-            stress_semantics = "off"
-        elif stress_path_structure_active == 1:
-            stress_semantics = "response"
-        else:
-            stress_semantics = "polarization_only"
-        for rep_outer in range(n_rep):
-            for p0 in params:
-                p = dict(p0)
-                p["rep_outer"] = int(rep_outer)
-                p["seed"] = int(p.get("seed", 0)) + int(rep_outer) * 10000
-                paths = A5_depol_stress.run_case(
-                    p,
-                    f_hz,
-                    basis=basis,
-                    antenna_config=dict(antenna_config or {}),
-                    force_cp_swap_on_odd_reflection=bool(force_cp_swap),
-                    stress_mode=stress_mode,
-                    scatterer_count=int(args.a5_scatterer_count) if stress_on else 0,
-                    diffuse_config=dict(a5_diffuse_config),
-                    los_blocker=bool(los_blocker),
-                    los_enabled_override=los_enabled_override,
+        for a5_pair_label, stress_on in variants:
+            stress_mode = str(args.a5_stress_mode) if stress_on else "none"
+            stress_mode_norm = str(stress_mode).lower().strip()
+            if stress_on and stress_mode_norm == "synthetic" and not bool(getattr(args, "allow_a5_synthetic_only", False)):
+                raise SystemExit(
+                    "A5 synthetic-only stress mode is disabled by default because it keeps delay/path topology fixed. "
+                    "Use --a5-stress-mode hybrid|geometry for stress-response, or pass --allow-a5-synthetic-only to override."
                 )
-                d = float(np.linalg.norm(np.asarray([p["rx_x"], p["rx_y"], 1.5]) - np.asarray([0.0, 0.0, 1.5])))
-                out.append(
-                    {
-                        "case_id": str(cid),
-                        "scenario_id": scenario_out,
-                        "link_id": f"{scenario_out}_{cid}",
-                        "params": p,
-                        "paths": paths_to_records(paths),
-                        "meta": {
-                            "d_m": d,
-                            "material_class": "PEC",
-                            "roughness_flag": int(stress_on),
-                            "human_flag": int(stress_on),
-                            "obstacle_flag": 1,
-                            "stress_mode": str(stress_mode),
-                            "scatterer_count": int(args.a5_scatterer_count) if stress_on else 0,
-                            "diffuse_enabled": int(bool(a5_diffuse_enabled)),
-                            "diffuse_factor": float(args.a5_diffuse_factor),
-                            "diffuse_lobe_alpha": float(args.a5_diffuse_lobe_alpha),
-                            "diffuse_rays_per_hit": int(args.a5_diffuse_rays_per_hit),
-                            "stress_path_structure_active": int(stress_path_structure_active),
-                            "stress_polarization_mixer_active": int(stress_pol_mixer_active),
-                            "stress_semantics": str(stress_semantics),
-                            "los_block_method": str(los_block_method),
-                            "basis": basis,
-                            "convention": convention,
-                            "matrix_source": matrix_source,
-                            "force_cp_swap_on_odd_reflection": int(bool(force_cp_swap)),
-                        },
-                    }
+            if stress_on and stress_mode_norm in {"geometry", "hybrid"} and int(args.a5_scatterer_count) <= 0:
+                raise SystemExit(
+                    "A5 stress-response mode requires --a5-scatterer-count > 0 "
+                    "(otherwise geometry/delay structure is unchanged)."
                 )
-                cid += 1
+            stress_path_structure_active = int(stress_on and stress_mode_norm in {"geometry", "hybrid"} and int(args.a5_scatterer_count) > 0)
+            stress_pol_mixer_active = int(stress_on and stress_mode_norm in {"synthetic", "hybrid"})
+            if not stress_on or stress_mode_norm == "none":
+                stress_semantics = "off"
+            elif stress_path_structure_active == 1:
+                stress_semantics = "response"
+            else:
+                stress_semantics = "polarization_only"
+            for rep_outer in range(n_rep):
+                for p0 in params:
+                    p = dict(p0)
+                    p["rep_outer"] = int(rep_outer)
+                    p["seed"] = int(p.get("seed", 0)) + int(rep_outer) * 10000
+                    p["a5_pair_label"] = str(a5_pair_label)
+                    paths = A5_depol_stress.run_case(
+                        p,
+                        f_hz,
+                        basis=basis,
+                        antenna_config=dict(antenna_config or {}),
+                        force_cp_swap_on_odd_reflection=bool(force_cp_swap),
+                        stress_mode=stress_mode,
+                        scatterer_count=int(args.a5_scatterer_count) if stress_on else 0,
+                        diffuse_config=dict(a5_diffuse_config),
+                        los_blocker=bool(los_blocker),
+                        los_enabled_override=los_enabled_override,
+                    )
+                    d = float(np.linalg.norm(np.asarray([p["rx_x"], p["rx_y"], 1.5]) - np.asarray([0.0, 0.0, 1.5])))
+                    out.append(
+                        {
+                            "case_id": str(cid),
+                            "scenario_id": scenario_out,
+                            "link_id": f"{scenario_out}_{cid}",
+                            "params": p,
+                            "paths": paths_to_records(paths),
+                            "meta": {
+                                "d_m": d,
+                                "material_class": "PEC",
+                                "roughness_flag": int(stress_on),
+                                "human_flag": int(stress_on),
+                                "obstacle_flag": 1,
+                                "a5_pair_label": str(a5_pair_label),
+                                "stress_mode": str(stress_mode),
+                                "scatterer_count": int(args.a5_scatterer_count) if stress_on else 0,
+                                "diffuse_enabled": int(bool(a5_diffuse_enabled)),
+                                "diffuse_factor": float(args.a5_diffuse_factor),
+                                "diffuse_lobe_alpha": float(args.a5_diffuse_lobe_alpha),
+                                "diffuse_rays_per_hit": int(args.a5_diffuse_rays_per_hit),
+                                "stress_path_structure_active": int(stress_path_structure_active),
+                                "stress_polarization_mixer_active": int(stress_pol_mixer_active),
+                                "stress_semantics": str(stress_semantics),
+                                "protocol_variant": str(scenario_variant),
+                                "los_block_method": str(los_block_method),
+                                "basis": basis,
+                                "convention": convention,
+                                "matrix_source": matrix_source,
+                                "force_cp_swap_on_odd_reflection": int(bool(force_cp_swap)),
+                            },
+                        }
+                    )
+                    cid += 1
         return out
 
     if s == "A6":
@@ -1325,6 +1435,7 @@ def _build_case_records(
                             "a6_even_layout": str(args.a6_even_layout),
                             "incidence_max_deg": float(inc_max),
                             "near_normal_benchmark": 1,
+                            "protocol_variant": str(scenario_variant),
                             "los_block_method": str(los_block_method),
                             "basis": basis,
                             "convention": convention,
@@ -1364,6 +1475,7 @@ def _build_case_records(
                         "d_m": float(np.linalg.norm(np.asarray([x, y, 1.5]) - np.asarray([2.0, 0.0, 1.5]))),
                         "material_class": "PEC",
                         "obstacle_flag": int(kind in {"B2", "B3"}),
+                        "protocol_variant": str(scenario_variant),
                         "rx_x": float(x),
                         "rx_y": float(y),
                         "basis": basis,
@@ -1382,7 +1494,7 @@ def main() -> None:
     parser.add_argument(
         "--scenario",
         required=True,
-        choices=["C0", "A2", "A3", "A4", "A5", "A6", "B1", "B2", "B3", "A2_on", "A3_on", "A4_on", "A6_on"],
+        choices=SCENARIO_CHOICES,
     )
     parser.add_argument("--basis", type=str, default="circular", choices=["circular", "linear"])
     parser.add_argument("--convention", type=str, default="IEEE-RHCP")
@@ -1465,12 +1577,16 @@ def main() -> None:
     rng = np.random.default_rng(int(args.seed))
     commit, branch = _git_meta()
     run_id = str(args.run_id or f"{args.scenario}_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}")
+    scenario_request = str(args.scenario)
+    scenario_variant = _scenario_variant_id(scenario_request)
+    scenario_out = _scenario_canonical_id(scenario_request)
+    scenario_base = _scenario_base_id(scenario_request)
     antenna_config = _build_antenna_config_from_args(args)
     f_hz = uwb_frequency(nf=int(args.nf))
     xpr_cfg = _load_json(args.xpr_model_config)
     floor_cfg = _load_json(args.floor_model_config)
     floor_ref_in = _load_json(args.floor_reference_json)
-    xpr_model = _make_xpr_model(str(args.scenario), xpr_cfg)
+    xpr_model = _make_xpr_model(scenario_request, xpr_cfg)
     floor_model = _make_floor_model(floor_cfg)
 
     case_records = _build_case_records(args, f_hz=f_hz, antenna_config=antenna_config)
@@ -1632,7 +1748,7 @@ def main() -> None:
     floor_ref_use: dict[str, Any] | None = None
     if floor_ref_in:
         floor_ref_use = dict(floor_ref_in)
-    elif str(args.scenario).upper() == "C0":
+    elif str(scenario_out).upper() == "C0":
         floor_ref_use = _build_floor_reference_with_curve(
             bundles,
             floor_model=floor_model,
@@ -1705,7 +1821,7 @@ def main() -> None:
                 b.metrics.extras["claim_caution_late_subband"] = c_l_sb
 
     warnings: list[str] = []
-    if str(args.scenario).upper().startswith("B"):
+    if str(scenario_out).upper().startswith("B"):
         los_n = int(sum(int(b.conditions.LOSflag) == 1 for b in bundles))
         nlos_n = int(sum(int(b.conditions.LOSflag) == 0 for b in bundles))
         t_los = int(max(0, args.room_target_los_n))
@@ -1718,7 +1834,10 @@ def main() -> None:
     run_meta = {
         "schema_version": SCHEMA_VERSION,
         "run_id": run_id,
-        "scenario_id": str(args.scenario),
+        "scenario_id": str(scenario_out),
+        "scenario_base_id": str(scenario_base),
+        "scenario_variant_id": str(scenario_variant),
+        "scenario_request_id": str(scenario_request),
         "basis": str(args.basis),
         "convention": str(args.convention),
         "matrix_source": str(args.matrix_source).upper(),
@@ -1747,6 +1866,10 @@ def main() -> None:
         "basis": str(args.basis),
         "convention": str(args.convention),
         "matrix_source": str(args.matrix_source).upper(),
+        "scenario_id": str(scenario_out),
+        "scenario_base_id": str(scenario_base),
+        "scenario_variant_id": str(scenario_variant),
+        "scenario_request_id": str(scenario_request),
         "force_cp_swap_on_odd_reflection": bool(_parse_bool(args.force_cp_swap_on_odd_reflection, default=False)),
         "antenna_config": dict(antenna_config),
         "n_links": len(bundles),
@@ -1754,7 +1877,7 @@ def main() -> None:
         "rays_csv": csv_out["rays_csv"],
         "warnings": list(warnings),
         "floor_reference_json": str(args.floor_reference_json or (Path(args.out_dir) / "floor_reference.json"))
-        if str(args.scenario).upper() == "C0" or args.floor_reference_json
+        if str(scenario_out).upper() == "C0" or args.floor_reference_json
         else "",
         "scene_debug_dir": str(scene_debug_dir) if _parse_bool(args.export_scene_debug, default=True) else "",
         "scene_debug_files": scene_debug_files,

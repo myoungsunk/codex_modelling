@@ -27,7 +27,27 @@ def main() -> None:
     parser.add_argument(
         "--scenario",
         required=True,
-        choices=["C0", "A2", "A3", "A4", "A5", "A6", "B1", "B2", "B3", "A2_on", "A3_on", "A4_on", "A6_on"],
+        choices=[
+            "C0",
+            "A2",
+            "A2_off",
+            "A2_on",
+            "A3",
+            "A3_supp",
+            "A3_on",
+            "A4",
+            "A4_iso",
+            "A4_bridge",
+            "A4_on",
+            "A5",
+            "A5_pair",
+            "A6",
+            "A6_off",
+            "A6_on",
+            "B1",
+            "B2",
+            "B3",
+        ],
     )
     parser.add_argument("--out-root", type=str, default="outputs/cp_lp_baseline")
     parser.add_argument("--run-id", type=str, default=None)

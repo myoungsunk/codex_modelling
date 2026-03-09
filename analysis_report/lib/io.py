@@ -61,7 +61,22 @@ def _read_json(path: Path) -> dict[str, Any]:
 
 def _scenario_from_name(name: str) -> str:
     up = str(name).upper()
-    for s in ["A2_ON", "A3_ON", "A4_ON", "A6_ON", "C0", "A2", "A3", "A4", "A5", "A6", "B1", "B2", "B3"]:
+    alias_to_base = {
+        "A2_OFF": "A2",
+        "A2_ON": "A2_ON",
+        "A3_SUPP": "A3",
+        "A3_ON": "A3_ON",
+        "A4_ISO": "A4",
+        "A4_BRIDGE": "A4",
+        "A4_ON": "A4_ON",
+        "A5_PAIR": "A5",
+        "A6_OFF": "A6",
+        "A6_ON": "A6_ON",
+    }
+    for token, mapped in alias_to_base.items():
+        if token in up:
+            return mapped
+    for s in ["C0", "A2", "A3", "A4", "A5", "A6", "B1", "B2", "B3"]:
         if s in up:
             return s
     return "NA"
