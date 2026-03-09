@@ -1,4 +1,4 @@
-# Detailed Proposition-Experiment-Data-Plot Mapping (diag_protocol_repro_v1_20260309_r1)
+# Detailed Proposition-Experiment-Data-Plot Mapping (diag_protocol_repro_v1_20260309_archetype)
 
 ## 0) 공통 플롯 규칙 요약
 - 공통 지표: XPD_floor, XPD_target_ex, XPD_early_ex, XPD_late_ex, rho_early, L_pol, DS, EL_proxy
@@ -43,9 +43,9 @@
 | L2-S1 | L2 | A5 | base/stress L_pol | [L2-S1__A5_base_stress_lpol_paired.png](figures/L2-S1__A5_base_stress_lpol_paired.png) | [L2-S1__data.csv](tables/plot_data/L2-S1__data.csv) | stress-response | PASS | MISSING |
 | L2-S2 | L2 | A5 | base/stress late_ex | [L2-S2__A5_base_stress_xpd_late_ex.png](figures/L2-S2__A5_base_stress_xpd_late_ex.png) | [L2-S2__data.csv](tables/plot_data/L2-S2__data.csv) | late contamination | PASS | READY |
 | L2-S3 | L2 | A5 | base/stress DS | [L2-S3__A5_base_stress_ds_tail.png](figures/L2-S3__A5_base_stress_ds_tail.png) | [L2-S3__data.csv](tables/plot_data/L2-S3__data.csv) | tail widening | PASS | READY |
-| L3-1 | L3 | A3/A4/B | EL,XPD_ex | [L3-1__el_vs_xpd_ex_scatter_regression.png](figures/L3-1__el_vs_xpd_ex_scatter_regression.png) | [L3-1__data.csv](tables/plot_data/L3-1__data.csv) | a1<0 monotonic tendency | PASS | READY |
-| L3-2 | L3 | A3/A4/B | EL bins | [L3-2__el_bin_conditional_box.png](figures/L3-2__el_bin_conditional_box.png) | [L3-2__data.csv](tables/plot_data/L3-2__data.csv) | nonparametric monotonicity | PASS | READY |
-| L3-3 | L3 | stage1 fit | EL,fitted mean | [L3-3__residualized_effect_fit_ci.png](figures/L3-3__residualized_effect_fit_ci.png) | [L3-3__data.csv](tables/plot_data/L3-3__data.csv) | mu(U) visualization | PASS | READY |
+| L3-1 | L3 | A3/A4/B | EL,XPD_ex | [L3-1__el_vs_xpd_ex_scatter_regression.png](figures/L3-1__el_vs_xpd_ex_scatter_regression.png) | [L3-1__data.csv](tables/plot_data/L3-1__data.csv) | a1<0 monotonic tendency | PARTIAL | READY |
+| L3-2 | L3 | A3/A4/B | EL bins | [L3-2__el_bin_conditional_box.png](figures/L3-2__el_bin_conditional_box.png) | [L3-2__data.csv](tables/plot_data/L3-2__data.csv) | nonparametric monotonicity | PARTIAL | READY |
+| L3-3 | L3 | stage1 fit | EL,fitted mean | [L3-3__residualized_effect_fit_ci.png](figures/L3-3__residualized_effect_fit_ci.png) | [L3-3__data.csv](tables/plot_data/L3-3__data.csv) | mu(U) visualization | PARTIAL | READY |
 | R1-1 | R1 | B1/B2/B3 | x,y,XPD_early_ex | [R1-1__B123_heatmap_xpd_early_ex.png](figures/R1-1__B123_heatmap_xpd_early_ex.png) | [R1-1__data.csv](tables/plot_data/R1-1__data.csv) | coverage-aware spatial pattern | PASS | READY |
 | R1-2 | R1 | B1/B2/B3 | x,y,rho_early(linear) | [R1-2__B123_heatmap_rho_early.png](figures/R1-2__B123_heatmap_rho_early.png) | [R1-2__data.csv](tables/plot_data/R1-2__data.csv) | coverage-aware contamination map | PASS | READY |
 | R1-3 | R1 | B1/B2/B3 | x,y,L_pol | [R1-3__B123_heatmap_lpol.png](figures/R1-3__B123_heatmap_lpol.png) | [R1-3__data.csv](tables/plot_data/R1-3__data.csv) | coverage-aware early-late structure map | PASS | READY |
@@ -58,9 +58,9 @@
 | P1-2 | P1 | A3/A4/B | bin medians | [P1-2__predicted_vs_observed_bin_median.png](figures/P1-2__predicted_vs_observed_bin_median.png) | [P1-2__data.csv](tables/plot_data/P1-2__data.csv) | condition-wise fit | PASS | READY |
 | P1-3 | P1 | A3/A4/B | ranks | [P1-3__rank_agreement_scatter.png](figures/P1-3__rank_agreement_scatter.png) | [P1-3__data.csv](tables/plot_data/P1-3__data.csv) | Spearman advantage | PASS | READY |
 | P1-4 | P1 | A3/A4/B | residual | [P1-4__residual_vs_el.png](figures/P1-4__residual_vs_el.png) | [P1-4__data.csv](tables/plot_data/P1-4__data.csv) | reduced EL bias | PASS | READY |
-| P2-1 | P2 | full vs minimal | effect-size set | [P2-1__full_vs_minimal_effect_size.png](figures/P2-1__full_vs_minimal_effect_size.png) | [P2-1__data.csv](tables/plot_data/P2-1__data.csv) | minimal reproducibility | PARTIAL | READY |
-| P2-2 | P2 | subsampling | coefficients | [P2-2__coefficient_stability_subsampling.png](figures/P2-2__coefficient_stability_subsampling.png) | [P2-2__data.csv](tables/plot_data/P2-2__data.csv) | sign/scale stability | PARTIAL | READY |
-| P2-3 | P2 | full vs minimal | CDF | [P2-3__full_vs_minimal_cdf_overlay.png](figures/P2-3__full_vs_minimal_cdf_overlay.png) | [P2-3__data.csv](tables/plot_data/P2-3__data.csv) | distribution reproducibility | PARTIAL | READY |
+| P2-1 | P2 | full vs minimal | effect-size set | [P2-1__full_vs_minimal_effect_size.png](figures/P2-1__full_vs_minimal_effect_size.png) | [P2-1__data.csv](tables/plot_data/P2-1__data.csv) | minimal reproducibility | PASS | READY |
+| P2-2 | P2 | subsampling | coefficients | [P2-2__coefficient_stability_subsampling.png](figures/P2-2__coefficient_stability_subsampling.png) | [P2-2__data.csv](tables/plot_data/P2-2__data.csv) | sign/scale stability | PASS | READY |
+| P2-3 | P2 | full vs minimal | CDF | [P2-3__full_vs_minimal_cdf_overlay.png](figures/P2-3__full_vs_minimal_cdf_overlay.png) | [P2-3__data.csv](tables/plot_data/P2-3__data.csv) | distribution reproducibility | PASS | READY |
 
 ## Notes
 - M1-1: C0 facet raw PDP
@@ -91,9 +91,9 @@
 - L3-1: subset=A3/A4/B
 - L3-2: nonparametric monotonicity
 - L3-3: stage1-style fit
-- R1-1: facet B1/B2/B3 with support n
-- R1-2: facet B1/B2/B3 with support n
-- R1-3: facet B1/B2/B3 with support n
+- R1-1: facet B1/B2/B3 with support mask + support n
+- R1-2: facet B1/B2/B3 with support mask + support n
+- R1-3: facet B1/B2/B3 with support mask + support n
 - R1-4: LOS/NLOS grouped CDFs with support n
 - R2-1: B1/B2/B3 pooled
 - R2-2: B1/B2/B3 pooled

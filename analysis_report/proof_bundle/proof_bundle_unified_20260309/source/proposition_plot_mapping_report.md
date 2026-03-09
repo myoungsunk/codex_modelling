@@ -1,4 +1,4 @@
-# Proposition Mapping Report (diag_protocol_repro_v1_20260309_r1)
+# Proposition Mapping Report (diag_protocol_repro_v1_20260309_archetype)
 
 명제-실험-데이터-플롯 매칭과 PASS/FAIL 결과를 정리한 표입니다.
 
@@ -19,11 +19,11 @@
 | G3 | A2/A3 + A4/A5 | XPD_ex 분산/꼬리 | 조건별 CDF + 분산 비교 | 완전분리 아님 + 조건별 변동 | PASS | READY |
 | L1 | A2-A5 + room | XPD_early_ex, XPD_late_ex, L_pol | L_pol box + early-late scatter | 기본 L_pol>0, stress 예외 | PASS | READY |
 | L2 | A4_iso(primary) + A4_bridge(secondary) / A5 stress | A4 branch label(include_late_panel, dispersion) + stress label + XPD_ex | A4_iso/A4_bridge material CDF + A5 stress CDF | primary는 A4_iso로 판정, A4_bridge는 보조(지연/dispersion) 증거 | PASS | READY |
-| L3 | 통제+room + EL proxy | EL, XPD_ex | scatter + Spearman | EL 증가에 따라 XPD/XPR 감소 단조 | PASS | READY |
+| L3 | 통제+room + EL proxy | EL, XPD_ex | scatter + Spearman | EL 증가에 따라 XPD/XPR 감소 단조 | PARTIAL | READY |
 | R1 | room grid LOS/NLOS (coverage-aware leverage) | Z 맵(XPD_ex, rho, L_pol, DS) + viable strata support | heatmap + LOS/NLOS CDF | 공간 분포 + LOS/NLOS 차이(viable strata 기준, universal claim 금지) | PASS | READY |
 | R2 | room grid + 지표 연결 (coverage-aware leverage) | Z와 DS/early집중도 + viable strata support | DS vs XPD_ex, DS vs rho | 유효조건 영역 분리(coverage-aware map) | PASS | READY |
 | P1 | 전체 데이터(통제+room) | Z, U(EL/material/late) | 조건부모델 vs 상수모델 | 조건부 모델 예측 우수 | PASS | READY |
-| P2 | 최소세트 subsampling | 부분 샘플 반복 | 계수 부호 안정성 | 표본 축소에도 결론 유지 | PARTIAL | READY |
+| P2 | 최소세트 subsampling | 부분 샘플 반복 | 계수 부호 안정성 | 표본 축소에도 결론 유지 | PASS | READY |
 
 ## Plot Files
 

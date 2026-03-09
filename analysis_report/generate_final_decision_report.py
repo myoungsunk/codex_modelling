@@ -14,6 +14,7 @@ import json
 import math
 import os
 from pathlib import Path
+import subprocess
 import sys
 from typing import Any
 
@@ -50,6 +51,22 @@ def _fmt(x: Any, n: int = 3) -> str:
     if not np.isfinite(v):
         return "nan"
     return f"{v:.{n}f}"
+
+
+def _current_git_branch() -> str:
+    try:
+        p = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        b = str(p.stdout).strip()
+        if p.returncode == 0 and b:
+            return b
+    except Exception:
+        pass
+    return "unknown"
 
 
 def _ensure_scene_montage(fig_dir: Path, scenario_id: str) -> Path | None:
@@ -187,7 +204,7 @@ def _build_final_markdown(
     lines: list[str] = []
     lines.append("# Final Diagnostic Decision")
     lines.append("")
-    lines.append("- Branch: `feature/dualcp-proxy-bridge`")
+    lines.append(f"- Branch: `{_current_git_branch()}`")
     lines.append(f"- Experiment tag: `{run_group}`")
     lines.append("- Reference artifacts:")
     for p in [

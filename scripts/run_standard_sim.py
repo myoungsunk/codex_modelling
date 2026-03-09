@@ -38,7 +38,6 @@ from scenarios import (
     A4_dielectric_plane,
     A5_depol_stress,
     A6_cp_parity_benchmark,
-    B0_room_box,
     C0_free_space,
 )
 from scenarios.common import default_antennas, make_los_blocker_plane, paths_to_records, uwb_frequency
@@ -63,6 +62,8 @@ SCENARIO_CHOICES = [
     "A6_on",
     "B1",
     "B2",
+    "B2a",
+    "B2b",
     "B3",
 ]
 
@@ -135,6 +136,18 @@ SCENARIO_PRESETS: dict[str, dict[str, Any]] = {
         "output": "A6_on",
         "variant": "A6_on",
         "los_block_mode": "none",
+    },
+    "B2A": {
+        "base": "B2",
+        "output": "B2",
+        "variant": "B2a",
+        "b2_zone": "transition",
+    },
+    "B2B": {
+        "base": "B2",
+        "output": "B2",
+        "variant": "B2b",
+        "b2_zone": "behind",
     },
 }
 
@@ -668,7 +681,13 @@ def _case_label(scenario_id: str, params: dict[str, Any]) -> str:
             f"_rep={int(p.get('rep_id', 0))}"
         )
     if s.startswith("B"):
-        return f"rx=({float(p.get('rx_x', np.nan)):.2f},{float(p.get('rx_y', np.nan)):.2f})"
+        core = (
+            f"rx=({float(p.get('rx_x', np.nan)):.2f},{float(p.get('rx_y', np.nan)):.2f},{float(p.get('rx_z', 1.5)):.2f})"
+        )
+        if s == "B2":
+            core += f"_mat={_sanitize_token(p.get('b2_partition_material', 'gypsum'))}"
+            core += f"_zone={_sanitize_token(p.get('b2_zone', 'mixed'))}"
+        return core
     return _sanitize_token(params)
 
 
@@ -709,7 +728,7 @@ def _plane_object_type(plane: Plane, scenario_id: str) -> str:
         return "absorber"
     if pid >= 9500:
         return "furniture"
-    if pid in {201, 301, 302}:
+    if sid.startswith("B") and pid >= 200:
         return "obstacle"
     if sid.startswith("B") and pid in {101, 102, 103, 104}:
         return "wall"
@@ -744,6 +763,9 @@ def _serialize_scene_objects(scene: list[Plane], scenario_id: str) -> list[dict[
     for idx, plane in enumerate(scene):
         verts = _plane_vertices_xyz(plane)
         obj_type = _plane_object_type(plane, scenario_id)
+        z_min = float(np.nanmin(verts[:, 2])) if verts.ndim == 2 and verts.shape[1] >= 3 else float("nan")
+        z_max = float(np.nanmax(verts[:, 2])) if verts.ndim == 2 and verts.shape[1] >= 3 else float("nan")
+        h_obj = float(z_max - z_min) if np.isfinite(z_min) and np.isfinite(z_max) else float("nan")
         if obj_type == "absorber":
             # In top-view plotting, represent vertical LOS blockers as a thin line-like strip
             # around the in-plane u-axis extent. This avoids exaggerated projected area that
@@ -781,6 +803,9 @@ def _serialize_scene_objects(scene: list[Plane], scenario_id: str) -> list[dict[
                 "material": _plane_material_name(plane),
                 "poly_xy": poly_xy,
                 "closed": bool(len(poly_xy) >= 3),
+                "z_min": z_min,
+                "z_max": z_max,
+                "height_m": h_obj,
             }
         )
     return objects
@@ -856,46 +881,342 @@ def _scene_bounds(
     }
 
 
-def _build_room_scene(kind: str) -> list[Plane]:
-    scene = B0_room_box.build_scene()
-    if kind == "B2":
-        scene.append(
-            Plane(
-                id=201,
-                p0=np.array([5.0, 0.0, 1.5]),
-                normal=np.array([-1.0, 0.0, 0.0]),
-                material=Material.pec(),
-                u_axis=np.array([0.0, 1.0, 0.0]),
-                v_axis=np.array([0.0, 0.0, 1.0]),
-                half_extent_u=1.8,
-                half_extent_v=1.5,
-            )
+def _build_room_shell(
+    *,
+    length_x: float,
+    width_y: float,
+    height_z: float,
+    wall_material: Material,
+    floor_material: Material,
+    ceiling_material: Material,
+) -> list[Plane]:
+    hx = 0.5 * float(length_x)
+    hy = 0.5 * float(width_y)
+    hz = 0.5 * float(height_z)
+    cx = 0.5 * float(length_x)
+    return [
+        Plane(
+            id=101,
+            p0=np.array([0.0, 0.0, hz]),
+            normal=np.array([1.0, 0.0, 0.0]),
+            material=wall_material,
+            u_axis=np.array([0.0, 1.0, 0.0]),
+            v_axis=np.array([0.0, 0.0, 1.0]),
+            half_extent_u=hy,
+            half_extent_v=hz,
+        ),
+        Plane(
+            id=102,
+            p0=np.array([length_x, 0.0, hz]),
+            normal=np.array([-1.0, 0.0, 0.0]),
+            material=wall_material,
+            u_axis=np.array([0.0, 1.0, 0.0]),
+            v_axis=np.array([0.0, 0.0, 1.0]),
+            half_extent_u=hy,
+            half_extent_v=hz,
+        ),
+        Plane(
+            id=103,
+            p0=np.array([cx, -hy, hz]),
+            normal=np.array([0.0, 1.0, 0.0]),
+            material=wall_material,
+            u_axis=np.array([1.0, 0.0, 0.0]),
+            v_axis=np.array([0.0, 0.0, 1.0]),
+            half_extent_u=hx,
+            half_extent_v=hz,
+        ),
+        Plane(
+            id=104,
+            p0=np.array([cx, hy, hz]),
+            normal=np.array([0.0, -1.0, 0.0]),
+            material=wall_material,
+            u_axis=np.array([1.0, 0.0, 0.0]),
+            v_axis=np.array([0.0, 0.0, 1.0]),
+            half_extent_u=hx,
+            half_extent_v=hz,
+        ),
+        Plane(
+            id=105,
+            p0=np.array([cx, 0.0, 0.0]),
+            normal=np.array([0.0, 0.0, 1.0]),
+            material=floor_material,
+            u_axis=np.array([1.0, 0.0, 0.0]),
+            v_axis=np.array([0.0, 1.0, 0.0]),
+            half_extent_u=hx,
+            half_extent_v=hy,
+        ),
+        Plane(
+            id=106,
+            p0=np.array([cx, 0.0, height_z]),
+            normal=np.array([0.0, 0.0, -1.0]),
+            material=ceiling_material,
+            u_axis=np.array([1.0, 0.0, 0.0]),
+            v_axis=np.array([0.0, 1.0, 0.0]),
+            half_extent_u=hx,
+            half_extent_v=hy,
+        ),
+    ]
+
+
+def _normalize_b2_partition_material(v: Any) -> str:
+    tok = str(v or "gypsum").strip().lower().replace("_", "-")
+    alias = {
+        "gypsum": "gypsum",
+        "gyp": "gypsum",
+        "glass": "glass",
+        "wood": "wood",
+        "monitor": "monitor-like",
+        "monitor-like": "monitor-like",
+        "monitorlike": "monitor-like",
+        "monitor_like": "monitor-like",
+    }
+    return alias.get(tok, "gypsum")
+
+
+def _b2_partition_material(token: str) -> tuple[Material, str]:
+    t = _normalize_b2_partition_material(token)
+    if t == "glass":
+        return (
+            Material.dielectric(
+                eps_r=6.2,
+                tan_delta=0.008,
+                name="partition_glass",
+                xpol_coupling_db=20.0,
+            ),
+            "glass",
         )
-    if kind == "B3":
-        scene.extend(
-            [
-                Plane(
-                    id=301,
-                    p0=np.array([5.5, 1.5, 1.5]),
-                    normal=np.array([-1.0, 0.0, 0.0]),
-                    material=Material.pec(),
-                    u_axis=np.array([0.0, 1.0, 0.0]),
-                    v_axis=np.array([0.0, 0.0, 1.0]),
-                    half_extent_u=1.5,
-                    half_extent_v=1.5,
-                ),
-                Plane(
-                    id=302,
-                    p0=np.array([5.5, 1.5, 1.5]),
-                    normal=np.array([0.0, -1.0, 0.0]),
-                    material=Material.pec(),
-                    u_axis=np.array([1.0, 0.0, 0.0]),
-                    v_axis=np.array([0.0, 0.0, 1.0]),
-                    half_extent_u=1.5,
-                    half_extent_v=1.5,
-                ),
-            ]
+    if t == "wood":
+        return (
+            Material.dielectric(
+                eps_r=2.3,
+                tan_delta=0.025,
+                name="partition_wood",
+                xpol_coupling_db=16.0,
+            ),
+            "wood",
         )
+    if t == "monitor-like":
+        return (
+            Material.dielectric(
+                eps_r=5.6,
+                tan_delta=0.012,
+                name="partition_monitor_like",
+                xpol_coupling_db=19.0,
+            ),
+            "monitor-like",
+        )
+    return (
+        Material.dielectric(
+            eps_r=2.7,
+            tan_delta=0.040,
+            name="partition_gypsum",
+            xpol_coupling_db=17.0,
+        ),
+        "gypsum",
+    )
+
+
+def _normalize_b2_zone(v: Any) -> str:
+    s = str(v or "").strip().lower()
+    if s in {"transition", "trans", "a", "b2a"}:
+        return "transition"
+    if s in {"behind", "behind-partition", "hard", "b", "b2b"}:
+        return "behind"
+    return "mixed"
+
+
+def _b2_zone_allows_point(zone: str, x: float, y: float) -> bool:
+    z = _normalize_b2_zone(zone)
+    _ = float(y)
+    if z == "transition":
+        # Near the partition boundary (both sides) to preserve mixed LOS/NLOS behavior.
+        return float(x) <= 6.0
+    if z == "behind":
+        # Behind the partition side only, typically harder contamination than transition.
+        return float(x) >= 5.0
+    return True
+
+
+def _room_profile(kind: str, *, params: dict[str, Any] | None = None) -> dict[str, Any]:
+    sid = str(kind).upper().strip()
+    p = dict(params or {})
+    wall_mat = Material.dielectric(eps_r=2.8, tan_delta=0.025, name="gypsum_wall")
+    floor_mat = Material.dielectric(eps_r=4.6, tan_delta=0.030, name="concrete_floor")
+    ceil_mat = Material.dielectric(eps_r=2.2, tan_delta=0.020, name="acoustic_ceiling")
+    profile: dict[str, Any] = {
+        "name": "practical_archetype_v2",
+        "layout_label": "Practical Archetype Layout",
+        "archetype_label": "Canonical Field-Inspired Layout",
+        "length_x": 12.0,
+        "width_y": 10.0,
+        "height_z": 3.2,
+        "wall_material": wall_mat,
+        "floor_material": floor_mat,
+        "ceiling_material": ceil_mat,
+        "tx_pos": np.array([1.6, 0.0, 1.8], dtype=float),
+        "rx_z": 1.5,
+        "max_bounce": 1,
+        "grid": {"x_min": 4.0, "x_max": 9.0, "y_min": -2.0, "y_max": 2.0, "step": 1.0},
+        "obstacles": [],
+        "material_class": "room_open_mixed",
+        "obstacle_height_summary": [],
+    }
+    if sid == "B2":
+        b2_zone = _normalize_b2_zone(p.get("b2_zone", "mixed"))
+        partition_mat, partition_label = _b2_partition_material(p.get("b2_partition_material", "gypsum"))
+        monitor_mat = Material.dielectric(
+            eps_r=6.5,
+            tan_delta=0.006,
+            name="monitor_like_panel",
+            xpol_coupling_db=20.0,
+        )
+        mat_class = "partition_soft_block_mixed"
+        if b2_zone == "transition":
+            mat_class = "partition_transition_zone"
+        elif b2_zone == "behind":
+            mat_class = "partition_behind_zone"
+        profile.update(
+            {
+                # Keep B1/B2 geometry aligned by default; obstacle-only effect is separated by obstacles.
+                "grid": {"x_min": 4.0, "x_max": 9.0, "y_min": -2.0, "y_max": 2.0, "step": 1.0},
+                "max_bounce": 2,
+                "material_class": mat_class,
+                "b2_partition_material": partition_label,
+                "b2_monitor_material": "monitor-like",
+                "b2_zone": b2_zone,
+                "obstacles": [
+                    Plane(
+                        id=201,
+                        p0=np.array([4.8, 0.0, 1.5]),
+                        normal=np.array([-1.0, 0.0, 0.0]),
+                        material=partition_mat,
+                        u_axis=np.array([0.0, 1.0, 0.0]),
+                        v_axis=np.array([0.0, 0.0, 1.0]),
+                        half_extent_u=2.4,
+                        half_extent_v=1.2,
+                    ),
+                    Plane(
+                        id=202,
+                        p0=np.array([6.2, -1.2, 1.3]),
+                        normal=np.array([0.0, 1.0, 0.0]),
+                        material=monitor_mat,
+                        u_axis=np.array([1.0, 0.0, 0.0]),
+                        v_axis=np.array([0.0, 0.0, 1.0]),
+                        half_extent_u=0.9,
+                        half_extent_v=0.7,
+                    ),
+                ],
+                "obstacle_height_summary": [
+                    {"name": "partition_panel", "height_m": 2.4},
+                    {"name": "monitor_panel", "height_m": 1.4},
+                ],
+            }
+        )
+    elif sid == "B3":
+        barrier_mat = Material.dielectric(
+            eps_r=5.8,
+            tan_delta=0.035,
+            name="concrete_barrier",
+            xpol_coupling_db=14.0,
+        )
+        metal_mat = Material.pec(xpol_coupling_db=12.0)
+        profile.update(
+            {
+                "tx_pos": np.array([1.2, -3.2, 1.8], dtype=float),
+                "rx_z": 1.5,
+                # Keep B3 focus on deeper corner-shadow samples (hard-NLOS risk emphasis).
+                "grid": {"x_min": 6.0, "x_max": 10.0, "y_min": 1.0, "y_max": 5.0, "step": 1.0},
+                "max_bounce": 3,
+                "material_class": "corner_high_el_blocked",
+                "obstacles": [
+                    Plane(
+                        id=301,
+                        p0=np.array([3.8, 1.0, 1.6]),
+                        normal=np.array([-1.0, 0.0, 0.0]),
+                        material=barrier_mat,
+                        u_axis=np.array([0.0, 1.0, 0.0]),
+                        v_axis=np.array([0.0, 0.0, 1.0]),
+                        half_extent_u=4.0,
+                        half_extent_v=1.6,
+                    ),
+                    Plane(
+                        id=303,
+                        p0=np.array([4.6, 0.9, 1.1]),
+                        normal=np.array([1.0, 0.0, 0.0]),
+                        material=barrier_mat,
+                        u_axis=np.array([0.0, 1.0, 0.0]),
+                        v_axis=np.array([0.0, 0.0, 1.0]),
+                        half_extent_u=0.5,
+                        half_extent_v=1.1,
+                    ),
+                    Plane(
+                        id=304,
+                        p0=np.array([6.4, 2.2, 1.4]),
+                        normal=np.array([0.0, -1.0, 0.0]),
+                        material=metal_mat,
+                        u_axis=np.array([1.0, 0.0, 0.0]),
+                        v_axis=np.array([0.0, 0.0, 1.0]),
+                        half_extent_u=1.2,
+                        half_extent_v=1.4,
+                    ),
+                    Plane(
+                        id=305,
+                        p0=np.array([5.6, 0.4, 1.5]),
+                        normal=np.array([0.0, -1.0, 0.0]),
+                        material=barrier_mat,
+                        u_axis=np.array([1.0, 0.0, 0.0]),
+                        v_axis=np.array([0.0, 0.0, 1.0]),
+                        half_extent_u=1.2,
+                        half_extent_v=1.5,
+                    ),
+                ],
+                "obstacle_height_summary": [
+                    {"name": "blocking_wall", "height_m": 3.2},
+                    {"name": "column_block", "height_m": 2.2},
+                    {"name": "return_reflector", "height_m": 2.8},
+                    {"name": "corner_lip_block", "height_m": 3.0},
+                ],
+            }
+        )
+    return profile
+
+
+def _room_grid_axes(args: argparse.Namespace, kind: str, *, params: dict[str, Any] | None = None) -> tuple[np.ndarray, np.ndarray]:
+    cli_default = {
+        "grid_x_min": 2.0,
+        "grid_x_max": 8.0,
+        "grid_y_min": -3.0,
+        "grid_y_max": 3.0,
+        "grid_step_m": 1.0,
+    }
+    user_override = any(abs(float(getattr(args, k)) - float(v)) > 1e-9 for k, v in cli_default.items())
+    profile_grid = dict(_room_profile(kind, params=params).get("grid", {}))
+    x_min = float(args.grid_x_min) if user_override else float(profile_grid.get("x_min", cli_default["grid_x_min"]))
+    x_max = float(args.grid_x_max) if user_override else float(profile_grid.get("x_max", cli_default["grid_x_max"]))
+    y_min = float(args.grid_y_min) if user_override else float(profile_grid.get("y_min", cli_default["grid_y_min"]))
+    y_max = float(args.grid_y_max) if user_override else float(profile_grid.get("y_max", cli_default["grid_y_max"]))
+    step = float(args.grid_step_m) if user_override else float(profile_grid.get("step", cli_default["grid_step_m"]))
+    step = max(step, 1e-9)
+    if x_max < x_min:
+        x_min, x_max = x_max, x_min
+    if y_max < y_min:
+        y_min, y_max = y_max, y_min
+    x_vals = np.arange(x_min, x_max + 1e-9, step)
+    y_vals = np.arange(y_min, y_max + 1e-9, step)
+    return x_vals, y_vals
+
+
+def _build_room_scene(kind: str, *, params: dict[str, Any] | None = None) -> list[Plane]:
+    profile = _room_profile(kind, params=params)
+    scene = _build_room_shell(
+        length_x=float(profile.get("length_x", 12.0)),
+        width_y=float(profile.get("width_y", 10.0)),
+        height_z=float(profile.get("height_z", 3.2)),
+        wall_material=profile.get("wall_material", Material.pec()),
+        floor_material=profile.get("floor_material", Material.pec()),
+        ceiling_material=profile.get("ceiling_material", Material.pec()),
+    )
+    scene.extend(list(profile.get("obstacles", [])))
     return scene
 
 
@@ -997,9 +1318,12 @@ def _build_scene_snapshot(
         return np.asarray(tx.position, dtype=float), np.asarray(rx.position, dtype=float), scene
 
     if s in {"B1", "B2", "B3"}:
-        tx = tx.with_position([2.0, 0.0, 1.5])
-        rx = rx.with_position([float(params.get("rx_x", 2.0)), float(params.get("rx_y", 0.0)), 1.5])
-        scene = _build_room_scene(s)
+        profile = _room_profile(s, params=params)
+        tx_pos = np.asarray(profile.get("tx_pos", np.array([1.6, 0.0, 1.8])), dtype=float)
+        rx_z = float(params.get("rx_z", profile.get("rx_z", 1.2)))
+        tx = tx.with_position([float(tx_pos[0]), float(tx_pos[1]), float(tx_pos[2])])
+        rx = rx.with_position([float(params.get("rx_x", 4.0)), float(params.get("rx_y", 0.0)), rx_z])
+        scene = _build_room_scene(s, params=params)
         return np.asarray(tx.position, dtype=float), np.asarray(rx.position, dtype=float), scene
 
     return np.asarray(tx.position, dtype=float), np.asarray(rx.position, dtype=float), scene
@@ -1040,6 +1364,30 @@ def _export_scene_debug_for_case(
     objects = _serialize_scene_objects(scene, scenario_id=scenario_id)
     bounds = _scene_bounds(tx=tx, rx=rx, objects=objects, rays=rays_topk)
     case_label = str(case_rec.get("case_label", _case_label(scenario_id, params)))
+    profile_meta: dict[str, Any] = {}
+    sid_base = _scenario_base_id(scenario_id)
+    if sid_base in {"B1", "B2", "B3"}:
+        prof = _room_profile(sid_base, params=params)
+        obs_h = []
+        for obj in objects:
+            try:
+                h = float(obj.get("height_m", np.nan))
+            except Exception:
+                h = float("nan")
+            if np.isfinite(h) and h > 0.0:
+                obs_h.append({"name": str(obj.get("name", "")), "height_m": float(h)})
+        try:
+            room_h = float(prof.get("height_z", np.nan))
+        except Exception:
+            room_h = float("nan")
+        profile_meta = {
+            "layout_label": str(prof.get("layout_label", "")),
+            "archetype_label": str(prof.get("archetype_label", "")),
+            "room_height_z_m": float(room_h),
+            "b2_partition_material": str(prof.get("b2_partition_material", "")),
+            "b2_monitor_material": str(prof.get("b2_monitor_material", "")),
+            "obstacle_heights_m": obs_h,
+        }
     scene_dict = {
         "scene_schema": "scene_debug_v1",
         "scenario_id": scenario_id,
@@ -1061,6 +1409,7 @@ def _export_scene_debug_for_case(
             "force_cp_swap_on_odd_reflection": bool(force_cp_swap_on_odd_reflection),
             "case_params": dict(params),
             "antenna_config": dict(antenna_config or {}),
+            **profile_meta,
         },
     }
     fname = f"{_sanitize_token(scenario_id)}__{_sanitize_token(case_id)}__scene_debug.json"
@@ -1074,22 +1423,27 @@ def _run_room_case(
     rx_x: float,
     rx_y: float,
     f_hz: np.ndarray,
+    case_params: dict[str, Any] | None = None,
     basis: str = "circular",
     convention: str = "IEEE-RHCP",
     antenna_config: dict[str, Any] | None = None,
     force_cp_swap_on_odd_reflection: bool = False,
 ) -> list[dict[str, Any]]:
     tx, rx = default_antennas(basis=basis, convention=convention, **dict(antenna_config or {}))
-    tx = tx.with_position([2.0, 0.0, 1.5])
-    rx = rx.with_position([rx_x, rx_y, 1.5])
-    scene = _build_room_scene(kind)
+    profile = _room_profile(kind, params=case_params)
+    tx_pos = np.asarray(profile.get("tx_pos", np.array([1.6, 0.0, 1.8])), dtype=float)
+    rx_z = float(profile.get("rx_z", 1.2))
+    max_bounce = int(max(0, profile.get("max_bounce", 2)))
+    tx = tx.with_position([float(tx_pos[0]), float(tx_pos[1]), float(tx_pos[2])])
+    rx = rx.with_position([rx_x, rx_y, rx_z])
+    scene = _build_room_scene(kind, params=case_params)
     paths = trace_paths(
         scene,
         tx,
         rx,
         f_hz,
-        max_bounce=2,
-        los_enabled=True,
+        max_bounce=max_bounce,
+        los_enabled=bool(profile.get("los_enabled", True)),
         force_cp_swap_on_odd_reflection=bool(force_cp_swap_on_odd_reflection),
     )
     return paths_to_records(paths)
@@ -1485,43 +1839,77 @@ def _build_case_records(
 
     # B1/B2/B3 room-grid style
     kind = s
-    x_vals = np.arange(float(args.grid_x_min), float(args.grid_x_max) + 1e-9, float(args.grid_step_m))
-    y_vals = np.arange(float(args.grid_y_min), float(args.grid_y_max) + 1e-9, float(args.grid_step_m))
+    base_profile = _room_profile(kind)
+    tx_pos = np.asarray(base_profile.get("tx_pos", np.array([1.6, 0.0, 1.8])), dtype=float)
+    rx_z = float(base_profile.get("rx_z", 1.2))
+    x_vals, y_vals = _room_grid_axes(args, kind)
+    b2_materials = ["gypsum"]
+    b2_zone = _normalize_b2_zone(str(scenario_preset.get("b2_zone", getattr(args, "b2_zone", "mixed"))))
+    if kind == "B2":
+        b2_materials = [
+            _normalize_b2_partition_material(x)
+            for x in str(getattr(args, "b2_partition_materials", "gypsum")).split(",")
+            if str(x).strip()
+        ]
+        b2_materials = [x for x in b2_materials if x]
+        if not b2_materials:
+            b2_materials = ["gypsum"]
     cid = 0
-    for x in x_vals:
-        for y in y_vals:
-            paths = _run_room_case(
-                kind=kind,
-                rx_x=float(x),
-                rx_y=float(y),
-                f_hz=f_hz,
-                basis=basis,
-                convention=convention,
-                antenna_config=dict(antenna_config or {}),
-                force_cp_swap_on_odd_reflection=bool(force_cp_swap),
-            )
-            out.append(
-                {
-                    "case_id": str(cid),
-                    "scenario_id": kind,
-                    "link_id": f"{kind}_{cid}",
-                    "params": {"rx_x": float(x), "rx_y": float(y)},
-                    "paths": paths,
-                    "meta": {
-                        "d_m": float(np.linalg.norm(np.asarray([x, y, 1.5]) - np.asarray([2.0, 0.0, 1.5]))),
-                        "material_class": "PEC",
-                        "obstacle_flag": int(kind in {"B2", "B3"}),
-                        "protocol_variant": str(scenario_variant),
-                        "rx_x": float(x),
-                        "rx_y": float(y),
-                        "basis": basis,
-                        "convention": convention,
-                        "matrix_source": matrix_source,
-                        "force_cp_swap_on_odd_reflection": int(bool(force_cp_swap)),
-                    },
-                }
-            )
-            cid += 1
+    for b2_mat in b2_materials:
+        for x in x_vals:
+            for y in y_vals:
+                case_params = {"rx_x": float(x), "rx_y": float(y), "rx_z": float(rx_z)}
+                if kind == "B2":
+                    if not _b2_zone_allows_point(b2_zone, float(x), float(y)):
+                        continue
+                    case_params["b2_partition_material"] = str(b2_mat)
+                    case_params["b2_zone"] = str(b2_zone)
+                profile = _room_profile(kind, params=case_params)
+                tx_pos_case = np.asarray(profile.get("tx_pos", tx_pos), dtype=float)
+                paths = _run_room_case(
+                    kind=kind,
+                    rx_x=float(x),
+                    rx_y=float(y),
+                    f_hz=f_hz,
+                    case_params=case_params,
+                    basis=basis,
+                    convention=convention,
+                    antenna_config=dict(antenna_config or {}),
+                    force_cp_swap_on_odd_reflection=bool(force_cp_swap),
+                )
+                out.append(
+                    {
+                        "case_id": str(cid),
+                        "scenario_id": kind,
+                        "link_id": f"{kind}_{cid}",
+                        "params": case_params,
+                        "paths": paths,
+                        "meta": {
+                            "d_m": float(np.linalg.norm(np.asarray([x, y, rx_z]) - tx_pos_case)),
+                            "material_class": str(profile.get("material_class", "room_mixed")),
+                            "b2_partition_material": str(profile.get("b2_partition_material", "")),
+                            "b2_monitor_material": str(profile.get("b2_monitor_material", "")),
+                            "b2_zone": str(profile.get("b2_zone", "")),
+                            "obstacle_flag": int(len(list(profile.get("obstacles", []))) > 0),
+                            "protocol_variant": str(scenario_variant),
+                            "room_profile": str(profile.get("name", "practical_archetype_v2")),
+                            "layout_label": str(profile.get("layout_label", "")),
+                            "archetype_label": str(profile.get("archetype_label", "")),
+                            "room_height_z_m": float(profile.get("height_z", np.nan)),
+                            "rx_x": float(x),
+                            "rx_y": float(y),
+                            "rx_z": float(rx_z),
+                            "tx_x": float(tx_pos_case[0]),
+                            "tx_y": float(tx_pos_case[1]),
+                            "tx_z": float(tx_pos_case[2]),
+                            "basis": basis,
+                            "convention": convention,
+                            "matrix_source": matrix_source,
+                            "force_cp_swap_on_odd_reflection": int(bool(force_cp_swap)),
+                        },
+                    }
+                )
+                cid += 1
     return out
 
 
@@ -1597,6 +1985,8 @@ def main() -> None:
     parser.add_argument("--max-links", type=int, default=0)
     parser.add_argument("--ds-reference", type=str, default="total", choices=["total", "co"])
     parser.add_argument("--el-proxy-mode", type=str, default="early_sum", choices=["early_sum", "dominant_early_ray"])
+    parser.add_argument("--b2-partition-materials", type=str, default="gypsum")
+    parser.add_argument("--b2-zone", type=str, default="mixed", choices=["mixed", "transition", "behind"])
     parser.add_argument("--grid-x-min", type=float, default=2.0)
     parser.add_argument("--grid-x-max", type=float, default=8.0)
     parser.add_argument("--grid-y-min", type=float, default=-3.0)

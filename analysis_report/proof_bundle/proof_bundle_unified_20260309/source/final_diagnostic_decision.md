@@ -1,7 +1,7 @@
 # Final Diagnostic Decision
 
-- Branch: `feature/dualcp-proxy-bridge`
-- Experiment tag: `diag_protocol_repro_v1_20260309_r1`
+- Branch: `main`
+- Experiment tag: `diag_protocol_repro_v1_20260309_archetype`
 - Reference artifacts:
   - [diagnostic_checks.json](tables/diagnostic_checks.json)
   - [diagnostic_report.md](diagnostic_report.md)
@@ -62,7 +62,7 @@ Intended physical interactions are generated correctly. A3 좌표/관통 검수�
 - A6 parity benchmark=PASS (odd hit=1.000, even hit=1.000)
 - G2 primary evidence source=A6_near_normal_benchmark, status=PASS
 - A3 mechanism status=PASS, A3 system-early status=FAIL
-- A5 target mode=isolation, W3 (room Te sweep) status=WARN (best S_xpd_early=0.922)
+- A5 target mode=isolation, W3 (room Te sweep) status=WARN (best S_xpd_early=0.663)
 
 ### Interpretation
 A2는 odd early-anchor로 적합합니다. A3는 mechanism 검증에는 적합하지만 fixed system early-window baseline으로는 부적합합니다. A5는 stress-isolation이 아니라 contamination-response로 해석해야 합니다.
@@ -92,10 +92,10 @@ A2는 odd early-anchor로 적합합니다. A3는 mechanism 검증에는 적합�
 **Status:** FAIL
 
 ### Evidence
-- D1-global=PASS (EL_iqr=4.525 dB)
+- D1-global=PASS (EL_iqr=5.535 dB)
 - D1-local(A2)=PASS, D1-local(A5)=FAIL role=stress_response_proxy
-- D2(stage1)=WARN, D2(stage2)=PASS (overall=WARN)
-- D3=FAIL (qNA_total=0, selected_rows_n=0)
+- D2(stage1)=FAIL, D2(stage2)=PASS (overall=FAIL)
+- D3=PASS (qNA_total=0, selected_rows_n=0)
 
 ### Interpretation
 회귀 식별성은 현재 단계에서 유효합니다. 잔여 이슈는 `LOS0_q3` 구조적 홀 문서화와 strata 해석 규칙 고정입니다.
@@ -131,10 +131,10 @@ RT를 잠재 설명변수 생성기로 쓰고, 검증은 관측 가능한 power-
 | A4_bridge | material effect secondary support | WARN(scope-control) | bridge/support context | primary material claim |
 | A4_on | bridge observability | WARN | LOS-on bridge check | L2-M sign-off |
 | A5_pair | contamination-response pair | PASS | paired contamination/stress-response evidence | faithful rough/human solver claim |
-| B1 | LOS real-space anchor | FAIL | coverage-aware leverage baseline | absolute universal map claim |
-| B2 | partition NLOS | WARN | coverage-aware contamination/NLOS leverage | absolute universal map claim |
-| B3 | corner high-EL NLOS | PASS | coverage-aware high-EL stress leverage | absolute universal map claim |
-| B-all | real-space identifiability set | FAIL | stage1 EL fit / coverage-aware leverage map | strict full-strata + universal map claim |
+| B1 | LOS real-space anchor | WARN | coverage-aware leverage baseline | absolute universal map claim |
+| B2 | partition NLOS | PASS | coverage-aware contamination/NLOS leverage | absolute universal map claim |
+| B3 | corner high-EL NLOS | WARN | coverage-aware high-EL stress leverage | absolute universal map claim |
+| B-all | real-space identifiability set | PASS | stage1 EL fit / coverage-aware leverage map | strict full-strata + universal map claim |
 
 ## Final Measurement Readiness Decision
 

@@ -1,4 +1,4 @@
-# Diagnostic Report (diag_protocol_repro_v1_20260309_r1)
+# Diagnostic Report (diag_protocol_repro_v1_20260309_archetype)
 
 ## Dataset Summary
 
@@ -13,9 +13,9 @@
 | A5 | 60 |
 | A6 | 20 |
 | A6_on | 20 |
-| B1 | 49 |
-| B2 | 49 |
-| B3 | 49 |
+| B1 | 30 |
+| B2 | 120 |
+| B3 | 25 |
 | C0 | 125 |
 
 - Figure metadata: [figure_metadata.csv](tables/figure_metadata.csv)
@@ -149,7 +149,7 @@
 
 | freq_source | dt_res_s | tau_max_s | Te_s | Tmax_s | W_floor_C_median_db | W_floor_status | A2_target_in_Wearly_rate | A3_target_in_Wearly_rate | A2_C_target_median_db | A3_C_target_median_db | A2_target_sign_hit_rate | A2_target_sign_status | A3_target_sign_hit_rate | A3_target_sign_status | A3_target_sign_status_reporting | A2A3_sign_stability_raw | A2A3_sign_stability_reporting | A6_parity_status | A6_hit_rate_odd | A6_hit_rate_even | G2_primary_evidence_source | G2_primary_evidence_status | A3_mechanism_status | A3_system_early_status | A5_target_mode | A5_stress_semantics | A5_contamination_response_ready | min_delay_gap_median_s | B2_status | B3_status | W3_best_te_ns | W3_best_S_xpd_early | W3_status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| link_rows.xpd_floor_freq_hz[C0] | 2.5e-10 | 3.175e-08 | 3e-09 | 3e-08 | -237.2 | PASS | 1 | 0.1667 | -230.4 | -227.8 | 1 | PASS | 0.6667 | WARN | WARN | FAIL | FAIL | PASS | 1 | 1 | A6_near_normal_benchmark | PASS | PASS | FAIL | isolation | response | True | 1.011e-09 | PASS | PASS | 3 | 0.922 | WARN |
+| link_rows.xpd_floor_freq_hz[C0] | 2.5e-10 | 3.175e-08 | 3e-09 | 3e-08 | -237.2 | PASS | 1 | 0.1667 | -230.4 | -227.8 | 1 | PASS | 0.6667 | WARN | WARN | FAIL | FAIL | PASS | 1 | 1 | A6_near_normal_benchmark | PASS | PASS | FAIL | isolation | response | True | 2.305e-10 | WARN | PASS | 5 | 0.6627 | WARN |
 
 - A3 reporting rule: A3 is mechanism-only/supplementary: use target-window metrics for mechanism context; fixed system early-window dominance is not primary evidence. If A6 is present, use A6 as primary G2 sign evidence.
 
@@ -185,9 +185,9 @@
 
 | Te_ns | S_xpd_early | S_rho_early_db | S_l_pol |
 | --- | --- | --- | --- |
-| 2 | 0.8882 | 0.8882 | 0.7523 |
-| 3 | 0.922 | 0.922 | 0.9088 |
-| 5 | 0.7494 | 0.7494 | 0.7515 |
+| 2 | 0.5321 | 0.5321 | 0.2883 |
+| 3 | 0.6363 | 0.6363 | 0.2598 |
+| 5 | 0.6627 | 0.6627 | 0.5117 |
 
 - A2/A3 odd-even sign stability over Te sweep: **FAIL** (raw=FAIL)
 
@@ -238,13 +238,13 @@
 
 | status | EL_iqr_db | corr_d_vs_LOS | min_strata_n |
 | --- | --- | --- | --- |
-| FAIL | 4.525 | -0.3775 | 1 |
+| FAIL | 5.535 | -0.35 | 10 |
 
 - D1 split: EL-identifying coverage(global) + parity/stress isolation(local)
 
 | component | status | role | EL_iqr_db | min_bin_n | n_rows | EL_std_db | delta_median_EL_stress_minus_base_db | n_base | n_stress | target |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| D1_global | PASS |  | 4.525 | 61 | 183 |  |  |  |  |  |
+| D1_global | PASS |  | 5.535 | 70 | 211 |  |  |  |  |  |
 | A2_isolation | PASS |  |  |  | 4 | 7.105e-15 |  |  |  | small EL variation is desired for parity isolation |
 | A5_isolation | FAIL | stress_response_proxy |  |  |  |  | 0 | 30 | 30 | response mode: L_pol decrease is primary, EL shift can be non-zero |
 
@@ -252,12 +252,12 @@
 
 | status | material_x_angle_status | stress_x_angle_status | design_status | design_rank | design_cols | condition_number |
 | --- | --- | --- | --- | --- | --- | --- |
-| WARN | PASS | WARN | WARN | 8 | 8 | 89.03 |
+| FAIL | PASS | WARN | FAIL | 10 | 11 | 1.651e+16 |
 
 | stage | status | n_rows | design_rank | design_cols | condition_number |
 | --- | --- | --- | --- | --- | --- |
-| stage1_EL_identifying | WARN | 183 | 8 | 8 | 89.03 |
-| stage2_effects_after_EL | PASS | 247 | 5 | 5 | 14.76 |
+| stage1_EL_identifying | FAIL | 211 | 10 | 11 | 1.651e+16 |
+| stage2_effects_after_EL | PASS | 275 | 5 | 5 | 12.4 |
 
 | group | low | mid | high | NA |
 | --- | --- | --- | --- | --- |
@@ -270,57 +270,63 @@
 | base | 30 | 0 | 0 | 0 |
 | stress | 27 | 2 | 0 | 1 |
 
-| stage | feature | vif |
-| --- | --- | --- |
-| stage1 | EL_proxy_db | 5.153 |
-
 - D3 split: LOS/NLOS×EL-bin strata coverage (viable-subset aware)
 
-| status | n_rows | min_strata_all_n | min_strata_viable_n | qna_total | selected_rows_n |
-| --- | --- | --- | --- | --- | --- |
-| FAIL | 147 | 1 | 1 | 0 | 0 |
+| status | status_physics_scene_objective | status_evidence_quality | n_rows | min_strata_all_n | min_strata_viable_n | qna_total | selected_rows_n | scene_debug_coverage | scene_debug_warn_total |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| PASS | WARN | PASS | 175 | 10 | 10 | 0 | 0 | 1 | 0 |
 
 | strata | n |
 | --- | --- |
-| LOS0_q1 | 27 |
-| LOS0_q2 | 1 |
-| LOS0_q3 | 7 |
+| LOS0_q1 | 48 |
+| LOS0_q2 | 30 |
+| LOS0_q3 | 47 |
 | LOS0_qNA | 0 |
-| LOS1_q1 | 24 |
-| LOS1_q2 | 46 |
-| LOS1_q3 | 42 |
+| LOS1_q1 | 10 |
+| LOS1_q2 | 29 |
+| LOS1_q3 | 11 |
 | LOS1_qNA | 0 |
 
 - D3 hole diagnosis (structural vs sampling)
 
 | strata | pool_n | selected_n | hole_type | status |
 | --- | --- | --- | --- | --- |
-| LOS0_q1 | 27 |  | none | PASS |
-| LOS0_q2 | 1 |  | none | PASS |
-| LOS0_q3 | 7 |  | none | PASS |
-| LOS1_q1 | 24 |  | none | PASS |
-| LOS1_q2 | 46 |  | none | PASS |
-| LOS1_q3 | 42 |  | none | PASS |
+| LOS0_q1 | 48 |  | none | PASS |
+| LOS0_q2 | 30 |  | none | PASS |
+| LOS0_q3 | 47 |  | none | PASS |
+| LOS1_q1 | 10 |  | none | PASS |
+| LOS1_q2 | 29 |  | none | PASS |
+| LOS1_q3 | 11 |  | none | PASS |
 
-- D3 per-scenario summary (B1/B2/B3)
+- D3 per-scenario summary (B1/B2/B3, scene-purpose one-line judgement)
 
-| scenario_id | status | n_rows | q1_db | q2_db | min_strata_all_n | min_strata_viable_n | qna_total |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| B1 | FAIL | 49 | 0.8818 | 2.72 | 0 | 1 | 0 |
-| B2 | WARN | 49 | -0.2895 | 2.687 | 2 | 2 | 0 |
-| B3 | PASS | 49 | 0.3647 | 2.72 | 0 | 4 | 0 |
+- Scene-status counts: PASS=1, WARN=2, FAIL=0 (fail count is per-scenario objective, not per-metric sum)
+
+| scenario_id | scene_axis | status | objective_hits | objective_total | support_rate | neg_tail_rate_xpd_early_ex_lt_0 | rho_early_q90_lin | early_fraction_median | early_fraction_q25 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| B1 | good_condition_baseline | WARN | 1 | 4 | 1 | 1 | 5.768 | 0.7634 | 0.7581 |
+| B2 | contamination_onset | PASS | 3 | 3 | 1 | 1 | 5.808 | 0.7781 | 0.6718 |
+| B3 | high_risk_tail | WARN | 0 | 4 | 1 | 1 | 2.263 | 1 | 1 |
+
+- D3 detailed support/tail summary (secondary evidence)
+
+| scenario_id | support_core_n | support_core_rate | support_risk_n | support_risk_rate | xpd_early_ex_median_db | xpd_early_ex_q75_db | xpd_early_ex_q90_db | xpd_early_ex_neg_tail_frac_lt_m30 | rho_early_q75_lin | rho_early_q90_lin | ds_q75_ns | ds_q90_ns | l_pol_q75_db | l_pol_q90_db | early_fraction_median | early_fraction_q25 | status_strata_legacy |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| B1 | 30 | 1 | 30 | 1 | -31.75 | -31.36 | -31.1 | 1 | 5.227 | 5.768 | 4.44 | 4.742 | 0.5721 | 0.9194 | 0.7634 | 0.7581 | PASS |
+| B2 | 120 | 1 | 120 | 1 | -31.63 | -30.5 | -27.28 | 0.8167 | 5.082 | 5.808 | 4.622 | 5.124 | -4.579 | -2.863 | 0.7781 | 0.6718 | PASS |
+| B3 | 25 | 1 | 25 | 1 | -27.09 | -24.66 | -24.6 | 0.04 | 1.896 | 2.263 | 0 | 0 | 0.3887 | 0.4543 | 1 | 1 | PASS |
 
 - Legacy D strata view
 
 | strata | n |
 | --- | --- |
-| LOS0_q1 | 27 |
-| LOS0_q2 | 1 |
-| LOS0_q3 | 7 |
+| LOS0_q1 | 48 |
+| LOS0_q2 | 30 |
+| LOS0_q3 | 47 |
 | LOS0_qNA | 0 |
-| LOS1_q1 | 24 |
-| LOS1_q2 | 46 |
-| LOS1_q3 | 42 |
+| LOS1_q1 | 10 |
+| LOS1_q2 | 29 |
+| LOS1_q3 | 11 |
 | LOS1_qNA | 0 |
 
 ### E) Power-based Pipeline
@@ -465,7 +471,7 @@
 
 ### B1
 
-- 의미: Room grid LOS anchor for coverage-aware leverage mapping (viable strata only; not universal).
+- 의미: LOS-dominant practical archetype baseline in an open room (CP-valid anchor).
 
 ![B1 scene](figures/B1__GLOBAL__scene.png)
 
@@ -478,7 +484,7 @@
 
 ### B2
 
-- 의미: Room grid with partition obstacle for coverage-aware NLOS leverage mapping (structural-hole aware).
+- 의미: Partitioned transition archetype (soft-block mixed contamination with material-labelled partition).
 
 ![B2 scene](figures/B2__GLOBAL__scene.png)
 
@@ -491,7 +497,7 @@
 
 ### B3
 
-- 의미: Room grid corner-obstacle stress region for coverage-aware leverage mapping (structural-hole aware).
+- 의미: Around-corner high-EL archetype (hard-NLOS risk; coverage-aware leverage map).
 
 ![B3 scene](figures/B3__GLOBAL__scene.png)
 

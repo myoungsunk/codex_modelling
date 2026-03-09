@@ -1954,6 +1954,9 @@ def _diagnostic_checks(
     cfg: dict[str, Any],
     runs: list[dict[str, Any]],
     selected_rows: list[dict[str, Any]] | None = None,
+    idx_rows: list[dict[str, Any]] | None = None,
+    scene_warns: list[str] | None = None,
+    warn_cases: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     checks: dict[str, Any] = {}
     scenario_rows = metrics_lib.split_by_scenario(link_rows)
@@ -2688,6 +2691,7 @@ def _diagnostic_checks(
         support_risk_rate = float(support_risk / n_total) if n_total > 0 else float("nan")
         xpd_neg_tail_frac = float(np.mean(xpd_fin < -30.0)) if len(xpd_fin) else float("nan")
         xpd_median = float(np.median(xpd_fin)) if len(xpd_fin) else float("nan")
+        xpd_q25 = float(np.percentile(xpd_fin, 25.0)) if len(xpd_fin) else float("nan")
         xpd_q75 = float(np.percentile(xpd_fin, 75.0)) if len(xpd_fin) else float("nan")
         xpd_q90 = float(np.percentile(xpd_fin, 90.0)) if len(xpd_fin) else float("nan")
         xpd_neg_tail_frac0 = float(np.mean(xpd_fin < 0.0)) if len(xpd_fin) else float("nan")
@@ -2698,6 +2702,7 @@ def _diagnostic_checks(
         lpol_q75 = float(np.percentile(lpol_fin, 75.0)) if len(lpol_fin) else float("nan")
         lpol_q90 = float(np.percentile(lpol_fin, 90.0)) if len(lpol_fin) else float("nan")
         ef_median = float(np.median(ef_fin)) if len(ef_fin) else float("nan")
+        ef_q25 = float(np.percentile(ef_fin, 25.0)) if len(ef_fin) else float("nan")
         if len(sviable) == 0:
             s_status = "FAIL"
         elif smin_viable >= 3 and sqna == 0:
@@ -2722,6 +2727,7 @@ def _diagnostic_checks(
                 "support_risk_rate": float(support_risk_rate),
                 "support_rate": float(support_risk_rate),
                 "xpd_early_ex_median_db": float(xpd_median),
+                "xpd_early_ex_q25_db": float(xpd_q25),
                 "xpd_early_ex_q75_db": float(xpd_q75),
                 "xpd_early_ex_q90_db": float(xpd_q90),
                 "neg_tail_rate_xpd_early_ex_lt_0": float(xpd_neg_tail_frac0),
@@ -2733,6 +2739,7 @@ def _diagnostic_checks(
                 "l_pol_q75_db": float(lpol_q75),
                 "l_pol_q90_db": float(lpol_q90),
                 "early_fraction_median": float(ef_median),
+                "early_fraction_q25": float(ef_q25),
                 "scene_axis": "",
                 "status_strata_legacy": s_status,
                 "objective_rule": "",
@@ -2838,37 +2845,73 @@ def _diagnostic_checks(
         ratio = float(good / total) if total > 0 else float("nan")
         return ratio, delta_med, total, basis_key
 
-    # B1: good-condition baseline (absolute criteria, not strict B1-vs-B2 ordering)
+    # B1: good-condition baseline (relative anchor in B-scenarios, not absolute XPD>0 gate)
     if "B1" in b_sid_map:
         r1 = b_sid_map["B1"]
-        # Heuristic absolute gates for practical baseline judgement.
-        # XPD sign remains a hard semantic gate for "good CP baseline".
-        b1_rho_q75_max = 6.0
-        b1_ef_median_min = 0.65
-        c_xpd = bool(_num(r1.get("xpd_early_ex_median_db", np.nan)) > 0.0)
-        c_rho = bool(_num(r1.get("rho_early_q75_lin", np.nan)) <= b1_rho_q75_max)
-        c_ef = bool(_num(r1.get("early_fraction_median", np.nan)) >= b1_ef_median_min)
         c_sup = bool(_num(r1.get("support_rate", np.nan)) >= 0.90)
-        hits = int(c_xpd) + int(c_rho) + int(c_ef) + int(c_sup)
-        # Keep XPD sign as semantic gate for PASS, but avoid over-failing practical scenes.
-        if hits >= 3 and c_xpd:
-            st = "PASS"
-        elif hits >= 2:
-            st = "WARN"
-        else:
+
+        def _high_rank_score(key: str) -> tuple[bool, float]:
+            vals = []
+            for sid in ["B1", "B2", "B3"]:
+                if sid not in b_sid_map:
+                    continue
+                v = _num(b_sid_map[sid].get(key, np.nan))
+                if np.isfinite(v):
+                    vals.append(float(v))
+            if len(vals) < 2:
+                return False, float("nan")
+            b1v = _num(r1.get(key, np.nan))
+            if not np.isfinite(b1v):
+                return False, float("nan")
+            # Relative position in [0,1]: 1 is best (highest)
+            score = float(np.mean(np.asarray(vals, dtype=float) <= float(b1v)))
+            # "상위": upper half among available B scenarios.
+            return bool(score >= 0.50), score
+
+        def _low_rank_score(key: str) -> tuple[bool, float]:
+            vals = []
+            for sid in ["B1", "B2", "B3"]:
+                if sid not in b_sid_map:
+                    continue
+                v = _num(b_sid_map[sid].get(key, np.nan))
+                if np.isfinite(v):
+                    vals.append(float(v))
+            if len(vals) < 2:
+                return False, float("nan")
+            b1v = _num(r1.get(key, np.nan))
+            if not np.isfinite(b1v):
+                return False, float("nan")
+            # Relative position in [0,1]: 1 is best (lowest)
+            score = float(np.mean(np.asarray(vals, dtype=float) >= float(b1v)))
+            # "하위(낮은 쪽)": lower half among available B scenarios.
+            return bool(score >= 0.50), score
+
+        c_xpd, xpd_rank = _high_rank_score("xpd_early_ex_median_db")
+        c_rho, rho_rank = _low_rank_score("rho_early_q75_lin")
+        c_ef, ef_rank = _high_rank_score("early_fraction_median")
+
+        hits = int(c_sup) + int(c_xpd) + int(c_rho) + int(c_ef)
+        if not c_sup:
             st = "FAIL"
+        elif hits >= 3:
+            st = "PASS"
+        else:
+            st = "WARN"
         _assign_scene_status(
             r1,
             status=st,
             axis="good_condition_baseline",
             hits=hits,
             total=4,
-            rule="absolute baseline: median(XPD_early_ex)>0 (PASS gate) + rho_q75<=6 + early_fraction_median>=0.65 + support_rate>=0.9",
+            rule="relative anchor baseline: support_rate>=0.9 + B-scenarios 상대상위(XPD_early_ex) + 상대하위(rho_q75) + 상대상위(early_fraction) (absolute XPD>0 gate 없음)",
             details={
-                "xpd_positive": c_xpd,
-                "rho_q75_le_6": c_rho,
-                "early_fraction_median_ge_0p65": c_ef,
                 "support_rate_ge_0p9": c_sup,
+                "xpd_relative_upper_half": c_xpd,
+                "xpd_relative_rank_score": float(xpd_rank),
+                "rho_q75_relative_lower_half": c_rho,
+                "rho_q75_relative_rank_score": float(rho_rank),
+                "early_fraction_relative_upper_half": c_ef,
+                "early_fraction_relative_rank_score": float(ef_rank),
             },
         )
 
@@ -2917,10 +2960,11 @@ def _diagnostic_checks(
             },
         )
 
-    # B3: high-risk region (risk-tail expansion, not worst median)
+    # B3: high-risk region (B1-anchored relative tails + support-aware)
     if "B3" in b_sid_map and "B2" in b_sid_map:
         b3_rows = _rows_by_sid("B3")
         b2_rows = _rows_by_sid("B2")
+        b1_rows = _rows_by_sid("B1") if "B1" in b_sid_map else []
         cr = _common_range(b3_rows, b2_rows, "EL_proxy_db")
         basis_key = "EL_proxy_db"
         if cr is None:
@@ -2931,10 +2975,33 @@ def _diagnostic_checks(
         c_ef = False
         tail_b2 = float("nan")
         tail_b3 = float("nan")
+        tail_threshold_med_anchor_db = float("nan")
+        tail_threshold_q25_anchor_db = float("nan")
+        tail_rate_med_anchor_b2 = float("nan")
+        tail_rate_med_anchor_b3 = float("nan")
+        tail_rate_q25_anchor_b2 = float("nan")
+        tail_rate_q25_anchor_b3 = float("nan")
+        xpd_q10_b2 = float("nan")
+        xpd_q10_b3 = float("nan")
+        c_tail_rate_med = False
+        c_tail_rate_q25 = False
+        c_tail_q10 = False
         rho_q75_b2 = float("nan")
         rho_q75_b3 = float("nan")
+        rho_q90_b2 = float("nan")
+        rho_q90_b3 = float("nan")
+        rho_exceed_rate_b2 = float("nan")
+        rho_exceed_rate_b3 = float("nan")
+        c_rho_q90 = False
+        c_rho_exceed = False
         ef_med_b2 = float("nan")
         ef_med_b3 = float("nan")
+        ef_q25_b2 = float("nan")
+        ef_q25_b3 = float("nan")
+        ef_low_rate_b2 = float("nan")
+        ef_low_rate_b3 = float("nan")
+        c_ef_q25 = False
+        c_ef_exceed = False
         if cr is not None:
             lo, hi = cr
             x2 = _metric_in_range(b2_rows, "xpd", basis_key, lo, hi)
@@ -2944,21 +3011,51 @@ def _diagnostic_checks(
             e2v = _metric_in_range(b2_rows, "ef", basis_key, lo, hi)
             e3v = _metric_in_range(b3_rows, "ef", basis_key, lo, hi)
             if len(x2) and len(x3):
+                x1 = _metric_in_range(b1_rows, "xpd", basis_key, lo, hi) if len(b1_rows) else np.asarray([], dtype=float)
+                dref = float(delta_ref) if np.isfinite(delta_ref) else 0.0
+                if len(x1):
+                    tail_threshold_med_anchor_db = float(np.median(x1) - dref)
+                    tail_threshold_q25_anchor_db = float(np.percentile(x1, 25.0) - dref)
+                else:
+                    tail_threshold_med_anchor_db = float(np.median(x2) - dref)
+                    tail_threshold_q25_anchor_db = float(np.percentile(x2, 25.0) - dref)
+                tail_rate_med_anchor_b2 = float(np.mean(x2 <= tail_threshold_med_anchor_db))
+                tail_rate_med_anchor_b3 = float(np.mean(x3 <= tail_threshold_med_anchor_db))
+                tail_rate_q25_anchor_b2 = float(np.mean(x2 <= tail_threshold_q25_anchor_db))
+                tail_rate_q25_anchor_b3 = float(np.mean(x3 <= tail_threshold_q25_anchor_db))
+                c_tail_rate_med = bool(tail_rate_med_anchor_b3 > (tail_rate_med_anchor_b2 + 0.05))
+                c_tail_rate_q25 = bool(tail_rate_q25_anchor_b3 > (tail_rate_q25_anchor_b2 + 0.05))
+                xpd_q10_b2 = float(np.percentile(x2, 10.0))
+                xpd_q10_b3 = float(np.percentile(x3, 10.0))
+                c_tail_q10 = bool(xpd_q10_b3 < xpd_q10_b2)
+                c_tail = bool(c_tail_rate_med or c_tail_rate_q25 or c_tail_q10)
+                # Legacy absolute reference (for monitoring only).
                 tail_b2 = float(np.mean(x2 < 0.0))
                 tail_b3 = float(np.mean(x3 < 0.0))
-                c_tail = bool(tail_b3 > tail_b2)
             if len(r2v) and len(r3v):
                 rho_q75_b2 = float(np.percentile(r2v, 75.0))
                 rho_q75_b3 = float(np.percentile(r3v, 75.0))
-                c_rho = bool(rho_q75_b3 > rho_q75_b2)
+                rho_q90_b2 = float(np.percentile(r2v, 90.0))
+                rho_q90_b3 = float(np.percentile(r3v, 90.0))
+                rho_exceed_rate_b2 = float(np.mean(r2v >= rho_q90_b2))
+                rho_exceed_rate_b3 = float(np.mean(r3v >= rho_q90_b2))
+                c_rho_q90 = bool(rho_q90_b3 > rho_q90_b2)
+                c_rho_exceed = bool(rho_exceed_rate_b3 > (rho_exceed_rate_b2 + 0.05))
+                c_rho = bool(c_rho_q90 or c_rho_exceed)
             if len(e2v) and len(e3v):
                 ef_med_b2 = float(np.median(e2v))
                 ef_med_b3 = float(np.median(e3v))
-                c_ef = bool(ef_med_b3 < ef_med_b2)
+                ef_q25_b2 = float(np.percentile(e2v, 25.0))
+                ef_q25_b3 = float(np.percentile(e3v, 25.0))
+                ef_low_rate_b2 = float(np.mean(e2v <= ef_q25_b2))
+                ef_low_rate_b3 = float(np.mean(e3v <= ef_q25_b2))
+                c_ef_q25 = bool(ef_q25_b3 < ef_q25_b2)
+                c_ef_exceed = bool(ef_low_rate_b3 > (ef_low_rate_b2 + 0.05))
+                c_ef = bool(c_ef_q25 or c_ef_exceed)
         c_sup = bool(_num(b_sid_map["B3"].get("support_rate", np.nan)) < _num(b_sid_map["B2"].get("support_rate", np.nan)))
         c_ds = bool(_num(b_sid_map["B3"].get("ds_q75_ns", np.nan)) > _num(b_sid_map["B2"].get("ds_q75_ns", np.nan)))
         hits = int(c_tail) + int(c_rho) + int(c_ef) + int(c_sup)
-        n_primary_available = int(np.isfinite(tail_b2) and np.isfinite(tail_b3)) + int(np.isfinite(rho_q75_b2) and np.isfinite(rho_q75_b3)) + int(np.isfinite(ef_med_b2) and np.isfinite(ef_med_b3)) + int(np.isfinite(_num(b_sid_map["B2"].get("support_rate", np.nan))) and np.isfinite(_num(b_sid_map["B3"].get("support_rate", np.nan))))
+        n_primary_available = int(np.isfinite(tail_b2) and np.isfinite(tail_b3)) + int(np.isfinite(rho_q90_b2) and np.isfinite(rho_q90_b3)) + int(np.isfinite(ef_q25_b2) and np.isfinite(ef_q25_b3)) + int(np.isfinite(_num(b_sid_map["B2"].get("support_rate", np.nan))) and np.isfinite(_num(b_sid_map["B3"].get("support_rate", np.nan))))
         if n_primary_available < 2:
             st = "FAIL"
         elif hits >= 3:
@@ -2971,18 +3068,41 @@ def _diagnostic_checks(
             axis="high_risk_tail",
             hits=hits,
             total=4,
-            rule="risk-zone pattern: neg_tail(<0)↑, rho_q75↑, early_fraction_median↓, support_rate↓ 중 3개 이상; FAIL only when primary comparison support is insufficient (DS_q75↑는 보조)",
+            rule="risk-zone pattern: B1-anchored relative tail↑ + rho upper-tail(q90/exceedance)↑ + early_fraction lower-tail(q25/exceedance)↑ + support_rate↓ 중 3개 이상; FAIL only when primary comparison support is insufficient (L_pol/DS는 보조)",
             details={
                 "comparison_basis": basis_key,
                 "neg_tail_rate_lt0_B2": tail_b2,
                 "neg_tail_rate_lt0_B3": tail_b3,
-                "neg_tail_rate_lt0_increase": c_tail,
+                "tail_threshold_med_anchor_db_from_B1_minus_delta_ref": tail_threshold_med_anchor_db,
+                "tail_threshold_q25_anchor_db_from_B1_minus_delta_ref": tail_threshold_q25_anchor_db,
+                "tail_rate_med_anchor_B2": tail_rate_med_anchor_b2,
+                "tail_rate_med_anchor_B3": tail_rate_med_anchor_b3,
+                "tail_rate_q25_anchor_B2": tail_rate_q25_anchor_b2,
+                "tail_rate_q25_anchor_B3": tail_rate_q25_anchor_b3,
+                "tail_rate_med_anchor_increase": c_tail_rate_med,
+                "tail_rate_q25_anchor_increase": c_tail_rate_q25,
+                "xpd_q10_B2": xpd_q10_b2,
+                "xpd_q10_B3": xpd_q10_b3,
+                "xpd_q10_worsen": c_tail_q10,
+                "tail_primary_hit": c_tail,
                 "rho_q75_B2": rho_q75_b2,
                 "rho_q75_B3": rho_q75_b3,
-                "rho_q75_increase": c_rho,
+                "rho_q90_B2": rho_q90_b2,
+                "rho_q90_B3": rho_q90_b3,
+                "rho_exceed_rate_gt_B2_q90_B2": rho_exceed_rate_b2,
+                "rho_exceed_rate_gt_B2_q90_B3": rho_exceed_rate_b3,
+                "rho_q90_increase": c_rho_q90,
+                "rho_exceed_rate_increase": c_rho_exceed,
+                "rho_upper_tail_hit": c_rho,
                 "early_fraction_median_B2": ef_med_b2,
                 "early_fraction_median_B3": ef_med_b3,
-                "early_fraction_median_decrease": c_ef,
+                "early_fraction_q25_B2": ef_q25_b2,
+                "early_fraction_q25_B3": ef_q25_b3,
+                "early_fraction_low_rate_le_B2_q25_B2": ef_low_rate_b2,
+                "early_fraction_low_rate_le_B2_q25_B3": ef_low_rate_b3,
+                "early_fraction_q25_decrease": c_ef_q25,
+                "early_fraction_low_rate_increase": c_ef_exceed,
+                "early_fraction_lower_tail_hit": c_ef,
                 "support_rate_B2": float(_num(b_sid_map["B2"].get("support_rate", np.nan))),
                 "support_rate_B3": float(_num(b_sid_map["B3"].get("support_rate", np.nan))),
                 "support_rate_decrease": c_sup,
@@ -2997,6 +3117,21 @@ def _diagnostic_checks(
         if st not in scene_status_counts:
             st = "WARN"
         scene_status_counts[st] = int(scene_status_counts.get(st, 0) + 1)
+
+    # Evidence-quality channel (separate from physics/objective status)
+    eq_rows = [r for r in (idx_rows or []) if str(r.get("scenario_id", "")) in {"B1", "B2", "B3"}]
+    eq_total = int(len(eq_rows))
+    eq_scene_debug_available = int(sum(1 for r in eq_rows if str(r.get("scene_debug_json", "")).strip()))
+    eq_coverage = float(eq_scene_debug_available / eq_total) if eq_total > 0 else float("nan")
+    eq_warn_total = int(sum(1 for w in (scene_warns or []) if isinstance(w, str) and w.strip()))
+    if eq_total == 0:
+        eq_status = "INCONCLUSIVE"
+    elif eq_coverage >= 0.95:
+        eq_status = "PASS"
+    elif eq_coverage >= 0.70:
+        eq_status = "WARN"
+    else:
+        eq_status = "FAIL"
 
     # Keep legacy correlation field for backward compatibility
     los = np.asarray([_num(r.get("LOSflag", np.nan)) for r in rows_el_global], dtype=float)
@@ -3075,6 +3210,12 @@ def _diagnostic_checks(
         "D3": {
             "status": d3_status,
             "status_scene_objective": "FAIL" if scene_status_counts.get("FAIL", 0) > 0 else ("WARN" if scene_status_counts.get("WARN", 0) > 0 else "PASS"),
+            "status_physics_scene_objective": "FAIL" if scene_status_counts.get("FAIL", 0) > 0 else ("WARN" if scene_status_counts.get("WARN", 0) > 0 else "PASS"),
+            "status_evidence_quality": eq_status,
+            "scene_debug_case_total": int(eq_total),
+            "scene_debug_case_available": int(eq_scene_debug_available),
+            "scene_debug_coverage": float(eq_coverage),
+            "scene_debug_warn_total": int(eq_warn_total),
             "scene_status_counts": scene_status_counts,
             "scene_fail_count": int(scene_status_counts.get("FAIL", 0)),
             "scene_warn_count": int(scene_status_counts.get("WARN", 0)),
@@ -4010,14 +4151,29 @@ def _build_markdown(
                 [
                     {
                         "status": d3.get("status", ""),
+                        "status_physics_scene_objective": d3.get("status_physics_scene_objective", d3.get("status_scene_objective", "")),
+                        "status_evidence_quality": d3.get("status_evidence_quality", ""),
                         "n_rows": d3.get("n_rows", 0),
                         "min_strata_all_n": d3.get("min_strata_all_n", 0),
                         "min_strata_viable_n": d3.get("min_strata_viable_n", 0),
                         "qna_total": d3.get("qna_total", 0),
                         "selected_rows_n": d3.get("selected_rows_n", 0),
+                        "scene_debug_coverage": d3.get("scene_debug_coverage", np.nan),
+                        "scene_debug_warn_total": d3.get("scene_debug_warn_total", 0),
                     }
                 ],
-                ["status", "n_rows", "min_strata_all_n", "min_strata_viable_n", "qna_total", "selected_rows_n"],
+                [
+                    "status",
+                    "status_physics_scene_objective",
+                    "status_evidence_quality",
+                    "n_rows",
+                    "min_strata_all_n",
+                    "min_strata_viable_n",
+                    "qna_total",
+                    "selected_rows_n",
+                    "scene_debug_coverage",
+                    "scene_debug_warn_total",
+                ],
             )
         )
         lines.append("")
@@ -4055,8 +4211,9 @@ def _build_markdown(
                         "objective_total",
                         "support_rate",
                         "neg_tail_rate_xpd_early_ex_lt_0",
-                        "rho_early_q75_lin",
+                        "rho_early_q90_lin",
                         "early_fraction_median",
+                        "early_fraction_q25",
                     ],
                 )
             )
@@ -4083,6 +4240,7 @@ def _build_markdown(
                         "l_pol_q75_db",
                         "l_pol_q90_db",
                         "early_fraction_median",
+                        "early_fraction_q25",
                         "status_strata_legacy",
                     ],
                 )
@@ -4265,6 +4423,9 @@ def main() -> None:
         cfg=cfg,
         runs=runs,
         selected_rows=selected_rows,
+        idx_rows=idx_rows,
+        scene_warns=scene_warns,
+        warn_cases=warn_cases,
     )
 
     # requested analysis tables (target/case/sensitivity levels)

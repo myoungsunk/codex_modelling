@@ -1,5 +1,5 @@
 item,type,simulation_additional_can_help,why,evidence
-B1 FAIL,coverage_hole (data + geometry design),yes,B1 strata LOS0_q2/q3 empty. Adding B1 grid points/orientation near LOS0 high-EL regime can fill holes.,tables/B_per_scenario_summary.csv (B1)
-B-all FAIL (D3),reporting-input gap + support policy,partial,selected_rows_n=0 (selected_points_csv 미제공)와 일부 낮은 strata support가 결합. 추가 시뮬레이션 + selected subset 제공 필요.,tables/diagnostic_checks.json:D_identifiability.D3
-A3_supp WARN(scope-control),intentional role lock,no (not target),A6를 G2 core로 쓰는 정책상 A3는 mechanism-only로 고정.,source/final_diagnostic_decision.md#L128
-A4_bridge WARN(scope-control),intentional role lock,no (not target),A4_bridge는 bridge/support로만 사용하도록 합의.,source/final_diagnostic_decision.md#L131
+B1 WARN,contract_threshold_tight,yes,상대 anchor 기준에서 support만 충족(1/4). B1/B2 동일 grid 유지하되 LOS-quality 좋은 subset 확장 또는 anchor threshold 완화 필요.,tables/B_per_scenario_summary.csv (B1)
+B3 WARN,scene_severity_or_tail_contract,yes,B1-anchored relative tail/rho upper-tail/early lower-tail이 아직 증가하지 않음. deep-shadow 강화(B3a/B3b)와 geometry 재설계 필요.,tables/diagnostic_checks.json:D_identifiability.D3.per_scenario_summary[B3]
+A3_supp WARN(scope-control),intentional_role_lock,no (not target),A6를 G2 core로 쓰는 정책상 A3는 mechanism-only 보조로 고정.,source/final_diagnostic_decision.md
+A4_bridge WARN(scope-control),intentional_role_lock,no (not target),A4_bridge는 bridge/support 전용으로 역할 고정.,source/final_diagnostic_decision.md

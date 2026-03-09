@@ -1,4 +1,4 @@
-# Intermediate Report (diag_protocol_repro_v1_20260309_r1)
+# Intermediate Report (diag_protocol_repro_v1_20260309_archetype)
 
 ## Final Scenario Structure (Agreed)
 
@@ -24,11 +24,11 @@
 | G2 | SUPPORTED | OK | A6 near-normal parity benchmark as primary G2 evidence; A3 kept as mechanism-only supplementary evidence. |
 | L1 | SUPPORTED | OK | Early/Late leakage separation via XPD_early_ex/XPD_late_ex/L_pol |
 | L2 | SUPPORTED | OK | A5 stress impact on center/tails (response-mode requires geometric path perturbation) |
-| L3 | SUPPORTED | OK | Correlation between leakage excess and -EL_proxy |
+| L3 | PARTIAL | OK | Correlation between leakage excess and -EL_proxy |
 | R1 | SUPPORTED | OK | Coverage-aware room-space leverage map (LOS/NLOS + heatmap; viable strata only, not universal) |
 | R2 | SUPPORTED | OK | Coverage-aware DS/early relation leverage map (B1/B2/B3 viable strata subset) |
 | P1 | SUPPORTED | OK | Two-stage model (EL first, then mechanism effects) vs constant baseline |
-| P2 | PARTIAL | OK | Stage-1 EL coefficient sign stability under subsampling |
+| P2 | SUPPORTED | OK | Stage-1 EL coefficient sign stability under subsampling |
 
 ## A5 Stress Semantics
 
@@ -49,7 +49,7 @@
 
 - Definition: Fraction inside/outside floor uncertainty band
 - Status: **SUPPORTED**
-- Details: `{"definition": "Fraction inside/outside floor uncertainty band", "inside_ratio": 0.24944320712694878, "outside_ratio": 0.7505567928730512, "status": "SUPPORTED"}`
+- Details: `{"definition": "Fraction inside/outside floor uncertainty band", "inside_ratio": 0.23333333333333334, "outside_ratio": 0.7666666666666667, "status": "SUPPORTED"}`
 
 ## G1
 
@@ -67,7 +67,7 @@
 
 - Definition: Early/Late leakage separation via XPD_early_ex/XPD_late_ex/L_pol
 - Status: **SUPPORTED**
-- Details: `{"definition": "Early/Late leakage separation via XPD_early_ex/XPD_late_ex/L_pol", "median_early_ex_db": -30.96598371159874, "median_late_ex_db": -22.57143715038745, "median_lpol_db": -8.2558502494477, "status": "SUPPORTED"}`
+- Details: `{"definition": "Early/Late leakage separation via XPD_early_ex/XPD_late_ex/L_pol", "median_early_ex_db": -30.1844505229891, "median_late_ex_db": -25.052449766174778, "median_lpol_db": -2.5858863412201147, "status": "SUPPORTED"}`
 
 ## L2
 
@@ -78,32 +78,32 @@
 ## L3
 
 - Definition: Correlation between leakage excess and -EL_proxy
-- Status: **SUPPORTED**
-- Details: `{"definition": "Correlation between leakage excess and -EL_proxy", "spearman": {"rho": 0.37098108841563526, "p": 2.409000000861539e-09, "ci_lo": 0.2441908838557069, "ci_hi": 0.48628043095648066, "n": 243}, "status": "SUPPORTED"}`
+- Status: **PARTIAL**
+- Details: `{"definition": "Correlation between leakage excess and -EL_proxy", "spearman": {"rho": 0.10855882195145593, "p": 0.0765972826747108, "ci_lo": -0.04262265787366852, "ci_hi": 0.2547695898983334, "n": 267}, "status": "PARTIAL"}`
 
 ## R1
 
 - Definition: Coverage-aware room-space leverage map (LOS/NLOS + heatmap; viable strata only, not universal)
 - Status: **SUPPORTED**
-- Details: `{"definition": "Coverage-aware room-space leverage map (LOS/NLOS + heatmap; viable strata only, not universal)", "n_b_rows": 147, "n_los": 112, "n_nlos": 35, "ks_wasserstein": {"ks_stat": 0.5153342070773264, "ks_p": 5.448384662358456e-07, "wasserstein": 4.709880183650388}, "status": "SUPPORTED"}`
+- Details: `{"definition": "Coverage-aware room-space leverage map (LOS/NLOS + heatmap; viable strata only, not universal)", "n_b_rows": 175, "n_los": 50, "n_nlos": 125, "ks_wasserstein": {"ks_stat": 0.428, "ks_p": 2.269659137267517e-06, "wasserstein": 2.5451701733415533}, "status": "SUPPORTED"}`
 
 ## R2
 
 - Definition: Coverage-aware DS/early relation leverage map (B1/B2/B3 viable strata subset)
 - Status: **SUPPORTED**
-- Details: `{"definition": "Coverage-aware DS/early relation leverage map (B1/B2/B3 viable strata subset)", "spearman_ds_vs_xpd": {"rho": -0.29512453259661015, "p": 0.0005366878880914245, "ci_lo": -0.46089669800925603, "ci_hi": -0.11773345911478794, "n": 134}, "status": "SUPPORTED"}`
+- Details: `{"definition": "Coverage-aware DS/early relation leverage map (B1/B2/B3 viable strata subset)", "spearman_ds_vs_xpd": {"rho": -0.49923813719879734, "p": 9.694465810869308e-19, "ci_lo": -0.5784239594783026, "ci_hi": -0.4055061940574268, "n": 275}, "status": "SUPPORTED"}`
 
 ## P1
 
 - Definition: Two-stage model (EL first, then mechanism effects) vs constant baseline
 - Status: **SUPPORTED**
-- Details: `{"definition": "Two-stage model (EL first, then mechanism effects) vs constant baseline", "cv_two_stage": {"n_stage1": 180, "n_stage2": 243, "b1_el": -0.05576966365672963, "rmse_const": 3.506766373908685, "rmse_lin": 2.473334619309229, "nll_const": 2.6732362992334755, "nll_lin": 2.3209956109621395}, "cv_one_shot_reference": {"n": 243, "rmse_const": 3.551525639134785, "rmse_lin": 2.432010631928581, "nll_const": 2.6858108902240643, "nll_lin": 2.30340510773064}, "status": "SUPPORTED"}`
+- Details: `{"definition": "Two-stage model (EL first, then mechanism effects) vs constant baseline", "cv_two_stage": {"n_stage1": 204, "n_stage2": 267, "b1_el": 0.4599038808519886, "rmse_const": 4.719356435427606, "rmse_lin": 3.6480299358899955, "nll_const": 2.96891847730238, "nll_lin": 2.7047228302112956}, "cv_one_shot_reference": {"n": 267, "rmse_const": 3.7166648895842966, "rmse_lin": 3.2339094045994004, "nll_const": 2.7262519136716983, "nll_lin": 2.586378389635617}, "status": "SUPPORTED"}`
 
 ## P2
 
 - Definition: Stage-1 EL coefficient sign stability under subsampling
-- Status: **PARTIAL**
-- Details: `{"definition": "Stage-1 EL coefficient sign stability under subsampling", "subset": ["A3", "A4", "B1", "B2", "B3"], "stability": {"n": 180, "base_sign": -1.0, "sign_keep_rate": 0.735}, "status": "PARTIAL"}`
+- Status: **SUPPORTED**
+- Details: `{"definition": "Stage-1 EL coefficient sign stability under subsampling", "subset": ["A3", "A4", "B1", "B2", "B3"], "stability": {"n": 204, "base_sign": 1.0, "sign_keep_rate": 1.0}, "status": "SUPPORTED"}`
 
 ## Scenario Sections
 
@@ -175,7 +175,7 @@
 
 ### B1
 
-- 의미: Room grid LOS anchor for coverage-aware leverage mapping (viable strata only; not universal).
+- 의미: LOS-dominant practical archetype baseline in an open room (CP-valid anchor).
 
 ![B1 scene](figures/B1__GLOBAL__scene.png)
 
@@ -194,7 +194,7 @@
 
 ### B2
 
-- 의미: Room grid with partition obstacle for coverage-aware NLOS leverage mapping (structural-hole aware).
+- 의미: Partitioned transition archetype (soft-block mixed contamination with material-labelled partition).
 
 ![B2 scene](figures/B2__GLOBAL__scene.png)
 
@@ -213,7 +213,7 @@
 
 ### B3
 
-- 의미: Room grid corner-obstacle stress region for coverage-aware leverage mapping (structural-hole aware).
+- 의미: Around-corner high-EL archetype (hard-NLOS risk; coverage-aware leverage map).
 
 ![B3 scene](figures/B3__GLOBAL__scene.png)
 

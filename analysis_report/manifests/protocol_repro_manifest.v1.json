@@ -196,7 +196,17 @@
       "scenario": "B1",
       "args": [
         "--matrix-source",
-        "A"
+        "A",
+        "--grid-x-min",
+        "4.0",
+        "--grid-x-max",
+        "9.0",
+        "--grid-y-min",
+        "-2.0",
+        "--grid-y-max",
+        "2.0",
+        "--grid-step-m",
+        "1.0"
       ]
     },
     {
@@ -204,7 +214,21 @@
       "scenario": "B2",
       "args": [
         "--matrix-source",
-        "A"
+        "A",
+        "--b2-partition-materials",
+        "gypsum,glass,wood,monitor-like",
+        "--b2-zone",
+        "mixed",
+        "--grid-x-min",
+        "4.0",
+        "--grid-x-max",
+        "9.0",
+        "--grid-y-min",
+        "-2.0",
+        "--grid-y-max",
+        "2.0",
+        "--grid-step-m",
+        "1.0"
       ]
     },
     {
@@ -212,7 +236,17 @@
       "scenario": "B3",
       "args": [
         "--matrix-source",
-        "A"
+        "A",
+        "--grid-x-min",
+        "6.0",
+        "--grid-x-max",
+        "10.0",
+        "--grid-y-min",
+        "1.0",
+        "--grid-y-max",
+        "5.0",
+        "--grid-step-m",
+        "1.0"
       ]
     }
   ],
@@ -231,6 +265,8 @@
       "A6_on": "g2_bridge_observability",
       "B1": "realspace_los",
       "B2": "realspace_partition_nlos",
+      "B2a": "realspace_partition_transition",
+      "B2b": "realspace_partition_behind",
       "B3": "realspace_corner_nlos"
     },
     "floor_policy": {
