@@ -32,37 +32,66 @@ def _odd_scene() -> list[Plane]:
     ]
 
 
-def _even_scene() -> list[Plane]:
-    # Two parallel PEC planes to form a controlled two-bounce channel.
+def _even_scene(even_layout: str = "localized") -> list[Plane]:
+    # Two PEC planes for controlled two-bounce benchmark.
+    # - full: wide parallel planes (legacy, may admit symmetric dual paths)
+    # - localized: finite reflector patches around intended bounce regions
+    layout = str(even_layout).strip().lower()
+    if layout not in {"full", "localized"}:
+        layout = "localized"
+    if layout == "full":
+        return [
+            Plane(
+                id=302,
+                p0=np.array([0.0, 0.0, 1.5]),
+                normal=np.array([0.0, -1.0, 0.0]),
+                material=Material.pec(),
+                u_axis=np.array([1.0, 0.0, 0.0]),
+                v_axis=np.array([0.0, 0.0, 1.0]),
+                half_extent_u=20.0,
+                half_extent_v=20.0,
+            ),
+            Plane(
+                id=303,
+                p0=np.array([0.0, 4.0, 1.5]),
+                normal=np.array([0.0, 1.0, 0.0]),
+                material=Material.pec(),
+                u_axis=np.array([1.0, 0.0, 0.0]),
+                v_axis=np.array([0.0, 0.0, 1.0]),
+                half_extent_u=20.0,
+                half_extent_v=20.0,
+            ),
+        ]
     return [
         Plane(
             id=302,
-            p0=np.array([0.0, 0.0, 1.5]),
+            p0=np.array([2.10, 0.0, 1.5]),
             normal=np.array([0.0, -1.0, 0.0]),
             material=Material.pec(),
             u_axis=np.array([1.0, 0.0, 0.0]),
             v_axis=np.array([0.0, 0.0, 1.0]),
-            half_extent_u=20.0,
-            half_extent_v=20.0,
+            # Expanded along x to keep near-normal even cases with rx_x=2.2 viable.
+            half_extent_u=0.20,
+            half_extent_v=0.25,
         ),
         Plane(
             id=303,
-            p0=np.array([0.0, 4.0, 1.5]),
+            p0=np.array([2.29, 4.0, 1.5]),
             normal=np.array([0.0, 1.0, 0.0]),
             material=Material.pec(),
             u_axis=np.array([1.0, 0.0, 0.0]),
             v_axis=np.array([0.0, 0.0, 1.0]),
-            half_extent_u=20.0,
-            half_extent_v=20.0,
+            half_extent_u=0.20,
+            half_extent_v=0.25,
         ),
     ]
 
 
-def build_scene(mode: str) -> list[Plane]:
+def build_scene(mode: str, even_layout: str = "localized") -> list[Plane]:
     if mode == "odd":
         return _odd_scene()
     if mode == "even":
-        return _even_scene()
+        return _even_scene(even_layout=even_layout)
     raise ValueError(f"unknown mode: {mode}")
 
 
@@ -128,10 +157,12 @@ def run_case(
     force_cp_swap_on_odd_reflection: bool = False,
     max_bounce_override: int | None = None,
     diffuse_config: dict[str, Any] | None = None,
+    even_path_policy: str = "canonical",
+    even_layout: str = "localized",
 ):
     tx, rx = default_antennas(basis=basis, **(antenna_config or {}))
     mode = str(params["mode"])
-    scene = build_scene(mode)
+    scene = build_scene(mode, even_layout=even_layout)
     target_bounce = int(params["target_bounce"])
     max_bounce = int(max_bounce_override) if max_bounce_override is not None else target_bounce
 
@@ -162,4 +193,27 @@ def run_case(
         if p.incidence_angles and max(float(a) for a in p.incidence_angles) > max_theta:
             continue
         out.append(p)
+
+    # For A6 even-bounce benchmark, two symmetric 2-bounce solutions may coexist.
+    # Default to a single canonical path to avoid equal-length dual-path ambiguity.
+    mode_l = str(mode).strip().lower()
+    pol = str(even_path_policy).strip().lower()
+    if mode_l == "even" and len(out) > 1 and pol in {"canonical", "dominant"}:
+        if pol == "canonical":
+            canon = [p for p in out if list(getattr(p, "surface_ids", [])) == [302, 303]]
+            if canon:
+                out = canon
+            else:
+                # Fallback to dominant path if canonical ordering not found.
+                pol = "dominant"
+        if pol == "dominant":
+            def _path_power_key(pp) -> float:
+                af = np.asarray(getattr(pp, "A_f", np.zeros((0, 2, 2), dtype=np.complex128)))
+                if af.size == 0:
+                    return -np.inf
+                p_lin = float(np.nanmean(np.abs(af) ** 2))
+                return p_lin
+
+            j = int(np.argmax([_path_power_key(p) for p in out]))
+            out = [out[j]]
     return out

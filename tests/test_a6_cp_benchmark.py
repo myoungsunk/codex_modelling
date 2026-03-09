@@ -65,6 +65,24 @@ class A6CPBenchmarkTests(unittest.TestCase):
         self.assertLessEqual(max(odd_angles), 15.0 + 1e-6)
         self.assertLessEqual(max(even_angles), 15.0 + 1e-6)
 
+    def test_a6_even_path_policy_canonical_reduces_symmetric_dual_paths(self) -> None:
+        f_hz = np.linspace(6e9, 10e9, 64)
+        ant_cfg = {
+            "convention": "IEEE-RHCP",
+            "tx_cross_pol_leakage_db": 120.0,
+            "rx_cross_pol_leakage_db": 120.0,
+            "tx_axial_ratio_db": 0.0,
+            "rx_axial_ratio_db": 0.0,
+            "enable_coupling": False,
+        }
+        params_even = next(p for p in A6.build_sweep_params(case_set="minimal") if str(p.get("mode")) == "even")
+        all_paths = A6.run_case(params_even, f_hz, basis="circular", antenna_config=ant_cfg, even_path_policy="all")
+        can_paths = A6.run_case(params_even, f_hz, basis="circular", antenna_config=ant_cfg, even_path_policy="canonical")
+        self.assertGreaterEqual(len(all_paths), 1)
+        self.assertGreaterEqual(len(can_paths), 1)
+        self.assertLessEqual(len(can_paths), len(all_paths))
+        self.assertEqual(len(can_paths), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

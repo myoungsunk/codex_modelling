@@ -80,6 +80,8 @@ def build_link_U_from_scenario(
         "include_late_panel",
         "a6_mode",
         "a6_case_set",
+        "a6_even_path_policy",
+        "a6_even_layout",
         "target_bounce",
         "incidence_max_deg",
         "near_normal_benchmark",

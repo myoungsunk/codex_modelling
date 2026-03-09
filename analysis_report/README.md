@@ -59,6 +59,7 @@ python analysis_report/generate_proposition_plot_mapping_detailed.py --run-group
   - `A2_off`: G1 primary evidence
   - `A6`: G2 primary evidence (near-normal PEC, incidence <= 15 deg)
     - A6 실행 시 `--a6-case-set both`를 쓰면 full/minimal을 한 번에 돌리고 `A6_case_set_sign_compare.csv`에서 odd/even 비교 가능
+    - `--a6-even-path-policy canonical`(기본)으로 even 대칭 다중경로를 단일 canonical path로 고정 가능
   - `A3_corner`: supplementary mechanism only
   - `A4_iso`: L2-M primary (`late_panel=false`, `dispersion=off`)
   - `A4_bridge`: L2-M secondary (`late_panel=true`, `dispersion=on`)

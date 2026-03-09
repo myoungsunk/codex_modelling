@@ -1254,6 +1254,8 @@ def _build_case_records(
                     basis=basis,
                     antenna_config=dict(antenna_config or {}),
                     force_cp_swap_on_odd_reflection=bool(force_cp_swap),
+                    even_path_policy=str(args.a6_even_path_policy),
+                    even_layout=str(args.a6_even_layout),
                 )
                 tx_pos = np.asarray([2.0, -2.0, 1.5], dtype=float) if str(p.get("mode")).lower() == "odd" else np.asarray([2.0, 1.0, 1.5], dtype=float)
                 rx_pos = np.asarray([float(p.get("rx_x", 2.4)), float(p.get("rx_y", -2.0)), float(p.get("rx_z", 1.5))], dtype=float)
@@ -1272,6 +1274,8 @@ def _build_case_records(
                             "a6_mode": str(p.get("mode", "odd")),
                             "target_bounce": int(p.get("target_bounce", 1)),
                             "a6_case_set": str(p.get("a6_case_set", a6_case_set)),
+                            "a6_even_path_policy": str(args.a6_even_path_policy),
+                            "a6_even_layout": str(args.a6_even_layout),
                             "incidence_max_deg": float(inc_max),
                             "near_normal_benchmark": 1,
                             "los_block_method": "synthetic_los_off",
@@ -1386,6 +1390,8 @@ def main() -> None:
     parser.add_argument("--a6-incidence-max-deg", type=float, default=15.0)
     parser.add_argument("--a6-modes", type=str, default="odd,even")
     parser.add_argument("--a6-case-set", type=str, default="full", choices=["full", "minimal", "both"])
+    parser.add_argument("--a6-even-path-policy", type=str, default="canonical", choices=["canonical", "dominant", "all"])
+    parser.add_argument("--a6-even-layout", type=str, default="localized", choices=["localized", "full"])
     parser.add_argument("--material-list", type=str, default="")
     parser.add_argument("--stress-flag", action="store_true")
     parser.add_argument("--strict-los-blocked", action="store_true")
