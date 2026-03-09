@@ -359,6 +359,7 @@ def _build_final_markdown(
     lines.append("| C0 | floor calibration | PASS | calibration / uncertainty | effect regression |")
     lines.append("| A2_off | odd parity isolation | PASS | G1 primary evidence | EL-identification |")
     lines.append("| A2_on | bridge observability | WARN | LOS-on bridge check | G1 sign-off |")
+    lines.append("| A3_on | bridge observability | WARN | LOS-on bridge check | G2 sign-off |")
     lines.append("| A3_corner | supplementary mechanism | WARN | mechanism-only context | system early baseline / G2 sign-off |")
     if bool(a6_parity.get("available", False)):
         lines.append(f"| A6 | near-normal parity benchmark | {a6_parity.get('status','NA')} | G2 primary sign evidence | oblique generalization |")
@@ -398,7 +399,7 @@ def _build_final_markdown(
     lines.append("")
     lines.append("- Full gallery and links: [scenario_space_plots.md](scenario_space_plots.md)")
     lines.append("- Case-level index: [index.md](index.md)")
-    for sid in ["C0", "A2", "A3", "A4", "A5", "A6", "B1", "B2", "B3"]:
+    for sid in ["C0", "A2", "A2_on", "A3", "A3_on", "A4", "A4_on", "A5", "A6", "B1", "B2", "B3"]:
         p = out_root / "figures" / f"{sid}__ALL__scene_montage.png"
         if p.exists():
             lines.append(f"- [{p.name}]({report_md.relpath(p, out_root)})")
@@ -411,7 +412,7 @@ def _build_final_markdown(
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", required=True, help="Path to analysis_report config (json/yaml)")
-    ap.add_argument("--scenarios", default="C0,A2,A3,A4,A5,A6,B1,B2,B3")
+    ap.add_argument("--scenarios", default="C0,A2,A2_on,A3,A3_on,A4,A4_on,A5,A6,B1,B2,B3")
     args = ap.parse_args()
 
     cfg = io_lib.load_config(args.config)

@@ -64,7 +64,7 @@ python analysis_report/generate_proposition_plot_mapping_detailed.py --run-group
   - `A4_iso`: L2-M primary (`late_panel=false`, `dispersion=off`)
   - `A4_bridge`: L2-M secondary (`late_panel=true`, `dispersion=on`)
   - `A5_pair`: L2-S proxy stress response (synthetic primary, geometric sensitivity)
-  - `A2_on/A4_on`: LOS-on observability bridge set
+  - `A2_on/A3_on/A4_on`: LOS-on observability bridge set
   - `B1/B2/B3`: R1/R2 real-space leverage (support count mandatory)
 - `scene_debug.json`이 없으면 해당 케이스 scene plot은 WARN으로 보고서에 기록됩니다.
 - 진단 B는 목적별 3-window를 분리해 계산합니다.

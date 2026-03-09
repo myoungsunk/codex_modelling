@@ -44,6 +44,46 @@ from scenarios import (
 from scenarios.common import default_antennas, make_los_blocker_plane, paths_to_records, uwb_frequency
 
 
+SCENARIO_ALIAS_TO_BASE: dict[str, str] = {
+    "A2_ON": "A2",
+    "A3_ON": "A3",
+    "A4_ON": "A4",
+}
+
+SCENARIO_ALIAS_CANONICAL: dict[str, str] = {
+    "A2_ON": "A2_on",
+    "A3_ON": "A3_on",
+    "A4_ON": "A4_on",
+}
+
+
+def _scenario_key(s: str) -> str:
+    return str(s).strip().upper()
+
+
+def _scenario_base_id(s: str) -> str:
+    return SCENARIO_ALIAS_TO_BASE.get(_scenario_key(s), _scenario_key(s))
+
+
+def _scenario_canonical_id(s: str) -> str:
+    key = _scenario_key(s)
+    return SCENARIO_ALIAS_CANONICAL.get(key, key)
+
+
+def _resolve_los_control(scenario_id: str, los_block_mode: str) -> tuple[str, bool, bool | None, str]:
+    base = _scenario_base_id(scenario_id)
+    if _scenario_key(scenario_id) in SCENARIO_ALIAS_TO_BASE:
+        # Bridge aliases force LOS-on (no blocker) to test observability with direct path present.
+        return base, False, True, "los_on_bridge"
+
+    mode = str(los_block_mode).lower().strip()
+    if mode == "occluder":
+        return base, True, None, "physical_occluder"
+    if mode == "none":
+        return base, False, True, "los_on"
+    return base, False, False, "synthetic_los_off"
+
+
 def _pctl(x: np.ndarray, q: float) -> float:
     arr = np.asarray(x, dtype=float)
     arr = arr[np.isfinite(arr)]
@@ -144,7 +184,7 @@ def _make_xpr_model(scenario: str, cfg: dict[str, Any]) -> BaseXPRModel:
             return BinnedXPR(default_xpr_db=float(cfg.get("default_xpr_db", 8.0)), bins=list(cfg.get("bins", [])))
         return ConstantXPR(float(cfg.get("xpr_db", 8.0)))
 
-    s = str(scenario).upper()
+    s = _scenario_base_id(str(scenario))
     if s == "A4":
         return ConditionalLinearXPR(a0=3.0, a_el=-0.03, sigma_db=0.6)
     if s == "A5":
@@ -454,7 +494,7 @@ def _floor_subbands_from_reference(reference: dict[str, Any]) -> tuple[list[dict
 
 
 def _case_label(scenario_id: str, params: dict[str, Any]) -> str:
-    s = str(scenario_id).upper()
+    s = _scenario_base_id(scenario_id)
     p = dict(params)
     if s == "C0":
         return (
@@ -535,7 +575,7 @@ def _plane_vertices_xyz(plane: Plane) -> np.ndarray:
 def _plane_object_type(plane: Plane, scenario_id: str) -> str:
     pid = int(getattr(plane, "id", -1))
     mat_name = _plane_material_name(plane).lower()
-    sid = str(scenario_id).upper()
+    sid = _scenario_base_id(scenario_id)
     if "absorber" in mat_name:
         return "absorber"
     if pid >= 9500:
@@ -552,7 +592,7 @@ def _plane_object_type(plane: Plane, scenario_id: str) -> str:
 
 
 def _serialize_scene_objects(scene: list[Plane], scenario_id: str) -> list[dict[str, Any]]:
-    sid = str(scenario_id).upper()
+    sid = _scenario_base_id(scenario_id)
     # For corner scenarios, infer the two reflector boundaries and suppress
     # stress objects that are geometrically behind the reflector walls.
     x_wall: float | None = None
@@ -741,10 +781,9 @@ def _build_scene_snapshot(
     a5_stress_mode: str,
     a5_scatterer_count: int,
 ) -> tuple[np.ndarray, np.ndarray, list[Plane]]:
-    s = str(scenario_id).upper()
+    s, los_blocker, _, _ = _resolve_los_control(scenario_id, los_block_mode)
     tx, rx = default_antennas(basis=basis, convention=convention, **dict(antenna_config or {}))
     scene: list[Plane] = []
-    los_blocker = str(los_block_mode).lower().strip() == "occluder"
 
     if s == "C0":
         rx = rx.with_position([float(params.get("distance_m", 1.0)), 0.0, 1.5])
@@ -933,14 +972,15 @@ def _build_case_records(
     *,
     antenna_config: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
-    s = str(args.scenario).upper()
+    scenario_out = _scenario_canonical_id(str(args.scenario))
+    s, los_blocker, los_enabled_override, los_block_method = _resolve_los_control(
+        scenario_out, str(args.los_block_mode)
+    )
     basis = str(args.basis)
     convention = str(args.convention)
     matrix_source = str(args.matrix_source)
     force_cp_swap = bool(_parse_bool(args.force_cp_swap_on_odd_reflection, default=False))
     n_rep = max(1, int(args.n_rep))
-    los_block_mode = str(args.los_block_mode).lower().strip()
-    los_blocker = bool(los_block_mode == "occluder")
     out: list[dict[str, Any]] = []
     if s == "C0":
         dlist = _parse_float_list(args.dist_list, [1.0, 2.0, 3.0, 4.0, 5.0])
@@ -961,8 +1001,8 @@ def _build_case_records(
                         out.append(
                             {
                                 "case_id": str(cid),
-                                "scenario_id": "C0",
-                                "link_id": f"C0_{cid}",
+                                "scenario_id": scenario_out,
+                                "link_id": f"{scenario_out}_{cid}",
                                 "params": {"distance_m": d, "yaw_deg": yaw, "pitch_deg": pit, "rep_id": int(rep_id)},
                                 "paths": paths_to_records(paths),
                                 "meta": {
@@ -1000,12 +1040,13 @@ def _build_case_records(
                         antenna_config=dict(antenna_config or {}),
                         force_cp_swap_on_odd_reflection=bool(force_cp_swap),
                         los_blocker=bool(los_blocker),
+                        los_enabled_override=los_enabled_override,
                     )
                     out.append(
                         {
                             "case_id": str(cid),
-                            "scenario_id": "A2",
-                            "link_id": f"A2_{cid}",
+                            "scenario_id": scenario_out,
+                            "link_id": f"{scenario_out}_{cid}",
                             "params": p,
                             "paths": paths_to_records(paths),
                             "meta": {
@@ -1013,7 +1054,7 @@ def _build_case_records(
                                 "material_class": "PEC",
                                 "obstacle_flag": 1,
                                 "rep_id": int(rep_id),
-                                "los_block_method": "physical_occluder" if bool(los_blocker) else "synthetic_los_off",
+                                "los_block_method": str(los_block_method),
                                 "basis": basis,
                                 "convention": convention,
                                 "matrix_source": matrix_source,
@@ -1038,13 +1079,14 @@ def _build_case_records(
                     antenna_config=dict(antenna_config or {}),
                     force_cp_swap_on_odd_reflection=bool(force_cp_swap),
                     los_blocker=bool(los_blocker),
+                    los_enabled_override=los_enabled_override,
                 )
                 d = float(np.linalg.norm(np.asarray([p["rx_x"], p["rx_y"], 1.5]) - np.asarray([0.0, 0.0, 1.5])))
                 out.append(
                     {
                         "case_id": str(cid),
-                        "scenario_id": "A3",
-                        "link_id": f"A3_{cid}",
+                        "scenario_id": scenario_out,
+                        "link_id": f"{scenario_out}_{cid}",
                         "params": p,
                         "paths": paths_to_records(paths),
                         "meta": {
@@ -1052,7 +1094,7 @@ def _build_case_records(
                             "material_class": "PEC",
                             "obstacle_flag": 1,
                             "rep_id": int(rep_id),
-                            "los_block_method": "physical_occluder" if bool(los_blocker) else "synthetic_los_off",
+                            "los_block_method": str(los_block_method),
                             "basis": basis,
                             "convention": convention,
                             "matrix_source": matrix_source,
@@ -1109,6 +1151,7 @@ def _build_case_records(
                                     antenna_config=dict(antenna_config or {}),
                                     force_cp_swap_on_odd_reflection=bool(force_cp_swap),
                                     los_blocker=bool(los_blocker),
+                                    los_enabled_override=los_enabled_override,
                                     include_late_panel=bool(include_late_panel),
                                     y_late_offset=late_offset_m,
                                     materials_db=materials_db,
@@ -1117,8 +1160,8 @@ def _build_case_records(
                                 out.append(
                                     {
                                         "case_id": str(cid),
-                                        "scenario_id": "A4",
-                                        "link_id": f"A4_{cid}",
+                                        "scenario_id": scenario_out,
+                                        "link_id": f"{scenario_out}_{cid}",
                                         "params": p,
                                         "paths": paths_to_records(paths),
                                         "meta": {
@@ -1131,7 +1174,7 @@ def _build_case_records(
                                             "materials_db": str(materials_db or ""),
                                             "obstacle_flag": 1,
                                             "rep_id": int(rep_id),
-                                            "los_block_method": "physical_occluder" if bool(los_blocker) else "synthetic_los_off",
+                                            "los_block_method": str(los_block_method),
                                             "basis": basis,
                                             "convention": convention,
                                             "matrix_source": matrix_source,
@@ -1190,13 +1233,14 @@ def _build_case_records(
                     scatterer_count=int(args.a5_scatterer_count) if stress_on else 0,
                     diffuse_config=dict(a5_diffuse_config),
                     los_blocker=bool(los_blocker),
+                    los_enabled_override=los_enabled_override,
                 )
                 d = float(np.linalg.norm(np.asarray([p["rx_x"], p["rx_y"], 1.5]) - np.asarray([0.0, 0.0, 1.5])))
                 out.append(
                     {
                         "case_id": str(cid),
-                        "scenario_id": "A5",
-                        "link_id": f"A5_{cid}",
+                        "scenario_id": scenario_out,
+                        "link_id": f"{scenario_out}_{cid}",
                         "params": p,
                         "paths": paths_to_records(paths),
                         "meta": {
@@ -1214,7 +1258,7 @@ def _build_case_records(
                             "stress_path_structure_active": int(stress_path_structure_active),
                             "stress_polarization_mixer_active": int(stress_pol_mixer_active),
                             "stress_semantics": str(stress_semantics),
-                            "los_block_method": "physical_occluder" if bool(los_blocker) else "synthetic_los_off",
+                            "los_block_method": str(los_block_method),
                             "basis": basis,
                             "convention": convention,
                             "matrix_source": matrix_source,
@@ -1262,8 +1306,8 @@ def _build_case_records(
                 out.append(
                     {
                         "case_id": str(cid),
-                        "scenario_id": "A6",
-                        "link_id": f"A6_{cid}",
+                        "scenario_id": scenario_out,
+                        "link_id": f"{scenario_out}_{cid}",
                         "params": p,
                         "paths": paths_to_records(paths),
                         "meta": {
@@ -1332,7 +1376,11 @@ def _build_case_records(
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--scenario", required=True, choices=["C0", "A2", "A3", "A4", "A5", "A6", "B1", "B2", "B3"])
+    parser.add_argument(
+        "--scenario",
+        required=True,
+        choices=["C0", "A2", "A3", "A4", "A5", "A6", "B1", "B2", "B3", "A2_on", "A3_on", "A4_on"],
+    )
     parser.add_argument("--basis", type=str, default="circular", choices=["circular", "linear"])
     parser.add_argument("--convention", type=str, default="IEEE-RHCP")
     parser.add_argument("--matrix-source", type=str, default="A", choices=["A", "J", "a", "j"])
@@ -1378,7 +1426,7 @@ def main() -> None:
     parser.add_argument("--a4-include-late-panel", type=str, default="true")
     parser.add_argument("--a4-late-offset-m", type=float, default=2.4)
     parser.add_argument("--materials-db", type=str, default="")
-    parser.add_argument("--los-block-mode", type=str, default="occluder", choices=["synthetic", "occluder"])
+    parser.add_argument("--los-block-mode", type=str, default="occluder", choices=["synthetic", "occluder", "none"])
     parser.add_argument("--a5-stress-mode", type=str, default="geometry", choices=["none", "synthetic", "geometry", "hybrid"])
     parser.add_argument("--a5-scatterer-count", type=int, default=3)
     parser.add_argument("--a5-diffuse-enabled", type=str, default="false")

@@ -24,7 +24,11 @@ def _run(cmd: list[str]) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--scenario", required=True, choices=["C0", "A2", "A3", "A4", "A5", "B1", "B2", "B3"])
+    parser.add_argument(
+        "--scenario",
+        required=True,
+        choices=["C0", "A2", "A3", "A4", "A5", "B1", "B2", "B3", "A2_on", "A3_on", "A4_on"],
+    )
     parser.add_argument("--out-root", type=str, default="outputs/cp_lp_baseline")
     parser.add_argument("--run-id", type=str, default=None)
     args, passthrough = parser.parse_known_args()
@@ -76,4 +80,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

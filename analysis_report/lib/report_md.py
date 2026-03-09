@@ -10,8 +10,11 @@ from typing import Any
 _SCENARIO_MEANING: dict[str, str] = {
     "C0": "Calibration-only baseline: floor reference and alignment sensitivity (W_floor).",
     "A2": "Odd parity isolation anchor (A2_off core evidence); A2_on is observability bridge set.",
-    "A3": "Corner 2-bounce supplementary mechanism scene (target-window evidence only, not system early baseline).",
-    "A4": "Material branch: A4_iso primary (late_panel=off, dispersion=off), A4_bridge secondary (late_panel=on, dispersion=on).",
+    "A2_ON": "LOS-on bridge observability counterpart of A2_off; direct LOS + odd-path coexistence check.",
+    "A3": "Corner 2-bounce supplementary mechanism scene (target-window evidence only, not system early baseline); A3_on is LOS-on observability bridge set.",
+    "A3_ON": "LOS-on bridge observability counterpart of A3_corner; direct LOS + even-path coexistence check.",
+    "A4": "Material branch: A4_iso primary (late_panel=off, dispersion=off), A4_bridge secondary (late_panel=on, dispersion=on); A4_on is LOS-on observability bridge set.",
+    "A4_ON": "LOS-on bridge observability counterpart of A4 material branch; direct LOS under material contrast.",
     "A5": "Proxy stress response pair (A5_pair): synthetic is primary, geometric is sensitivity check.",
     "A6": "Near-normal PEC parity benchmark; primary G2 sign evidence.",
     "B1": "Room grid baseline (mostly LOS) for spatial Z/U trend mapping.",
@@ -35,7 +38,7 @@ def final_structure_rows() -> list[dict[str, str]]:
         {"unit": "A4_iso", "role": "L2-M primary", "notes": "late_panel=false, dispersion=off"},
         {"unit": "A4_bridge", "role": "L2-M secondary", "notes": "late_panel=true, dispersion=on"},
         {"unit": "A5_pair", "role": "L2-S proxy stress-response", "notes": "synthetic primary, geometric sensitivity"},
-        {"unit": "A2_on/A4_on", "role": "bridge observability set", "notes": "LOS-on contrast bridge"},
+        {"unit": "A2_on/A3_on/A4_on", "role": "bridge observability set", "notes": "LOS-on contrast bridge"},
         {"unit": "B1/B2/B3", "role": "R1/R2 real-space leverage", "notes": "support count must be shown"},
     ]
 
