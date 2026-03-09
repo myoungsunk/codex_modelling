@@ -162,6 +162,7 @@ python3 scripts/run_protocol_manifest.py \
   --output-root outputs/protocol_repro_v1 \
   --analysis-config-out analysis_report/config.protocol_repro_v1.json
 ```
+Default manifest strengthens C0 robustness (`distance=1..5 m`, `yaw=-20..20 deg`, `n_rep=5`) for stable `Delta_repeat` and `Delta_ref`.
 Use `--only A6_off,A6_on` for partial reruns and `--tag <name>` when you need parallel output folders.
 
 Reporting rule: use `A6` as the primary G2 (odd/even sign) evidence in standard reports; keep `A3` as supplementary mechanism evidence.

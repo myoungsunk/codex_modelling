@@ -100,3 +100,4 @@ python3 scripts/run_protocol_manifest.py \
   --output-root outputs/protocol_repro_v1 \
   --analysis-config-out analysis_report/config.protocol_repro_v1.json
 ```
+- manifest 기본 C0는 `distance=1..5 m`, `yaw=-20..20 deg`, `repeat=5`로 고정되어 `Delta_repeat`/`Delta_ref` 안정성을 우선 확보합니다.

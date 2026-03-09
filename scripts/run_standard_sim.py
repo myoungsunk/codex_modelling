@@ -211,6 +211,42 @@ def _parse_bool(raw: Any, default: bool = False) -> bool:
     return bool(default)
 
 
+def _c0_diversity_stats(case_records: list[dict[str, Any]]) -> dict[str, Any]:
+    d_set: set[float] = set()
+    yaw_set: set[float] = set()
+    pitch_set: set[float] = set()
+    rep_set: set[int] = set()
+    for rec in case_records:
+        if str(rec.get("scenario_id", "")).upper() != "C0":
+            continue
+        p = dict(rec.get("params", {}))
+        d = float(p.get("distance_m", np.nan))
+        yaw = float(p.get("yaw_deg", np.nan))
+        pitch = float(p.get("pitch_deg", np.nan))
+        rep_id = p.get("rep_id", np.nan)
+        if np.isfinite(d):
+            d_set.add(round(float(d), 6))
+        if np.isfinite(yaw):
+            yaw_set.add(round(float(yaw), 6))
+        if np.isfinite(pitch):
+            pitch_set.add(round(float(pitch), 6))
+        try:
+            rep_v = float(rep_id)
+        except Exception:
+            rep_v = float("nan")
+        if np.isfinite(rep_v):
+            rep_set.add(int(round(rep_v)))
+    return {
+        "n_dist": int(len(d_set)),
+        "n_yaw": int(len(yaw_set)),
+        "n_pitch": int(len(pitch_set)),
+        "n_rep": int(len(rep_set)),
+        "dist_values_m": [float(x) for x in sorted(d_set)],
+        "yaw_values_deg": [float(x) for x in sorted(yaw_set)],
+        "pitch_values_deg": [float(x) for x in sorted(pitch_set)],
+    }
+
+
 def _build_antenna_config_from_args(args: argparse.Namespace) -> dict[str, Any]:
     return {
         "tx_cross_pol_leakage_db": float(args.tx_cross_pol_leakage_db),
@@ -1592,6 +1628,7 @@ def main() -> None:
     case_records = _build_case_records(args, f_hz=f_hz, antenna_config=antenna_config)
     if int(args.max_links) > 0:
         case_records = case_records[: int(args.max_links)]
+    c0_diversity = _c0_diversity_stats(case_records) if str(scenario_out).upper() == "C0" else {}
 
     scene_debug_files: list[str] = []
     scene_debug_dir = Path(args.out_dir) / "scene_debug"
@@ -1821,6 +1858,16 @@ def main() -> None:
                 b.metrics.extras["claim_caution_late_subband"] = c_l_sb
 
     warnings: list[str] = []
+    if str(scenario_out).upper() == "C0":
+        n_dist = int(c0_diversity.get("n_dist", 0))
+        n_yaw = int(c0_diversity.get("n_yaw", 0))
+        n_rep = int(c0_diversity.get("n_rep", 0))
+        if n_dist < 3 or n_yaw < 3 or n_rep < 3:
+            warnings.append(
+                "C0 calibration diversity low: "
+                f"n_dist={n_dist}, n_yaw={n_yaw}, n_rep={n_rep} "
+                "(recommended >=3 each for robust Delta_repeat/Delta_ref)"
+            )
     if str(scenario_out).upper().startswith("B"):
         los_n = int(sum(int(b.conditions.LOSflag) == 1 for b in bundles))
         nlos_n = int(sum(int(b.conditions.LOSflag) == 0 for b in bundles))
@@ -1838,6 +1885,7 @@ def main() -> None:
         "scenario_base_id": str(scenario_base),
         "scenario_variant_id": str(scenario_variant),
         "scenario_request_id": str(scenario_request),
+        "c0_diversity": dict(c0_diversity),
         "basis": str(args.basis),
         "convention": str(args.convention),
         "matrix_source": str(args.matrix_source).upper(),
@@ -1870,6 +1918,7 @@ def main() -> None:
         "scenario_base_id": str(scenario_base),
         "scenario_variant_id": str(scenario_variant),
         "scenario_request_id": str(scenario_request),
+        "c0_diversity": dict(c0_diversity),
         "force_cp_swap_on_odd_reflection": bool(_parse_bool(args.force_cp_swap_on_odd_reflection, default=False)),
         "antenna_config": dict(antenna_config),
         "n_links": len(bundles),
