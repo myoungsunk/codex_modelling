@@ -1,0 +1,54 @@
+run_group: "2026-02-example"
+input_runs:
+  - "outputs/run_C0"
+  - "outputs/run_A2"
+scenario_map: {}
+scenario_roles:
+  C0: calibration_only
+  A2: odd_isolation
+  A3: mechanism_supplementary
+  A4: material_effect
+  A5: stress_response_proxy
+  A6: g2_primary_benchmark
+  B1: realspace_los
+  B2: realspace_partition_nlos
+  B3: realspace_corner_nlos
+floor_policy:
+  mode: "from_C0"           # from_C0 | from_calibration_json | none
+  calibration_json: ""
+  delta_method: "p5_p95"     # p5_p95 | iqr | std
+windows:
+  Te_ns: 10.0
+  Tmax_ns: 200.0
+  floor_window_ns: 1.5        # W_floor (C0): LOS peak 주변 좁은 창
+  target_window_ns: 3.0       # W_target (A2-A5): target delay 주변 창
+  target_window_ns_by_scenario:
+    A3: 6.0                   # A3는 mechanism-only로 별도 W_target 사용 권장
+  target_window_mode_by_scenario:
+    A3: fixed                 # fixed | adaptive
+  target_sign_metric_by_scenario:
+    A2: excess                # excess | raw
+    A3: raw                   # G2 sign-off는 raw 권장
+  te_sweep_ns: [2.0, 3.0, 5.0] # W_early (room): 분리력 S(Te) 스윕
+  noise_tail_sweep_ns: [30.0, 50.0, 80.0]   # sensitivity_level.csv export
+  threshold_sweep_db: [4.0, 6.0, 8.0]       # sensitivity_level.csv export
+  tau0_method: "threshold"
+  noise_tail_ns: 50.0
+  threshold_margin_db: 6.0
+measurement_sweep:
+  BW_Hz: 1.0e9
+  df_Hz: 1.0e6
+plots:
+  max_links_for_pdp_examples: 3
+  pdp_example_selection: "highest_energy"
+stats:
+  alpha: 0.05
+  bootstrap_n: 1000
+scene_plots:
+  enabled: true
+  source: "scene_debug_json" # scene_debug_json | rebuild_from_scenario
+  debug_rays_k: 20
+  ray_selection: "top_power"
+  max_cases_per_scenario: 9999
+  figure_size: [10, 6]
+  save_format: "png"

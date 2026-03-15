@@ -1,0 +1,7 @@
+case_set,expected_sign_hit_rate,hit_rate_min_set,median_xpd_target_ex_db,median_xpd_target_raw_db,mode,n_eval,sign_metric_for_status,status
+full,1.0,1.0,-33.06286481744288,-8.0,odd,45,raw,PASS
+full,1.0,1.0,-17.06286481744288,8.0,even,45,raw,PASS
+minimal,1.0,1.0,-33.06286481744288,-8.0,odd,5,raw,PASS
+minimal,1.0,1.0,-17.06286481744288,8.0,even,5,raw,PASS
+full_vs_minimal,0.0,nan,0.0,0.0,odd,nan,delta(minimal-full),
+full_vs_minimal,0.0,nan,0.0,0.0,even,nan,delta(minimal-full),

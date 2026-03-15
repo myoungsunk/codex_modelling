@@ -1,0 +1,290 @@
+[
+  {
+    "item": "A3_coord_sanity",
+    "status": "WARN",
+    "detail": {
+      "status": "WARN",
+      "note": "Coordinate penetration sanity needs scenario geometry file review; not inferable from standard outputs only."
+    }
+  },
+  {
+    "item": "D_identifiability",
+    "status": "WARN",
+    "detail": {
+      "EL_iqr_db": 6.773974219541017,
+      "corr_d_vs_LOS": -0.5531406228999123,
+      "strata_counts": {
+        "LOS0_q1": 42,
+        "LOS0_q2": 9,
+        "LOS0_q3": 9,
+        "LOS1_q1": 40,
+        "LOS1_q2": 73,
+        "LOS1_q3": 71,
+        "LOS0_qNA": 1,
+        "LOS1_qNA": 4
+      },
+      "min_strata_n": 9,
+      "status": "WARN",
+      "D1": {
+        "status": "PASS",
+        "global": {
+          "status": "PASS",
+          "subset": [
+            "A3",
+            "A4",
+            "B1",
+            "B2",
+            "B3"
+          ],
+          "EL_iqr_db": 6.773974219541017,
+          "el_bins_low_mid_high": {
+            "low": 111,
+            "mid": 110,
+            "high": 109
+          },
+          "min_bin_n": 109,
+          "n_rows": 345
+        },
+        "A2_isolation": {
+          "status": "PASS",
+          "n_rows": 18,
+          "EL_std_db": 6.894959784888595e-15,
+          "target": "small EL variation is desired for parity isolation"
+        },
+        "A5_isolation": {
+          "status": "PASS",
+          "role": "stress_response",
+          "n_base": 30,
+          "n_stress": 29,
+          "delta_median_EL_stress_minus_base_db": -2.4888276868568227,
+          "target": "response mode: L_pol decrease is primary, EL shift can be non-zero"
+        }
+      },
+      "D2": {
+        "status": "PASS",
+        "material_x_angle_status": "PASS",
+        "material_x_angle_groups_good": 3,
+        "material_x_angle_groups_total": 3,
+        "material_x_angle_coverage": {
+          "glass": {
+            "low": 2,
+            "mid": 10,
+            "high": 12,
+            "NA": 0
+          },
+          "wood": {
+            "low": 2,
+            "mid": 10,
+            "high": 12,
+            "NA": 0
+          },
+          "gypsum": {
+            "low": 2,
+            "mid": 10,
+            "high": 12,
+            "NA": 0
+          }
+        },
+        "stress_x_angle_status": "PASS",
+        "stress_x_angle_groups_good": 2,
+        "stress_x_angle_groups_total": 2,
+        "stress_x_angle_coverage": {
+          "base": {
+            "low": 25,
+            "mid": 5,
+            "high": 0,
+            "NA": 0
+          },
+          "stress": {
+            "low": 25,
+            "mid": 5,
+            "high": 0,
+            "NA": 0
+          }
+        },
+        "design_status": "PASS",
+        "stage1": {
+          "status": "PASS",
+          "n_rows": 345,
+          "design_rank": 8,
+          "design_cols": 8,
+          "condition_number": 65.40037661136286,
+          "vif_threshold": 5.0,
+          "vif": {
+            "EL_proxy_db": 3.9666533316939105,
+            "d_m": 2.302140815879659
+          },
+          "vif_warnings": {}
+        },
+        "stage2": {
+          "status": "PASS",
+          "n_rows": 423,
+          "design_rank": 5,
+          "design_cols": 5,
+          "condition_number": 7.89678796024209,
+          "vif_threshold": 5.0,
+          "vif": {},
+          "vif_warnings": {}
+        },
+        "design_rank": 8,
+        "design_cols": 8,
+        "condition_number": 65.40037661136286,
+        "vif_threshold": 5.0,
+        "vif": {
+          "stage1": {
+            "EL_proxy_db": 3.9666533316939105,
+            "d_m": 2.302140815879659
+          },
+          "stage2": {}
+        },
+        "vif_warnings": {
+          "stage1": {},
+          "stage2": {}
+        }
+      },
+      "D3": {
+        "status": "WARN",
+        "n_rows": 249,
+        "q1_db": 0.3315773539159679,
+        "q2_db": 2.7199659283313338,
+        "all_6_bins": [
+          "LOS0_q1",
+          "LOS0_q2",
+          "LOS0_q3",
+          "LOS1_q1",
+          "LOS1_q2",
+          "LOS1_q3"
+        ],
+        "viable_bins": [
+          "LOS0_q1",
+          "LOS0_q2",
+          "LOS0_q3",
+          "LOS1_q1",
+          "LOS1_q2",
+          "LOS1_q3"
+        ],
+        "min_strata_all_n": 9,
+        "min_strata_viable_n": 9,
+        "qna_total": 5,
+        "strata_counts": {
+          "LOS0_q1": 42,
+          "LOS0_q2": 9,
+          "LOS0_q3": 9,
+          "LOS1_q1": 40,
+          "LOS1_q2": 73,
+          "LOS1_q3": 71,
+          "LOS0_qNA": 1,
+          "LOS1_qNA": 4
+        },
+        "selected_rows_n": 0,
+        "strata_counts_selected": {},
+        "hole_analysis": [
+          {
+            "strata": "LOS0_q1",
+            "pool_n": 42,
+            "selected_n": "",
+            "hole_type": "none",
+            "status": "PASS"
+          },
+          {
+            "strata": "LOS0_q2",
+            "pool_n": 9,
+            "selected_n": "",
+            "hole_type": "none",
+            "status": "PASS"
+          },
+          {
+            "strata": "LOS0_q3",
+            "pool_n": 9,
+            "selected_n": "",
+            "hole_type": "none",
+            "status": "PASS"
+          },
+          {
+            "strata": "LOS1_q1",
+            "pool_n": 40,
+            "selected_n": "",
+            "hole_type": "none",
+            "status": "PASS"
+          },
+          {
+            "strata": "LOS1_q2",
+            "pool_n": 73,
+            "selected_n": "",
+            "hole_type": "none",
+            "status": "PASS"
+          },
+          {
+            "strata": "LOS1_q3",
+            "pool_n": 71,
+            "selected_n": "",
+            "hole_type": "none",
+            "status": "PASS"
+          }
+        ],
+        "per_scenario_summary": [
+          {
+            "scenario_id": "B1",
+            "status": "FAIL",
+            "n_rows": 49,
+            "q1_db": 0.7483634856182274,
+            "q2_db": 2.503280274987567,
+            "min_strata_all_n": 0,
+            "min_strata_viable_n": 1,
+            "qna_total": 2,
+            "strata_counts": {
+              "LOS0_q1": 1,
+              "LOS0_q2": 0,
+              "LOS0_q3": 0,
+              "LOS1_q1": 15,
+              "LOS1_q2": 16,
+              "LOS1_q3": 15,
+              "LOS0_qNA": 0,
+              "LOS1_qNA": 2
+            }
+          },
+          {
+            "scenario_id": "B2",
+            "status": "PASS",
+            "n_rows": 100,
+            "q1_db": -1.5761926501973234,
+            "q2_db": 2.719965928331334,
+            "min_strata_all_n": 4,
+            "min_strata_viable_n": 4,
+            "qna_total": 0,
+            "strata_counts": {
+              "LOS0_q1": 27,
+              "LOS0_q2": 4,
+              "LOS0_q3": 7,
+              "LOS1_q1": 6,
+              "LOS1_q2": 30,
+              "LOS1_q3": 26,
+              "LOS0_qNA": 0,
+              "LOS1_qNA": 0
+            }
+          },
+          {
+            "scenario_id": "B3",
+            "status": "WARN",
+            "n_rows": 100,
+            "q1_db": 0.5776310015021131,
+            "q2_db": 2.719965928331334,
+            "min_strata_all_n": 2,
+            "min_strata_viable_n": 2,
+            "qna_total": 3,
+            "strata_counts": {
+              "LOS0_q1": 13,
+              "LOS0_q2": 6,
+              "LOS0_q3": 2,
+              "LOS1_q1": 19,
+              "LOS1_q2": 27,
+              "LOS1_q3": 30,
+              "LOS0_qNA": 1,
+              "LOS1_qNA": 2
+            }
+          }
+        ]
+      }
+    }
+  }
+]

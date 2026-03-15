@@ -1,0 +1,4 @@
+plot_id,series,scenario_id,case_id,link_id,x,y,data,meta
+M1-7,uncertainty_budget_db,C0,,,floor_delta_db,0.6107424330369078,0.6107424330369078,
+M1-7,uncertainty_budget_db,C0,,,repeat_delta_db,0.22305050627602038,0.22305050627602038,
+M1-7,uncertainty_budget_db,C0,,,delta_ref_db,0.6107424330369078,0.6107424330369078,

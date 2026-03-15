@@ -1,0 +1,20 @@
+{
+  "imputed_count": 2,
+  "unresolved_count": 0,
+  "rows": [
+    {
+      "scenario_id": "A5",
+      "case_id": "13",
+      "link_id": "A5_13",
+      "EL_proxy_db": 2.719965928331348,
+      "method": "dominant_ray_EL_db"
+    },
+    {
+      "scenario_id": "B3",
+      "case_id": "42",
+      "link_id": "B3_42",
+      "EL_proxy_db": 2.7199659283313338,
+      "method": "dominant_ray_EL_db"
+    }
+  ]
+}

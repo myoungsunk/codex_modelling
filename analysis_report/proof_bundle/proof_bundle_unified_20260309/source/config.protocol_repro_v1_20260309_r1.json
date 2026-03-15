@@ -1,0 +1,104 @@
+{
+  "scenario_map": {},
+  "scenario_roles": {
+    "C0": "calibration_only",
+    "A2": "odd_isolation",
+    "A2_on": "odd_bridge_observability",
+    "A3": "mechanism_supplementary",
+    "A3_on": "even_bridge_observability",
+    "A4": "material_effect",
+    "A4_on": "material_bridge_observability",
+    "A5": "stress_response_proxy",
+    "A6": "g2_primary_benchmark",
+    "A6_on": "g2_bridge_observability",
+    "B1": "realspace_los",
+    "B2": "realspace_partition_nlos",
+    "B3": "realspace_corner_nlos"
+  },
+  "floor_policy": {
+    "mode": "from_C0",
+    "calibration_json": "",
+    "delta_method": "p5_p95"
+  },
+  "windows": {
+    "Te_ns": 3.0,
+    "Tmax_ns": 30.0,
+    "floor_window_ns": 1.5,
+    "target_window_ns": 3.0,
+    "target_window_ns_by_scenario": {
+      "A3": 6.0,
+      "A6": 3.0,
+      "A6_on": 3.0
+    },
+    "target_window_mode_by_scenario": {
+      "A3": "fixed",
+      "A6": "fixed",
+      "A6_on": "fixed"
+    },
+    "target_sign_metric_by_scenario": {
+      "A2": "excess",
+      "A3": "raw",
+      "A6": "raw",
+      "A6_on": "raw"
+    },
+    "te_sweep_ns": [
+      2.0,
+      3.0,
+      5.0
+    ],
+    "noise_tail_sweep_ns": [
+      30.0,
+      50.0,
+      80.0
+    ],
+    "threshold_sweep_db": [
+      4.0,
+      6.0,
+      8.0
+    ],
+    "tau0_method": "threshold",
+    "noise_tail_ns": 50.0,
+    "threshold_margin_db": 6.0
+  },
+  "measurement_sweep": {
+    "BW_Hz": 1000000000.0,
+    "df_Hz": 1000000.0
+  },
+  "plots": {
+    "max_links_for_pdp_examples": 3,
+    "pdp_example_selection": "highest_energy"
+  },
+  "stats": {
+    "alpha": 0.05,
+    "bootstrap_n": 1000
+  },
+  "scene_plots": {
+    "enabled": true,
+    "source": "scene_debug_json",
+    "debug_rays_k": 20,
+    "ray_selection": "top_power",
+    "max_cases_per_scenario": 9999,
+    "figure_size": [
+      10,
+      6
+    ],
+    "save_format": "png"
+  },
+  "run_group": "diag_protocol_repro_v1_20260309_r1",
+  "input_runs": [
+    "/Users/kimmyoungsun/Documents/codex/outputs/protocol_repro_v1/C0__20260309_r1",
+    "/Users/kimmyoungsun/Documents/codex/outputs/protocol_repro_v1/A2_off__20260309_r1",
+    "/Users/kimmyoungsun/Documents/codex/outputs/protocol_repro_v1/A6_off__20260309_r1",
+    "/Users/kimmyoungsun/Documents/codex/outputs/protocol_repro_v1/A3_supp__20260309_r1",
+    "/Users/kimmyoungsun/Documents/codex/outputs/protocol_repro_v1/A4_iso__20260309_r1",
+    "/Users/kimmyoungsun/Documents/codex/outputs/protocol_repro_v1/A4_bridge__20260309_r1",
+    "/Users/kimmyoungsun/Documents/codex/outputs/protocol_repro_v1/A5_pair__20260309_r1",
+    "/Users/kimmyoungsun/Documents/codex/outputs/protocol_repro_v1/A2_on__20260309_r1",
+    "/Users/kimmyoungsun/Documents/codex/outputs/protocol_repro_v1/A6_on__20260309_r1",
+    "/Users/kimmyoungsun/Documents/codex/outputs/protocol_repro_v1/A3_on__20260309_r1",
+    "/Users/kimmyoungsun/Documents/codex/outputs/protocol_repro_v1/A4_on__20260309_r1",
+    "/Users/kimmyoungsun/Documents/codex/outputs/protocol_repro_v1/B1__20260309_r1",
+    "/Users/kimmyoungsun/Documents/codex/outputs/protocol_repro_v1/B2__20260309_r1",
+    "/Users/kimmyoungsun/Documents/codex/outputs/protocol_repro_v1/B3__20260309_r1"
+  ]
+}

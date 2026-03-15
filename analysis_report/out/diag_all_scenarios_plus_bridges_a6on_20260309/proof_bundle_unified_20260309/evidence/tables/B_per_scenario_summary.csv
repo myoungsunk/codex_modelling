@@ -1,0 +1,4 @@
+min_strata_all_n,min_strata_viable_n,n_rows,q1_db,q2_db,qna_total,scenario_id,status,strata_counts
+0,1,25,2.4952931314875553,4.195205549293248,0,B1,FAIL,"{""LOS0_q1"": 1, ""LOS0_q2"": 0, ""LOS0_q3"": 0, ""LOS1_q1"": 7, ""LOS1_q2"": 9, ""LOS1_q3"": 8, ""LOS0_qNA"": 0, ""LOS1_qNA"": 0}"
+0,3,25,2.4992860345072074,4.190098339356254,0,B2,PASS,"{""LOS0_q1"": 3, ""LOS0_q2"": 3, ""LOS0_q3"": 0, ""LOS1_q1"": 6, ""LOS1_q2"": 6, ""LOS1_q3"": 7, ""LOS0_qNA"": 0, ""LOS1_qNA"": 0}"
+0,1,25,1.5549896299028718,4.195205549293248,0,B3,FAIL,"{""LOS0_q1"": 4, ""LOS0_q2"": 1, ""LOS0_q3"": 0, ""LOS1_q1"": 4, ""LOS1_q2"": 8, ""LOS1_q3"": 8, ""LOS0_qNA"": 0, ""LOS1_qNA"": 0}"

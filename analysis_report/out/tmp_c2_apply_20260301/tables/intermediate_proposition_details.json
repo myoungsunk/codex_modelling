@@ -1,0 +1,147 @@
+{
+  "M1": {
+    "definition": "C0 floor distance/yaw sensitivity",
+    "n": 30,
+    "trend": {
+      "slope": -0.09401464052724587,
+      "intercept": 24.978348288745664,
+      "r": -0.05736274922277541,
+      "p": 0.7633486841782926,
+      "n": 30
+    },
+    "variance_decomp": {
+      "n": 30,
+      "distance_group_var": 0.05763991688281151,
+      "yaw_group_var": 0.022595997331414992,
+      "dominant": "distance"
+    },
+    "status": "SUPPORTED"
+  },
+  "M2": {
+    "definition": "Fraction inside/outside floor uncertainty band",
+    "inside_ratio": 0.07238605898123325,
+    "outside_ratio": 0.9276139410187667,
+    "status": "SUPPORTED"
+  },
+  "G1": {
+    "definition": "A2 odd-bounce increases cross dominance vs C0",
+    "delta_median_db": -32.934837404558046,
+    "ks_wasserstein": {
+      "ks_stat": 1.0,
+      "ks_p": 1.4253754280521992e-16,
+      "wasserstein": 32.93925328231725
+    },
+    "status": "SUPPORTED"
+  },
+  "G2": {
+    "definition": "A3 even-bounce recovery vs A2",
+    "delta_median_db": 3.4895295726365383,
+    "ks_wasserstein": {
+      "ks_stat": 0.5,
+      "ks_p": 0.001953604031784197,
+      "wasserstein": 3.616896084596988
+    },
+    "status": "SUPPORTED"
+  },
+  "L1": {
+    "definition": "Early/Late leakage separation via XPD_early_ex/XPD_late_ex/L_pol",
+    "median_early_ex_db": -31.36231200502684,
+    "median_late_ex_db": -24.93483769676745,
+    "median_lpol_db": -7.999999589782957,
+    "status": "SUPPORTED"
+  },
+  "L2": {
+    "definition": "A5 stress impact on center/tails",
+    "base": {
+      "n": 30,
+      "mean": -19.032027097874245,
+      "std": 0.6584136378266066,
+      "p5": -19.940151240653133,
+      "p10": -19.69815300994449,
+      "p90": -18.169538582237376,
+      "p95": -17.985773124176053
+    },
+    "stress": {
+      "n": 30,
+      "mean": -25.05446358747018,
+      "std": 1.232900081263948,
+      "p5": -27.17300937281377,
+      "p10": -26.86748119410372,
+      "p90": -23.976145634559987,
+      "p95": -23.648862808698272
+    },
+    "delta_mean_db": -6.022436489595936,
+    "var_ratio": 1.872531202928443,
+    "status": "SUPPORTED"
+  },
+  "L3": {
+    "definition": "Correlation between leakage excess and -EL_proxy",
+    "spearman": {
+      "rho": 0.1687309780844257,
+      "p": 0.0017395116529412304,
+      "ci_lo": 0.056503791850099204,
+      "ci_hi": 0.26688767499108423,
+      "n": 342
+    },
+    "status": "PARTIAL"
+  },
+  "R1": {
+    "definition": "Room-space LOS/NLOS and heatmap consistency",
+    "n_b_rows": 161,
+    "n_los": 126,
+    "n_nlos": 35,
+    "ks_wasserstein": {
+      "ks_stat": 0.5348571428571428,
+      "ks_p": 9.543117557995215e-08,
+      "wasserstein": 4.808748263731411
+    },
+    "status": "SUPPORTED"
+  },
+  "R2": {
+    "definition": "DS/early-fraction relation with leakage",
+    "spearman_ds_vs_xpd": {
+      "rho": -0.24796665315542266,
+      "p": 0.0002247235468931729,
+      "ci_lo": -0.3806075403658744,
+      "ci_hi": -0.11189996248409197,
+      "n": 217
+    },
+    "status": "SUPPORTED"
+  },
+  "P1": {
+    "definition": "Two-stage model (EL first, then mechanism effects) vs constant baseline",
+    "cv_two_stage": {
+      "n_stage1": 256,
+      "n_stage2": 342,
+      "b1_el": -0.08465971930043258,
+      "rmse_const": 4.5254316398707255,
+      "rmse_lin": 3.6724274114925834,
+      "nll_const": 2.927426715328338,
+      "nll_lin": 2.718733953951605
+    },
+    "cv_one_shot_reference": {
+      "n": 342,
+      "rmse_const": 4.592429606476808,
+      "rmse_lin": 3.997322602808709,
+      "nll_const": 2.942056132523816,
+      "nll_lin": 2.8037279600459164
+    },
+    "status": "SUPPORTED"
+  },
+  "P2": {
+    "definition": "Stage-1 EL coefficient sign stability under subsampling",
+    "subset": [
+      "A3",
+      "A4",
+      "B1",
+      "B2",
+      "B3"
+    ],
+    "stability": {
+      "n": 256,
+      "base_sign": -1.0,
+      "sign_keep_rate": 0.93
+    },
+    "status": "SUPPORTED"
+  }
+}

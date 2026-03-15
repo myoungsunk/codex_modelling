@@ -1,0 +1,162 @@
+{
+  "M1": {
+    "definition": "C0 floor distance/yaw sensitivity",
+    "n": 125,
+    "trend": {
+      "slope": 0.023238995337509685,
+      "intercept": 25.029897963477662,
+      "r": 0.012076647160113689,
+      "p": 0.893663984013666,
+      "n": 125
+    },
+    "variance_decomp": {
+      "n": 125,
+      "distance_group_var": 0.006061532906614555,
+      "yaw_group_var": 0.0163228124392014,
+      "dominant": "yaw"
+    },
+    "status": "SUPPORTED"
+  },
+  "M2": {
+    "definition": "Fraction inside/outside floor uncertainty band",
+    "inside_ratio": 0.23333333333333334,
+    "outside_ratio": 0.7666666666666667,
+    "status": "SUPPORTED"
+  },
+  "G1": {
+    "definition": "A2 odd-bounce increases cross dominance vs C0",
+    "delta_median_db": -33.05244952454008,
+    "ks_wasserstein": {
+      "ks_stat": 1.0,
+      "ks_p": 1.8166333859430377e-07,
+      "wasserstein": 33.0395613384995
+    },
+    "status": "SUPPORTED"
+  },
+  "G2": {
+    "definition": "A6 near-normal parity benchmark as primary G2 evidence; A3 kept as mechanism-only supplementary evidence.",
+    "primary_source": "A6_near_normal_benchmark",
+    "primary_status": "PASS",
+    "A6_hit_rate_odd": 1.0,
+    "A6_hit_rate_even": 1.0,
+    "A6_n_eval_total": 20,
+    "A3_delta_median_db_supplementary": 9.833970437966855e-08,
+    "A3_ks_wasserstein_supplementary": {
+      "ks_stat": 0.5,
+      "ks_p": 0.4043956043956044,
+      "wasserstein": 2.453719645612548
+    },
+    "status": "SUPPORTED"
+  },
+  "L1": {
+    "definition": "Early/Late leakage separation via XPD_early_ex/XPD_late_ex/L_pol",
+    "median_early_ex_db": -30.1844505229891,
+    "median_late_ex_db": -25.052449766174778,
+    "median_lpol_db": -2.5858863412201147,
+    "status": "SUPPORTED"
+  },
+  "L2": {
+    "definition": "A5 stress impact on center/tails (response-mode requires geometric path perturbation)",
+    "base": {
+      "n": 30,
+      "mean": -25.609360941114023,
+      "std": 0.2542914826869116,
+      "p5": -25.92423979358817,
+      "p10": -25.90388533142512,
+      "p90": -25.370670243500307,
+      "p95": -25.104062041441587
+    },
+    "stress": {
+      "n": 30,
+      "mean": -25.076730637607827,
+      "std": 1.0344917954738737,
+      "p5": -27.106139150933817,
+      "p10": -26.51349305015846,
+      "p90": -23.899005997481847,
+      "p95": -23.792885031375356
+    },
+    "delta_mean_db": 0.5326303035061954,
+    "var_ratio": 4.0681338774824765,
+    "stress_semantics": {
+      "n_a5_rows": 60,
+      "n_stress_rows": 30,
+      "n_response": 30,
+      "n_polarization_only": 0,
+      "n_off": 0,
+      "n_unknown": 0,
+      "dominant_semantics": "response",
+      "contamination_response_ready": true
+    },
+    "status": "SUPPORTED"
+  },
+  "L3": {
+    "definition": "Correlation between leakage excess and -EL_proxy",
+    "spearman": {
+      "rho": 0.10855882195145593,
+      "p": 0.0765972826747108,
+      "ci_lo": -0.04262265787366852,
+      "ci_hi": 0.2547695898983334,
+      "n": 267
+    },
+    "status": "PARTIAL"
+  },
+  "R1": {
+    "definition": "Coverage-aware room-space leverage map (LOS/NLOS + heatmap; viable strata only, not universal)",
+    "n_b_rows": 175,
+    "n_los": 50,
+    "n_nlos": 125,
+    "ks_wasserstein": {
+      "ks_stat": 0.428,
+      "ks_p": 2.269659137267517e-06,
+      "wasserstein": 2.5451701733415533
+    },
+    "status": "SUPPORTED"
+  },
+  "R2": {
+    "definition": "Coverage-aware DS/early relation leverage map (B1/B2/B3 viable strata subset)",
+    "spearman_ds_vs_xpd": {
+      "rho": -0.49923813719879734,
+      "p": 9.694465810869308e-19,
+      "ci_lo": -0.5784239594783026,
+      "ci_hi": -0.4055061940574268,
+      "n": 275
+    },
+    "status": "SUPPORTED"
+  },
+  "P1": {
+    "definition": "Two-stage model (EL first, then mechanism effects) vs constant baseline",
+    "cv_two_stage": {
+      "n_stage1": 204,
+      "n_stage2": 267,
+      "b1_el": 0.4599038808519886,
+      "rmse_const": 4.719356435427606,
+      "rmse_lin": 3.6480299358899955,
+      "nll_const": 2.96891847730238,
+      "nll_lin": 2.7047228302112956
+    },
+    "cv_one_shot_reference": {
+      "n": 267,
+      "rmse_const": 3.7166648895842966,
+      "rmse_lin": 3.2339094045994004,
+      "nll_const": 2.7262519136716983,
+      "nll_lin": 2.586378389635617
+    },
+    "status": "SUPPORTED"
+  },
+  "P2": {
+    "definition": "Stage-1 EL coefficient sign stability under subsampling",
+    "subset": [
+      "A3",
+      "A4",
+      "B1",
+      "B2",
+      "B3"
+    ],
+    "stability": {
+      "n": 204,
+      "base_sign": 1.0,
+      "sign_keep_rate": 1.0
+    },
+    "status": "SUPPORTED"
+  }
+}

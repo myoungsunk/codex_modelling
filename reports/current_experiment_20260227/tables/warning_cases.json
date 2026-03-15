@@ -1,0 +1,2995 @@
+[
+  {
+    "severity": "FAIL",
+    "scenario_id": "A3",
+    "case_id": "12",
+    "case_label": "A3_12",
+    "link_id": "A3_12",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A3__12__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target bounce n=2 missing in top-0 rays",
+      "missing/NaN in key metrics"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": true,
+      "target_tau_outside_early": false,
+      "effect_within_floor_uncert": false,
+      "metric_missing": true
+    },
+    "XPD_early_excess_db": -24.934837698993658,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": 0.0,
+    "EL_proxy_db": NaN,
+    "LOSflag": 0.0,
+    "top_rays": []
+  },
+  {
+    "severity": "FAIL",
+    "scenario_id": "A3",
+    "case_id": "13",
+    "case_label": "A3_13",
+    "link_id": "A3_13",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A3__13__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target bounce n=2 missing in top-0 rays",
+      "missing/NaN in key metrics"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": true,
+      "target_tau_outside_early": false,
+      "effect_within_floor_uncert": false,
+      "metric_missing": true
+    },
+    "XPD_early_excess_db": -24.934837698993658,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": 0.0,
+    "EL_proxy_db": NaN,
+    "LOSflag": 0.0,
+    "top_rays": []
+  },
+  {
+    "severity": "FAIL",
+    "scenario_id": "A3",
+    "case_id": "14",
+    "case_label": "A3_14",
+    "link_id": "A3_14",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A3__14__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target bounce n=2 missing in top-0 rays",
+      "missing/NaN in key metrics"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": true,
+      "target_tau_outside_early": false,
+      "effect_within_floor_uncert": false,
+      "metric_missing": true
+    },
+    "XPD_early_excess_db": -24.934837698993658,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": 0.0,
+    "EL_proxy_db": NaN,
+    "LOSflag": 0.0,
+    "top_rays": []
+  },
+  {
+    "severity": "FAIL",
+    "scenario_id": "A3",
+    "case_id": "15",
+    "case_label": "A3_15",
+    "link_id": "A3_15",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A3__15__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target bounce n=2 missing in top-0 rays",
+      "missing/NaN in key metrics"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": true,
+      "target_tau_outside_early": false,
+      "effect_within_floor_uncert": false,
+      "metric_missing": true
+    },
+    "XPD_early_excess_db": -24.934837698993658,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": 0.0,
+    "EL_proxy_db": NaN,
+    "LOSflag": 0.0,
+    "top_rays": []
+  },
+  {
+    "severity": "FAIL",
+    "scenario_id": "A3",
+    "case_id": "16",
+    "case_label": "A3_16",
+    "link_id": "A3_16",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A3__16__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target bounce n=2 missing in top-1 rays"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": true,
+      "target_tau_outside_early": false,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -32.93483746859778,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": -7.99999976960412,
+    "EL_proxy_db": 2.7199659283313338,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 1.1594746402000892e-07,
+        "tau_ns": 21.358523427006453,
+        "los_flag_ray": 0,
+        "material_class": "2"
+      }
+    ]
+  },
+  {
+    "severity": "FAIL",
+    "scenario_id": "A3",
+    "case_id": "17",
+    "case_label": "A3_17",
+    "link_id": "A3_17",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A3__17__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target bounce n=2 missing in top-1 rays"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": true,
+      "target_tau_outside_early": false,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -32.93483746859778,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": -7.99999976960412,
+    "EL_proxy_db": 2.7199659283313338,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 1.1594746402000892e-07,
+        "tau_ns": 21.358523427006453,
+        "los_flag_ray": 0,
+        "material_class": "2"
+      }
+    ]
+  },
+  {
+    "severity": "FAIL",
+    "scenario_id": "A3",
+    "case_id": "2",
+    "case_label": "A3_2",
+    "link_id": "A3_2",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A3__2__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target bounce n=2 missing in top-0 rays",
+      "missing/NaN in key metrics"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": true,
+      "target_tau_outside_early": false,
+      "effect_within_floor_uncert": false,
+      "metric_missing": true
+    },
+    "XPD_early_excess_db": -24.934837698993658,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": 0.0,
+    "EL_proxy_db": NaN,
+    "LOSflag": 0.0,
+    "top_rays": []
+  },
+  {
+    "severity": "FAIL",
+    "scenario_id": "A3",
+    "case_id": "3",
+    "case_label": "A3_3",
+    "link_id": "A3_3",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A3__3__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target bounce n=2 missing in top-0 rays",
+      "missing/NaN in key metrics"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": true,
+      "target_tau_outside_early": false,
+      "effect_within_floor_uncert": false,
+      "metric_missing": true
+    },
+    "XPD_early_excess_db": -24.934837698993658,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": 0.0,
+    "EL_proxy_db": NaN,
+    "LOSflag": 0.0,
+    "top_rays": []
+  },
+  {
+    "severity": "FAIL",
+    "scenario_id": "A3",
+    "case_id": "4",
+    "case_label": "A3_4",
+    "link_id": "A3_4",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A3__4__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target bounce n=2 missing in top-0 rays",
+      "missing/NaN in key metrics"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": true,
+      "target_tau_outside_early": false,
+      "effect_within_floor_uncert": false,
+      "metric_missing": true
+    },
+    "XPD_early_excess_db": -24.934837698993658,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": 0.0,
+    "EL_proxy_db": NaN,
+    "LOSflag": 0.0,
+    "top_rays": []
+  },
+  {
+    "severity": "FAIL",
+    "scenario_id": "A3",
+    "case_id": "5",
+    "case_label": "A3_5",
+    "link_id": "A3_5",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A3__5__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target bounce n=2 missing in top-0 rays",
+      "missing/NaN in key metrics"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": true,
+      "target_tau_outside_early": false,
+      "effect_within_floor_uncert": false,
+      "metric_missing": true
+    },
+    "XPD_early_excess_db": -24.934837698993658,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": 0.0,
+    "EL_proxy_db": NaN,
+    "LOSflag": 0.0,
+    "top_rays": []
+  },
+  {
+    "severity": "FAIL",
+    "scenario_id": "A3",
+    "case_id": "6",
+    "case_label": "A3_6",
+    "link_id": "A3_6",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A3__6__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target bounce n=2 missing in top-0 rays",
+      "missing/NaN in key metrics"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": true,
+      "target_tau_outside_early": false,
+      "effect_within_floor_uncert": false,
+      "metric_missing": true
+    },
+    "XPD_early_excess_db": -24.934837698993658,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": 0.0,
+    "EL_proxy_db": NaN,
+    "LOSflag": 0.0,
+    "top_rays": []
+  },
+  {
+    "severity": "FAIL",
+    "scenario_id": "A3",
+    "case_id": "7",
+    "case_label": "A3_7",
+    "link_id": "A3_7",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A3__7__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target bounce n=2 missing in top-0 rays",
+      "missing/NaN in key metrics"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": true,
+      "target_tau_outside_early": false,
+      "effect_within_floor_uncert": false,
+      "metric_missing": true
+    },
+    "XPD_early_excess_db": -24.934837698993658,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": 0.0,
+    "EL_proxy_db": NaN,
+    "LOSflag": 0.0,
+    "top_rays": []
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A2",
+    "case_id": "0",
+    "case_label": "A2_0",
+    "link_id": "A2_0",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A2__0__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target tau 16.678ns >= Te 10.000ns"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -31.27019969964964,
+    "XPD_late_excess_db": -23.270199840134936,
+    "L_pol_db": -7.9999998595147055,
+    "EL_proxy_db": 2.7199659283313338,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 1.9015384099281446e-07,
+        "tau_ns": 16.6782047599076,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A2",
+    "case_id": "1",
+    "case_label": "A2_1",
+    "link_id": "A2_1",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A2__1__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target tau 16.678ns >= Te 10.000ns"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -31.27019969964964,
+    "XPD_late_excess_db": -23.270199840134936,
+    "L_pol_db": -7.9999998595147055,
+    "EL_proxy_db": 2.7199659283313338,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 1.9015384099281446e-07,
+        "tau_ns": 16.6782047599076,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A2",
+    "case_id": "10",
+    "case_label": "A2_10",
+    "link_id": "A2_10",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A2__10__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target tau 22.376ns >= Te 10.000ns"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -31.27019958726141,
+    "XPD_late_excess_db": -23.270199840134936,
+    "L_pol_db": -7.999999747126473,
+    "EL_proxy_db": 2.7199659283313338,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 1.0564102277378595e-07,
+        "tau_ns": 22.376159751488377,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A2",
+    "case_id": "11",
+    "case_label": "A2_11",
+    "link_id": "A2_11",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A2__11__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target tau 22.376ns >= Te 10.000ns"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -31.27019958726141,
+    "XPD_late_excess_db": -23.270199840134936,
+    "L_pol_db": -7.999999747126473,
+    "EL_proxy_db": 2.7199659283313338,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 1.0564102277378595e-07,
+        "tau_ns": 22.376159751488377,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A2",
+    "case_id": "12",
+    "case_label": "A2_12",
+    "link_id": "A2_12",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A2__12__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target tau 24.054ns >= Te 10.000ns"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -31.27019954792553,
+    "XPD_late_excess_db": -23.270199840134936,
+    "L_pol_db": -7.999999707790595,
+    "EL_proxy_db": 2.719965928331348,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 9.142011586193009e-08,
+        "tau_ns": 24.053648977813772,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A2",
+    "case_id": "13",
+    "case_label": "A2_13",
+    "link_id": "A2_13",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A2__13__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target tau 24.054ns >= Te 10.000ns"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -31.27019954792553,
+    "XPD_late_excess_db": -23.270199840134936,
+    "L_pol_db": -7.999999707790595,
+    "EL_proxy_db": 2.719965928331348,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 9.142011586193009e-08,
+        "tau_ns": 24.053648977813772,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A2",
+    "case_id": "14",
+    "case_label": "A2_14",
+    "link_id": "A2_14",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A2__14__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target tau 24.054ns >= Te 10.000ns"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -31.27019954792553,
+    "XPD_late_excess_db": -23.270199840134936,
+    "L_pol_db": -7.999999707790595,
+    "EL_proxy_db": 2.719965928331348,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 9.142011586193009e-08,
+        "tau_ns": 24.053648977813772,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A2",
+    "case_id": "15",
+    "case_label": "A2_15",
+    "link_id": "A2_15",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A2__15__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target tau 26.052ns >= Te 10.000ns"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -31.27019949735083,
+    "XPD_late_excess_db": -23.270199840134936,
+    "L_pol_db": -7.999999657215893,
+    "EL_proxy_db": 2.719965928331348,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 7.793190204623549e-08,
+        "tau_ns": 26.052188664154635,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A2",
+    "case_id": "16",
+    "case_label": "A2_16",
+    "link_id": "A2_16",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A2__16__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target tau 26.052ns >= Te 10.000ns"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -31.27019949735083,
+    "XPD_late_excess_db": -23.270199840134936,
+    "L_pol_db": -7.999999657215893,
+    "EL_proxy_db": 2.719965928331348,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 7.793190204623549e-08,
+        "tau_ns": 26.052188664154635,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A2",
+    "case_id": "17",
+    "case_label": "A2_17",
+    "link_id": "A2_17",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A2__17__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target tau 26.052ns >= Te 10.000ns"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -31.27019949735083,
+    "XPD_late_excess_db": -23.270199840134936,
+    "L_pol_db": -7.999999657215893,
+    "EL_proxy_db": 2.719965928331348,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 7.793190204623549e-08,
+        "tau_ns": 26.052188664154635,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A2",
+    "case_id": "18",
+    "case_label": "A2_18",
+    "link_id": "A2_18",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A2__18__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target tau 28.500ns >= Te 10.000ns"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -31.270199429917895,
+    "XPD_late_excess_db": -23.270199840134936,
+    "L_pol_db": -7.999999589782957,
+    "EL_proxy_db": 2.719965928331348,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 6.51211784221968e-08,
+        "tau_ns": 28.499728786764642,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A2",
+    "case_id": "19",
+    "case_label": "A2_19",
+    "link_id": "A2_19",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A2__19__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target tau 28.500ns >= Te 10.000ns"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -31.270199429917895,
+    "XPD_late_excess_db": -23.270199840134936,
+    "L_pol_db": -7.999999589782957,
+    "EL_proxy_db": 2.719965928331348,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 6.51211784221968e-08,
+        "tau_ns": 28.499728786764642,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A2",
+    "case_id": "2",
+    "case_label": "A2_2",
+    "link_id": "A2_2",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A2__2__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target tau 16.678ns >= Te 10.000ns"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -31.27019969964964,
+    "XPD_late_excess_db": -23.270199840134936,
+    "L_pol_db": -7.9999998595147055,
+    "EL_proxy_db": 2.7199659283313338,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 1.9015384099281446e-07,
+        "tau_ns": 16.6782047599076,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A2",
+    "case_id": "20",
+    "case_label": "A2_20",
+    "link_id": "A2_20",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A2__20__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target tau 28.500ns >= Te 10.000ns"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -31.270199429917895,
+    "XPD_late_excess_db": -23.270199840134936,
+    "L_pol_db": -7.999999589782957,
+    "EL_proxy_db": 2.719965928331348,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 6.51211784221968e-08,
+        "tau_ns": 28.499728786764642,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A2",
+    "case_id": "21",
+    "case_label": "A2_21",
+    "link_id": "A2_21",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A2__21__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target tau 29.835ns >= Te 10.000ns"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -31.270199390582015,
+    "XPD_late_excess_db": -23.270199840134936,
+    "L_pol_db": -7.99999955044708,
+    "EL_proxy_db": 2.7199659283313338,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 5.94230753102546e-08,
+        "tau_ns": 29.83487966865117,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A2",
+    "case_id": "22",
+    "case_label": "A2_22",
+    "link_id": "A2_22",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A2__22__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target tau 29.835ns >= Te 10.000ns"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -31.270199390582015,
+    "XPD_late_excess_db": -23.270199840134936,
+    "L_pol_db": -7.99999955044708,
+    "EL_proxy_db": 2.7199659283313338,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 5.94230753102546e-08,
+        "tau_ns": 29.83487966865117,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A2",
+    "case_id": "23",
+    "case_label": "A2_23",
+    "link_id": "A2_23",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A2__23__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target tau 29.835ns >= Te 10.000ns"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -31.270199390582015,
+    "XPD_late_excess_db": -23.270199840134936,
+    "L_pol_db": -7.99999955044708,
+    "EL_proxy_db": 2.7199659283313338,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 5.94230753102546e-08,
+        "tau_ns": 29.83487966865117,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A2",
+    "case_id": "24",
+    "case_label": "A2_24",
+    "link_id": "A2_24",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A2__24__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target tau 31.468ns >= Te 10.000ns"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -31.270199340007316,
+    "XPD_late_excess_db": -23.270199840134936,
+    "L_pol_db": -7.99999949987238,
+    "EL_proxy_db": 2.7199659283313338,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 5.341400027888052e-08,
+        "tau_ns": 31.468373804308992,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A2",
+    "case_id": "25",
+    "case_label": "A2_25",
+    "link_id": "A2_25",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A2__25__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target tau 31.468ns >= Te 10.000ns"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -31.270199340007316,
+    "XPD_late_excess_db": -23.270199840134936,
+    "L_pol_db": -7.99999949987238,
+    "EL_proxy_db": 2.7199659283313338,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 5.341400027888052e-08,
+        "tau_ns": 31.468373804308992,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A2",
+    "case_id": "26",
+    "case_label": "A2_26",
+    "link_id": "A2_26",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A2__26__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target tau 31.468ns >= Te 10.000ns"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -31.270199340007316,
+    "XPD_late_excess_db": -23.270199840134936,
+    "L_pol_db": -7.99999949987238,
+    "EL_proxy_db": 2.7199659283313338,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 5.341400027888052e-08,
+        "tau_ns": 31.468373804308992,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A2",
+    "case_id": "3",
+    "case_label": "A2_3",
+    "link_id": "A2_3",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A2__3__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target tau 18.869ns >= Te 10.000ns"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -31.27019966031376,
+    "XPD_late_excess_db": -23.270199840134936,
+    "L_pol_db": -7.999999820178825,
+    "EL_proxy_db": 2.7199659283313338,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 1.4855768827563644e-07,
+        "tau_ns": 18.869234693997473,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A2",
+    "case_id": "4",
+    "case_label": "A2_4",
+    "link_id": "A2_4",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A2__4__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target tau 18.869ns >= Te 10.000ns"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -31.27019966031376,
+    "XPD_late_excess_db": -23.270199840134936,
+    "L_pol_db": -7.999999820178825,
+    "EL_proxy_db": 2.7199659283313338,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 1.4855768827563644e-07,
+        "tau_ns": 18.869234693997473,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A2",
+    "case_id": "5",
+    "case_label": "A2_5",
+    "link_id": "A2_5",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A2__5__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target tau 18.869ns >= Te 10.000ns"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -31.27019966031376,
+    "XPD_late_excess_db": -23.270199840134936,
+    "L_pol_db": -7.999999820178825,
+    "EL_proxy_db": 2.7199659283313338,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 1.4855768827563644e-07,
+        "tau_ns": 18.869234693997473,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A2",
+    "case_id": "6",
+    "case_label": "A2_6",
+    "link_id": "A2_6",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A2__6__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target tau 21.359ns >= Te 10.000ns"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -31.27019960973906,
+    "XPD_late_excess_db": -23.270199840134936,
+    "L_pol_db": -7.999999769604122,
+    "EL_proxy_db": 2.7199659283313338,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 1.1594746402000896e-07,
+        "tau_ns": 21.358523427006453,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A2",
+    "case_id": "7",
+    "case_label": "A2_7",
+    "link_id": "A2_7",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A2__7__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target tau 21.359ns >= Te 10.000ns"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -31.27019960973906,
+    "XPD_late_excess_db": -23.270199840134936,
+    "L_pol_db": -7.999999769604122,
+    "EL_proxy_db": 2.7199659283313338,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 1.1594746402000896e-07,
+        "tau_ns": 21.358523427006453,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A2",
+    "case_id": "8",
+    "case_label": "A2_8",
+    "link_id": "A2_8",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A2__8__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target tau 21.359ns >= Te 10.000ns"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -31.27019960973906,
+    "XPD_late_excess_db": -23.270199840134936,
+    "L_pol_db": -7.999999769604122,
+    "EL_proxy_db": 2.7199659283313338,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 1.1594746402000896e-07,
+        "tau_ns": 21.358523427006453,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A2",
+    "case_id": "9",
+    "case_label": "A2_9",
+    "link_id": "A2_9",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A2__9__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target tau 22.376ns >= Te 10.000ns"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -31.27019958726141,
+    "XPD_late_excess_db": -23.270199840134936,
+    "L_pol_db": -7.999999747126473,
+    "EL_proxy_db": 2.7199659283313338,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 1.0564102277378595e-07,
+        "tau_ns": 22.376159751488377,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A3",
+    "case_id": "0",
+    "case_label": "A3_0",
+    "link_id": "A3_0",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A3__0__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target tau 24.054ns >= Te 10.000ns"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -16.93483799120306,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": 7.999999707790596,
+    "EL_proxy_db": 2.719965928331348,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 2,
+        "P_lin": 9.142011586193009e-08,
+        "tau_ns": 24.053648977813772,
+        "los_flag_ray": 0,
+        "material_class": "2|1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A3",
+    "case_id": "1",
+    "case_label": "A3_1",
+    "link_id": "A3_1",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A3__1__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target tau 24.054ns >= Te 10.000ns"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -16.93483799120306,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": 7.999999707790596,
+    "EL_proxy_db": 2.719965928331348,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 2,
+        "P_lin": 9.142011586193009e-08,
+        "tau_ns": 24.053648977813772,
+        "los_flag_ray": 0,
+        "material_class": "2|1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A3",
+    "case_id": "10",
+    "case_label": "A3_10",
+    "link_id": "A3_10",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A3__10__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target tau 25.825ns >= Te 10.000ns"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -16.934838035821187,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": 7.999999663172471,
+    "EL_proxy_db": 2.719965928331348,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 2,
+        "P_lin": 7.931007715749694e-08,
+        "tau_ns": 25.824841598711476,
+        "los_flag_ray": 0,
+        "material_class": "2|1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A3",
+    "case_id": "11",
+    "case_label": "A3_11",
+    "link_id": "A3_11",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A3__11__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target tau 25.825ns >= Te 10.000ns"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -16.934838035821187,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": 7.999999663172471,
+    "EL_proxy_db": 2.719965928331348,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 2,
+        "P_lin": 7.931007715749694e-08,
+        "tau_ns": 25.824841598711476,
+        "los_flag_ray": 0,
+        "material_class": "2|1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A3",
+    "case_id": "18",
+    "case_label": "A3_18",
+    "link_id": "A3_18",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A3__18__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target tau 24.449ns >= Te 10.000ns"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -27.89993968946396,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": -2.965101990470301,
+    "EL_proxy_db": -1.6794308150390407,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 1.1737891419309543e-07,
+        "tau_ns": 21.227889030747157,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      },
+      {
+        "rank": 2,
+        "ray_index": 1,
+        "n_bounce": 1,
+        "P_lin": 1.1737891419309543e-07,
+        "tau_ns": 21.227889030747157,
+        "los_flag_ray": 0,
+        "material_class": "2"
+      },
+      {
+        "rank": 3,
+        "ray_index": 2,
+        "n_bounce": 2,
+        "P_lin": 8.848564300710285e-08,
+        "tau_ns": 24.449244688309,
+        "los_flag_ray": 0,
+        "material_class": "2|1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A3",
+    "case_id": "19",
+    "case_label": "A3_19",
+    "link_id": "A3_19",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A3__19__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target tau 24.449ns >= Te 10.000ns"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -27.89993968946396,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": -2.965101990470301,
+    "EL_proxy_db": -1.6794308150390407,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 1.1737891419309543e-07,
+        "tau_ns": 21.227889030747157,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      },
+      {
+        "rank": 2,
+        "ray_index": 1,
+        "n_bounce": 1,
+        "P_lin": 1.1737891419309543e-07,
+        "tau_ns": 21.227889030747157,
+        "los_flag_ray": 0,
+        "material_class": "2"
+      },
+      {
+        "rank": 3,
+        "ray_index": 2,
+        "n_bounce": 2,
+        "P_lin": 8.848564300710285e-08,
+        "tau_ns": 24.449244688309,
+        "los_flag_ray": 0,
+        "material_class": "2|1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A3",
+    "case_id": "20",
+    "case_label": "A3_20",
+    "link_id": "A3_20",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A3__20__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target tau 27.797ns >= Te 10.000ns"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -16.93483808923057,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": 7.999999609763087,
+    "EL_proxy_db": 2.7199659283313338,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 2,
+        "P_lin": 6.845538275741332e-08,
+        "tau_ns": 27.797007933179334,
+        "los_flag_ray": 0,
+        "material_class": "2|1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A3",
+    "case_id": "21",
+    "case_label": "A3_21",
+    "link_id": "A3_21",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A3__21__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target tau 27.797ns >= Te 10.000ns"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -16.93483808923057,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": 7.999999609763087,
+    "EL_proxy_db": 2.7199659283313338,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 2,
+        "P_lin": 6.845538275741332e-08,
+        "tau_ns": 27.797007933179334,
+        "los_flag_ray": 0,
+        "material_class": "2|1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A3",
+    "case_id": "22",
+    "case_label": "A3_22",
+    "link_id": "A3_22",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A3__22__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target tau 22.795ns >= Te 10.000ns"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -16.93483796141445,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": 7.99999973757921,
+    "EL_proxy_db": 2.719965928331348,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 2,
+        "P_lin": 1.0179764239755173e-07,
+        "tau_ns": 22.794653377602373,
+        "los_flag_ray": 0,
+        "material_class": "1|2"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A3",
+    "case_id": "23",
+    "case_label": "A3_23",
+    "link_id": "A3_23",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A3__23__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target tau 22.795ns >= Te 10.000ns"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -16.93483796141445,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": 7.99999973757921,
+    "EL_proxy_db": 2.719965928331348,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 2,
+        "P_lin": 1.0179764239755173e-07,
+        "tau_ns": 22.794653377602373,
+        "los_flag_ray": 0,
+        "material_class": "1|2"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A3",
+    "case_id": "8",
+    "case_label": "A3_8",
+    "link_id": "A3_8",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A3__8__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target tau 22.238ns >= Te 10.000ns"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -28.028420131088424,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": -3.0935824320947676,
+    "EL_proxy_db": -1.625723112010654,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 1.4855768827563644e-07,
+        "tau_ns": 18.869234693997473,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      },
+      {
+        "rank": 2,
+        "ray_index": 1,
+        "n_bounce": 1,
+        "P_lin": 1.4855768827563644e-07,
+        "tau_ns": 18.869234693997473,
+        "los_flag_ray": 0,
+        "material_class": "2"
+      },
+      {
+        "rank": 3,
+        "ray_index": 2,
+        "n_bounce": 2,
+        "P_lin": 1.069615355584582e-07,
+        "tau_ns": 22.237606346543473,
+        "los_flag_ray": 0,
+        "material_class": "2|1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A3",
+    "case_id": "9",
+    "case_label": "A3_9",
+    "link_id": "A3_9",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A3__9__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout",
+      "target tau 22.238ns >= Te 10.000ns"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": true,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -28.028420131088424,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": -3.0935824320947676,
+    "EL_proxy_db": -1.625723112010654,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 1.4855768827563644e-07,
+        "tau_ns": 18.869234693997473,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      },
+      {
+        "rank": 2,
+        "ray_index": 1,
+        "n_bounce": 1,
+        "P_lin": 1.4855768827563644e-07,
+        "tau_ns": 18.869234693997473,
+        "los_flag_ray": 0,
+        "material_class": "2"
+      },
+      {
+        "rank": 3,
+        "ray_index": 2,
+        "n_bounce": 2,
+        "P_lin": 1.069615355584582e-07,
+        "tau_ns": 22.237606346543473,
+        "los_flag_ray": 0,
+        "material_class": "2|1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A4",
+    "case_id": "0",
+    "case_label": "A4_0",
+    "link_id": "A4_0",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A4__0__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": false,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -34.856634631604614,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": -9.921796932610956,
+    "EL_proxy_db": 8.34334409270864,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 1.302288767076592e-07,
+        "tau_ns": 10.54822286479395,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A4",
+    "case_id": "1",
+    "case_label": "A4_1",
+    "link_id": "A4_1",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A4__1__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": false,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -34.8050676186343,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": -9.870229919640636,
+    "EL_proxy_db": 8.34334409270864,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 1.302288767076592e-07,
+        "tau_ns": 10.54822286479395,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A4",
+    "case_id": "10",
+    "case_label": "A4_10",
+    "link_id": "A4_10",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A4__10__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": false,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -34.706831202786475,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": -9.771993503792821,
+    "EL_proxy_db": 8.343344092708648,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 1.4469875189739913e-08,
+        "tau_ns": 31.64466859438184,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A4",
+    "case_id": "11",
+    "case_label": "A4_11",
+    "link_id": "A4_11",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A4__11__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": false,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -34.839751201700814,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": -9.904913502707155,
+    "EL_proxy_db": 8.343344092708648,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 1.4469875189739913e-08,
+        "tau_ns": 31.64466859438184,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A4",
+    "case_id": "12",
+    "case_label": "A4_12",
+    "link_id": "A4_12",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A4__12__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": false,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -33.09993358520872,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": -8.16509588621506,
+    "EL_proxy_db": 9.960320052165471,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 2.639555399983994e-08,
+        "tau_ns": 19.449961929480228,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A4",
+    "case_id": "13",
+    "case_label": "A4_13",
+    "link_id": "A4_13",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A4__13__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": false,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -33.52118129519224,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": -8.586343596198585,
+    "EL_proxy_db": 9.960320052165471,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 2.639555399983994e-08,
+        "tau_ns": 19.449961929480228,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A4",
+    "case_id": "14",
+    "case_label": "A4_14",
+    "link_id": "A4_14",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A4__14__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": false,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -33.896779710521,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": -8.961942011527345,
+    "EL_proxy_db": 9.823548343520798,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 1.5182980507508497e-08,
+        "tau_ns": 26.052188664154635,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A4",
+    "case_id": "15",
+    "case_label": "A4_15",
+    "link_id": "A4_15",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A4__15__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": false,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -33.999508374270945,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": -9.064670675277286,
+    "EL_proxy_db": 9.823548343520798,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 1.5182980507508497e-08,
+        "tau_ns": 26.052188664154635,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A4",
+    "case_id": "16",
+    "case_label": "A4_16",
+    "link_id": "A4_16",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A4__16__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": false,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -34.37195931756217,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": -9.437121618568515,
+    "EL_proxy_db": 9.412818035341374,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 9.604041655042392e-09,
+        "tau_ns": 34.34252552473151,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A4",
+    "case_id": "17",
+    "case_label": "A4_17",
+    "link_id": "A4_17",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A4__17__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": false,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -34.41755104040176,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": -9.482713341408104,
+    "EL_proxy_db": 9.412818035341374,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 9.604041655042392e-09,
+        "tau_ns": 34.34252552473151,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A4",
+    "case_id": "18",
+    "case_label": "A4_18",
+    "link_id": "A4_18",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A4__18__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": false,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -33.414606935438165,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": -8.479769236444506,
+    "EL_proxy_db": 9.950421756523127,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 1.5508562143135687e-08,
+        "tau_ns": 25.40348465291915,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A4",
+    "case_id": "19",
+    "case_label": "A4_19",
+    "link_id": "A4_19",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A4__19__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": false,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -33.540783442742665,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": -8.605945743749011,
+    "EL_proxy_db": 9.950421756523127,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 1.5508562143135687e-08,
+        "tau_ns": 25.40348465291915,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A4",
+    "case_id": "2",
+    "case_label": "A4_2",
+    "link_id": "A4_2",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A4__2__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": false,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -35.28636913175137,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": -10.351531432757714,
+    "EL_proxy_db": 6.422752621717265,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 5.4772771603573384e-08,
+        "tau_ns": 20.289911797241476,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A4",
+    "case_id": "20",
+    "case_label": "A4_20",
+    "link_id": "A4_20",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A4__20__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": false,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -33.82896837507076,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": -8.894130676077097,
+    "EL_proxy_db": 9.939936992626059,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 1.0607891740181339e-08,
+        "tau_ns": 30.753090050360395,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A4",
+    "case_id": "21",
+    "case_label": "A4_21",
+    "link_id": "A4_21",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A4__21__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": false,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -34.12796777205699,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": -9.193130073063331,
+    "EL_proxy_db": 9.939936992626059,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 1.0607891740181339e-08,
+        "tau_ns": 30.753090050360395,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A4",
+    "case_id": "22",
+    "case_label": "A4_22",
+    "link_id": "A4_22",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A4__22__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": false,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -34.07218179542453,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": -9.137344096430866,
+    "EL_proxy_db": 9.778752881830613,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 7.1981859796885866e-09,
+        "tau_ns": 38.03215840403624,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A4",
+    "case_id": "23",
+    "case_label": "A4_23",
+    "link_id": "A4_23",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A4__23__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": false,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -34.2755225036681,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": -9.340684804674442,
+    "EL_proxy_db": 9.778752881830613,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 7.1981859796885866e-09,
+        "tau_ns": 38.03215840403624,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A4",
+    "case_id": "24",
+    "case_label": "A4_24",
+    "link_id": "A4_24",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A4__24__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": false,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -26.95765670912529,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": -2.0228190101316317,
+    "EL_proxy_db": 10.16088375251713,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 8.56945748671249e-08,
+        "tau_ns": 10.54822286479395,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A4",
+    "case_id": "25",
+    "case_label": "A4_25",
+    "link_id": "A4_25",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A4__25__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": false,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -26.795765136509715,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": -1.8609274375160578,
+    "EL_proxy_db": 10.16088375251713,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 8.56945748671249e-08,
+        "tau_ns": 10.54822286479395,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A4",
+    "case_id": "26",
+    "case_label": "A4_26",
+    "link_id": "A4_26",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A4__26__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": false,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -26.999211783058158,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": -2.064374084064501,
+    "EL_proxy_db": 6.768543836278312,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 5.058078860350406e-08,
+        "tau_ns": 20.289911797241476,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A4",
+    "case_id": "27",
+    "case_label": "A4_27",
+    "link_id": "A4_27",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A4__27__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": false,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -26.963566559246086,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": -2.02872886025243,
+    "EL_proxy_db": 6.768543836278312,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 5.058078860350406e-08,
+        "tau_ns": 20.289911797241476,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A4",
+    "case_id": "28",
+    "case_label": "A4_28",
+    "link_id": "A4_28",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A4__28__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": false,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -27.188536165277362,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": -2.2536984662837036,
+    "EL_proxy_db": 5.485015418672418,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 3.067088513877363e-08,
+        "tau_ns": 30.205513502736004,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A4",
+    "case_id": "29",
+    "case_label": "A4_29",
+    "link_id": "A4_29",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A4__29__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": false,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -27.3241203449697,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": -2.389282645976044,
+    "EL_proxy_db": 5.485015418672418,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 3.067088513877363e-08,
+        "tau_ns": 30.205513502736004,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A4",
+    "case_id": "3",
+    "case_label": "A4_3",
+    "link_id": "A4_3",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A4__3__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": false,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -35.179264646219536,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": -10.244426947225877,
+    "EL_proxy_db": 6.422752621717265,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 5.4772771603573384e-08,
+        "tau_ns": 20.289911797241476,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A4",
+    "case_id": "30",
+    "case_label": "A4_30",
+    "link_id": "A4_30",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A4__30__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": false,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -25.59774891731228,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": -0.662911218318623,
+    "EL_proxy_db": 16.17216777951589,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 1.1927582270097646e-08,
+        "tau_ns": 14.151926020498102,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A4",
+    "case_id": "31",
+    "case_label": "A4_31",
+    "link_id": "A4_31",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A4__31__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": false,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -25.757837411806978,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": -0.8229997128133221,
+    "EL_proxy_db": 16.17216777951589,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 1.1927582270097646e-08,
+        "tau_ns": 14.151926020498102,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A4",
+    "case_id": "32",
+    "case_label": "A4_32",
+    "link_id": "A4_32",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A4__32__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": false,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -26.423590666456167,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": -1.4887529674625108,
+    "EL_proxy_db": 12.748340198482424,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 1.0495307567392546e-08,
+        "tau_ns": 22.376159751488377,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A4",
+    "case_id": "33",
+    "case_label": "A4_33",
+    "link_id": "A4_33",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A4__33__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": false,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -26.563604756956625,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": -1.6287670579629672,
+    "EL_proxy_db": 12.748340198482424,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 1.0495307567392546e-08,
+        "tau_ns": 22.376159751488377,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  },
+  {
+    "severity": "WARN",
+    "scenario_id": "A4",
+    "case_id": "34",
+    "case_label": "A4_34",
+    "link_id": "A4_34",
+    "scene_source": "fallback_layout",
+    "scene_png": "analysis_report/out/report_20260227_current/figures/A4__34__scene.png",
+    "pdp_png": "",
+    "reasons": [
+      "scene_debug missing -> fallback spatial layout"
+    ],
+    "flags": {
+      "scene_fallback": true,
+      "los_block_violation": false,
+      "target_bounce_missing": false,
+      "target_tau_outside_early": false,
+      "effect_within_floor_uncert": false,
+      "metric_missing": false
+    },
+    "XPD_early_excess_db": -26.819894137728298,
+    "XPD_late_excess_db": -24.934837698993658,
+    "L_pol_db": -1.8850564387346411,
+    "EL_proxy_db": 10.160883752517137,
+    "LOSflag": 0.0,
+    "top_rays": [
+      {
+        "rank": 1,
+        "ray_index": 0,
+        "n_bounce": 1,
+        "P_lin": 9.521619429680548e-09,
+        "tau_ns": 31.64466859438184,
+        "los_flag_ray": 0,
+        "material_class": "1"
+      }
+    ]
+  }
+]
