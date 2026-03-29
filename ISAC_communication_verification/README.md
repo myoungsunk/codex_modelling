@@ -23,8 +23,8 @@ The repository now also includes an indoor richness and robustness campaign for 
 ## Conventions
 - Linear basis order: `[H; V]`
 - Time convention: `exp(-j*w*t)`
-- Circular basis order inside the solver: `[LHCP; RHCP]` with `circular_order="LR"`
-- User-facing `[RHCP; LHCP]` must be handled by an explicit permutation at the API boundary
+- Circular basis order inside the solver: `[RHCP; LHCP]` with `circular_order="RL"`
+- CP port order is standardized as `RHCP=port 0`, `LHCP=port 1` across the API and experiments
 - HFSS Theta-Phi loading rule: `[H; V] = [E_phi; E_theta]`
 - FFD boresight is interpreted as local `+z`
 - Default Phase 2 pose is facing boresight: Tx local `+z` points to Rx, Rx local `+z` points to Tx

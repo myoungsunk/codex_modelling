@@ -56,6 +56,7 @@ class FFDPatternTests(unittest.TestCase):
             pattern = FFDPattern.from_port_files(
                 {"port0": tmp_path / "port0.ffd", "port1": tmp_path / "port1.ffd"},
                 port_order=("port0", "port1"),
+                sweep_order="theta_inner",
             )
             direction = np.array([np.sqrt(0.5), 0.0, np.sqrt(0.5)], dtype=float)
             exact = pattern.port_field(0, np.array([6.0e9]), direction)[0]
@@ -71,6 +72,7 @@ class FFDPatternTests(unittest.TestCase):
             pattern = FFDPattern.from_port_files(
                 {"port0": tmp_path / "port0.ffd", "port1": tmp_path / "port1.ffd"},
                 port_order=("port0", "port1"),
+                sweep_order="theta_inner",
             )
             direction = np.array([np.sqrt(0.5), 0.0, np.sqrt(0.5)], dtype=float)
             theta_phi = pattern.port_field(0, np.array([6.0e9]), direction)[0]
@@ -85,6 +87,7 @@ class FFDPatternTests(unittest.TestCase):
             pattern = FFDPattern.from_port_files(
                 {"port0": tmp_path / "port0.ffd", "port1": tmp_path / "port1.ffd"},
                 port_order=("port0", "port1"),
+                sweep_order="theta_inner",
             )
             direction = np.array([0.0, 0.0, 1.0], dtype=float)
             with self.assertRaises(ValueError):
@@ -98,6 +101,7 @@ class FFDPatternTests(unittest.TestCase):
             pattern = FFDPattern.from_port_files(
                 {"port0": tmp_path / "port0.ffd", "port1": tmp_path / "port1.ffd"},
                 port_order=("port0", "port1"),
+                sweep_order="theta_inner",
             )
             normalized = pattern.normalized_copy("family_radiated_power")
             direction = np.array([np.sqrt(0.5), 0.0, np.sqrt(0.5)], dtype=float)
@@ -125,6 +129,29 @@ class FFDPatternTests(unittest.TestCase):
             direction = np.array([np.sqrt(0.5), 0.0, np.sqrt(0.5)], dtype=float)
             sample = pattern.port_field(0, np.array([6.5e9]), direction)[0]
             self.assertTrue(np.allclose(sample, np.array([4.0 + 4.0j, 40.0 - 4.0j]), atol=1e-12))
+
+    def test_phi_inner_sweep_order_is_supported(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            block_phi_inner = [
+                (1.0 + 0.0j, 10.0 + 0.0j),
+                (2.0 + 0.0j, 20.0 + 0.0j),
+                (3.0 + 0.0j, 30.0 + 0.0j),
+                (4.0 + 0.0j, 40.0 + 0.0j),
+            ]
+            _write_multifrequency_ffd(tmp_path / "port0.ffd", [6.0e9], [block_phi_inner])
+            _write_multifrequency_ffd(tmp_path / "port1.ffd", [6.0e9], [block_phi_inner])
+            pattern = FFDPattern.from_port_files(
+                {"port0": tmp_path / "port0.ffd", "port1": tmp_path / "port1.ffd"},
+                port_order=("port0", "port1"),
+                sweep_order="phi_inner",
+            )
+            raw = pattern.fields_by_port["port0"][0]
+            self.assertEqual(pattern.sweep_order, "phi_inner")
+            self.assertEqual(raw[0, 0, 0], 1.0 + 0.0j)
+            self.assertEqual(raw[0, 1, 0], 2.0 + 0.0j)
+            self.assertEqual(raw[1, 0, 0], 3.0 + 0.0j)
+            self.assertEqual(raw[1, 1, 0], 4.0 + 0.0j)
 
 
 if __name__ == "__main__":

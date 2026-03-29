@@ -10,9 +10,18 @@ Vec3 = NDArray[np.float64]
 Mat2 = NDArray[np.complex128]
 
 
+def canonical_up_hint(up_hint: Vec3 | None = None) -> Vec3:
+    up = np.asarray([0.0, 0.0, 1.0] if up_hint is None else up_hint, dtype=float)
+    if np.linalg.norm(up) < 1e-12:
+        raise ValueError("up_hint must be non-zero")
+    out = normalize(up)
+    out.setflags(write=False)
+    return out
+
+
 def transverse_basis(k: Vec3, up_hint: Vec3 | None = None) -> tuple[Vec3, Vec3]:
     direction = normalize(np.asarray(k, dtype=float))
-    up = np.asarray([0.0, 0.0, 1.0] if up_hint is None else up_hint, dtype=float)
+    up = canonical_up_hint(up_hint)
     u = up - float(np.dot(up, direction)) * direction
     if np.linalg.norm(u) < 1e-9:
         alt = np.array([1.0, 0.0, 0.0], dtype=float) if abs(direction[0]) < 0.8 else np.array([0.0, 1.0, 0.0], dtype=float)

@@ -23,6 +23,7 @@ class PathRecord:
     valid: bool
     jones_f: NDArray[np.complex128] | None = None
     scalar_factor_f: NDArray[np.complex128] | None = None
+    basis_up_hint: NDArray[np.float64] | None = None
 
     @property
     def bounce_points(self) -> tuple[NDArray[np.float64], ...]:
@@ -40,8 +41,9 @@ class PathRecord:
         self,
         jones_f: NDArray[np.complex128],
         scalar_factor_f: NDArray[np.complex128],
+        basis_up_hint: NDArray[np.float64] | None = None,
     ) -> "PathRecord":
-        return replace(self, jones_f=jones_f, scalar_factor_f=scalar_factor_f)
+        return replace(self, jones_f=jones_f, scalar_factor_f=scalar_factor_f, basis_up_hint=basis_up_hint)
 
 
 @dataclass(frozen=True)

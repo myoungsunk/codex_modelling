@@ -3,11 +3,18 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
+import sys
 
 import numpy as np
 
 from rt_core.geometry import Material
 from rt_core.polarization import depol_matrix, fresnel_reflection, jones_reflection, local_sp_bases
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "ISAC_communication_verification"))
+
+from dualpol_rt.em.fresnel import fresnel_reflection as isac_fresnel_reflection
+from dualpol_rt.em.materials import Material as IsacMaterial
 
 
 class PolarizationCoreTests(unittest.TestCase):
@@ -108,6 +115,31 @@ class PolarizationCoreTests(unittest.TestCase):
         self.assertAlmostEqual(float(np.linalg.norm(s_out)), 1.0, places=12)
         self.assertAlmostEqual(float(np.dot(s_in, p_in)), 0.0, places=12)
         self.assertAlmostEqual(float(np.dot(s_out, p_out)), 0.0, places=12)
+
+    def test_isac_fresnel_matches_rt_core_for_tm_plus_one_convention(self) -> None:
+        f = np.linspace(6e9, 8e9, 9)
+        theta_i = np.deg2rad(33.0)
+        gs, gp = fresnel_reflection(Material.pec(pec_tm_sign=1.0), theta_i=theta_i, f_hz=f)
+        gamma_te, gamma_tm = isac_fresnel_reflection(IsacMaterial.pec(), theta_i=theta_i, freqs_hz=f)
+        self.assertTrue(np.allclose(gs, gamma_te, atol=1e-12))
+        self.assertTrue(np.allclose(gp, gamma_tm, atol=1e-12))
+
+    def test_isac_fresnel_matches_rt_core_for_lossy_dielectric(self) -> None:
+        f = np.linspace(6e9, 8e9, 9)
+        theta_i = np.deg2rad(41.0)
+        rt_material = Material.dielectric(eps_r=4.2, tan_delta=0.02, name="test")
+        gs, gp = fresnel_reflection(rt_material, theta_i=theta_i, f_hz=f)
+        sigma_prefactor = 2.0 * np.pi * 8.8541878128e-12 * 4.2 * 0.02 * 1.0e9
+        isac_material = IsacMaterial(
+            name="test",
+            eps_r_const=4.2,
+            sigma_const=float(sigma_prefactor),
+            sigma_power_c=float(sigma_prefactor),
+            sigma_power_d=1.0,
+        )
+        gamma_te, gamma_tm = isac_fresnel_reflection(isac_material, theta_i=theta_i, freqs_hz=f)
+        self.assertTrue(np.allclose(gs, gamma_te, atol=1e-12))
+        self.assertTrue(np.allclose(gp, gamma_tm, atol=1e-12))
 
 
 if __name__ == "__main__":

@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 
 from dualpol_rt.channel.path_record import PathRecord
-from dualpol_rt.em.basis import basis_change, local_te_tm_bases, transverse_basis
+from dualpol_rt.em.basis import basis_change, canonical_up_hint, local_te_tm_bases, transverse_basis
 from dualpol_rt.em.fresnel import fresnel_reflection
 
 
@@ -16,13 +16,14 @@ def path_jones_response(
     up_hint: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     freqs = np.asarray(freqs_hz, dtype=float)
+    basis_up_hint = canonical_up_hint(up_hint)
     jones_f = np.repeat(np.eye(2, dtype=np.complex128)[None, :, :], len(freqs), axis=0)
     points = [np.asarray(point, dtype=float) for point in path.points]
     for bounce_idx in range(path.bounce_count):
         k_in = points[bounce_idx + 1] - points[bounce_idx]
         k_out = points[bounce_idx + 2] - points[bounce_idx + 1]
-        w_in = np.column_stack(transverse_basis(k_in, up_hint=up_hint)).astype(np.complex128)
-        w_out = np.column_stack(transverse_basis(k_out, up_hint=up_hint)).astype(np.complex128)
+        w_in = np.column_stack(transverse_basis(k_in, up_hint=basis_up_hint)).astype(np.complex128)
+        w_out = np.column_stack(transverse_basis(k_out, up_hint=basis_up_hint)).astype(np.complex128)
         te_in, tm_in, te_out, tm_out, theta_i, _n_eff = local_te_tm_bases(k_in, k_out, path.normals[bounce_idx])
         local_in = np.column_stack([te_in, tm_in]).astype(np.complex128)
         local_out = np.column_stack([te_out, tm_out]).astype(np.complex128)
@@ -43,5 +44,6 @@ def attach_em_response(
     freqs_hz: np.ndarray,
     up_hint: np.ndarray | None = None,
 ) -> PathRecord:
-    jones_f, scalar_factor_f = path_jones_response(path, freqs_hz=freqs_hz, up_hint=up_hint)
-    return path.with_em_response(jones_f=jones_f, scalar_factor_f=scalar_factor_f)
+    basis_up_hint = canonical_up_hint(up_hint)
+    jones_f, scalar_factor_f = path_jones_response(path, freqs_hz=freqs_hz, up_hint=basis_up_hint)
+    return path.with_em_response(jones_f=jones_f, scalar_factor_f=scalar_factor_f, basis_up_hint=basis_up_hint)

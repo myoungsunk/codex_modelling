@@ -4,10 +4,15 @@ from __future__ import annotations
 
 import unittest
 import warnings
+from pathlib import Path
+import sys
 
 import numpy as np
 
-from analysis.ctf_cir import cir_bandlimit_info, ctf_to_cir, tau_resolution_s
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "ISAC_communication_verification"))
+
+from analysis.ctf_cir import cir_bandlimit_info, convert_basis, ctf_to_cir, linear_to_circular_matrix, tau_resolution_s
+from dualpol_rt.channel.builder import convert_basis as isac_convert_basis
 
 
 class CtfCirTests(unittest.TestCase):
@@ -39,6 +44,23 @@ class CtfCirTests(unittest.TestCase):
         self.assertTrue(any("nonuniform frequency grid" in str(ww.message).lower() for ww in w))
         info = cir_bandlimit_info(f, nfft=256)
         self.assertGreaterEqual(float(info["grid_uniformity_rel_max"]), 0.0)
+
+    def test_linear_to_circular_matrix_defaults_to_rhcp_lhcp_order(self) -> None:
+        U = linear_to_circular_matrix()
+        expected = np.column_stack(
+            [
+                np.array([1.0, -1j], dtype=np.complex128) / np.sqrt(2.0),
+                np.array([1.0, 1j], dtype=np.complex128) / np.sqrt(2.0),
+            ]
+        )
+        self.assertTrue(np.allclose(U, expected, atol=1e-12))
+
+    def test_analysis_basis_conversion_matches_isac_builder(self) -> None:
+        rng = np.random.default_rng(7)
+        H = rng.normal(size=(5, 2, 2)) + 1j * rng.normal(size=(5, 2, 2))
+        converted_analysis = convert_basis(H, src="linear", dst="circular", circular_order="RL")
+        converted_isac = isac_convert_basis(H, src="linear", dst="circular", circular_order="RL")
+        self.assertTrue(np.allclose(converted_analysis, converted_isac, atol=1e-12))
 
 
 if __name__ == "__main__":

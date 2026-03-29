@@ -95,6 +95,10 @@ class RealisticCompareTests(unittest.TestCase):
         self.assertLess(debug["same_family_basis_invariance_lp"]["normalized"], 1e-8)
         self.assertLess(debug["same_family_basis_invariance_cp"]["raw"], 1e-8)
         self.assertLess(debug["same_family_basis_invariance_cp"]["normalized"], 1e-8)
+        self.assertEqual(
+            debug["same_family_basis_invariance_note"],
+            "Representation invariance is evaluated on the LP-family channel only; CP-family channels already live in circular port space.",
+        )
 
     def test_realistic_debug_point_smoke(self) -> None:
         cfg, families = self._build_fixture()
@@ -168,6 +172,16 @@ class RealisticCompareTests(unittest.TestCase):
         normalized_delta = abs(debug["normalized_delta"].delta_equal_power_rate[10.0])
         self.assertGreater(raw_delta, 1e-6)
         self.assertLess(normalized_delta, raw_delta)
+        self.assertAlmostEqual(
+            debug["lp_normalized_summary"].gain_normalized_equal_power_rate[10.0],
+            debug["lp_normalized_summary"].equal_power_rate[10.0],
+            places=12,
+        )
+        self.assertAlmostEqual(
+            debug["cp_normalized_summary"].gain_normalized_equal_power_rate[10.0],
+            debug["cp_normalized_summary"].equal_power_rate[10.0],
+            places=12,
+        )
 
 
 if __name__ == "__main__":

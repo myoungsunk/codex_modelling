@@ -256,9 +256,9 @@ def _evaluate_point(
     lp_raw_summary = summarize_channel(H_lp_raw, cfg.snr_db_list)
     cp_raw_summary = summarize_channel(H_cp_raw, cfg.snr_db_list)
     raw_delta = compare_channels(H_lp_raw, H_cp_raw, cfg.snr_db_list)
-    lp_norm_summary = summarize_channel(H_lp_norm, cfg.snr_db_list)
-    cp_norm_summary = summarize_channel(H_cp_norm, cfg.snr_db_list)
-    norm_delta = compare_channels(H_lp_norm, H_cp_norm, cfg.snr_db_list)
+    lp_norm_summary = summarize_channel(H_lp_norm, cfg.snr_db_list, gain_normalized_mode="channel_equal_power")
+    cp_norm_summary = summarize_channel(H_cp_norm, cfg.snr_db_list, gain_normalized_mode="channel_equal_power")
+    norm_delta = compare_channels(H_lp_norm, H_cp_norm, cfg.snr_db_list, gain_normalized_mode="channel_equal_power")
     richness = compute_path_richness(enriched_paths, freqs_hz=cfg.freqs_hz)
     return richness, lp_raw_summary, cp_raw_summary, raw_delta, lp_norm_summary, cp_norm_summary, norm_delta
 

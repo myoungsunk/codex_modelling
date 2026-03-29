@@ -27,24 +27,51 @@ class ChannelDeltaSummary:
     delta_condition_number: float
 
 
-def summarize_channel(H_f: np.ndarray, snr_db_list: tuple[float, ...]) -> ChannelSummary:
+def _resolve_gain_normalized_rate(
+    H: np.ndarray,
+    snr_db: float,
+    *,
+    gain_normalized_mode: str,
+) -> float:
+    mode = str(gain_normalized_mode).lower()
+    if mode == "fro":
+        return float(gain_normalized_equal_power_rate(H, snr_db))
+    if mode == "channel_equal_power":
+        return float(equal_power_rate(H, snr_db))
+    raise ValueError(f"unsupported gain_normalized_mode: {gain_normalized_mode}")
+
+
+def summarize_channel(
+    H_f: np.ndarray,
+    snr_db_list: tuple[float, ...],
+    *,
+    gain_normalized_mode: str = "fro",
+) -> ChannelSummary:
     H = np.asarray(H_f, dtype=np.complex128)
     sv = singular_values(H)
     cond = condition_numbers(H)
     return ChannelSummary(
         equal_power_rate={float(snr): equal_power_rate(H, snr) for snr in snr_db_list},
         waterfilled_capacity={float(snr): waterfilled_capacity(H, snr) for snr in snr_db_list},
-        gain_normalized_equal_power_rate={float(snr): gain_normalized_equal_power_rate(H, snr) for snr in snr_db_list},
+        gain_normalized_equal_power_rate={
+            float(snr): _resolve_gain_normalized_rate(H, snr, gain_normalized_mode=gain_normalized_mode) for snr in snr_db_list
+        },
         xpr_db=float(xpr_db(H)),
         mean_condition_number=float(np.mean(cond)),
         mean_singular_values=np.mean(sv, axis=0).astype(float),
     )
 
 
-def compare_channels(H_lp: np.ndarray, H_cp: np.ndarray, snr_db_list: tuple[float, ...]) -> ChannelDeltaSummary:
+def compare_channels(
+    H_lp: np.ndarray,
+    H_cp: np.ndarray,
+    snr_db_list: tuple[float, ...],
+    *,
+    gain_normalized_mode: str = "fro",
+) -> ChannelDeltaSummary:
     """Return CP-minus-LP deltas for matched channel pairs."""
-    lp = summarize_channel(H_lp, snr_db_list)
-    cp = summarize_channel(H_cp, snr_db_list)
+    lp = summarize_channel(H_lp, snr_db_list, gain_normalized_mode=gain_normalized_mode)
+    cp = summarize_channel(H_cp, snr_db_list, gain_normalized_mode=gain_normalized_mode)
     return ChannelDeltaSummary(
         delta_equal_power_rate={snr: float(cp.equal_power_rate[snr] - lp.equal_power_rate[snr]) for snr in lp.equal_power_rate},
         delta_waterfilled_capacity={snr: float(cp.waterfilled_capacity[snr] - lp.waterfilled_capacity[snr]) for snr in lp.waterfilled_capacity},

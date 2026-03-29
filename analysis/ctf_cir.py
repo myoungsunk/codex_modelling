@@ -23,22 +23,34 @@ from scipy.signal.windows import hann, kaiser
 WindowName = Literal["hann", "kaiser", "none"]
 
 
-def linear_to_circular_matrix(convention: str = "IEEE-RHCP") -> NDArray[np.complex128]:
+def linear_to_circular_matrix(
+    convention: str = "IEEE-RHCP",
+    circular_order: str = "RL",
+) -> NDArray[np.complex128]:
     if convention.upper().startswith("IEEE"):
-        return np.array(
-            [[1 / np.sqrt(2), 1 / np.sqrt(2)], [-1j / np.sqrt(2), 1j / np.sqrt(2)]],
-            dtype=np.complex128,
-        )
-    return np.array(
-        [[1 / np.sqrt(2), 1 / np.sqrt(2)], [1j / np.sqrt(2), -1j / np.sqrt(2)]],
-        dtype=np.complex128,
-    )
+        right = np.array([1 / np.sqrt(2), -1j / np.sqrt(2)], dtype=np.complex128)
+        left = np.array([1 / np.sqrt(2), 1j / np.sqrt(2)], dtype=np.complex128)
+    else:
+        right = np.array([1 / np.sqrt(2), 1j / np.sqrt(2)], dtype=np.complex128)
+        left = np.array([1 / np.sqrt(2), -1j / np.sqrt(2)], dtype=np.complex128)
+    order = str(circular_order).upper()
+    if order == "RL":
+        return np.column_stack([right, left]).astype(np.complex128)
+    if order == "LR":
+        return np.column_stack([left, right]).astype(np.complex128)
+    raise ValueError(f"unsupported circular_order: {circular_order}")
 
 
-def convert_basis(H_f: NDArray[np.complex128], src: str, dst: str, convention: str = "IEEE-RHCP") -> NDArray[np.complex128]:
+def convert_basis(
+    H_f: NDArray[np.complex128],
+    src: str,
+    dst: str,
+    convention: str = "IEEE-RHCP",
+    circular_order: str = "RL",
+) -> NDArray[np.complex128]:
     if src == dst:
         return H_f
-    U = linear_to_circular_matrix(convention)
+    U = linear_to_circular_matrix(convention, circular_order=circular_order)
     if src == "linear" and dst == "circular":
         return np.einsum("ab,kbc,cd->kad", U.conj().T, H_f, U)
     if src == "circular" and dst == "linear":
@@ -83,6 +95,7 @@ def synthesize_ctf_with_basis(
     input_basis: str | None = None,
     eval_basis: str | None = None,
     convention: str = "IEEE-RHCP",
+    circular_order: str = "RL",
 ) -> NDArray[np.complex128]:
     """Synthesize H(f) from A/J and convert basis explicitly if requested."""
 
@@ -90,7 +103,7 @@ def synthesize_ctf_with_basis(
     src = str(input_basis).lower() if input_basis is not None else None
     dst = str(eval_basis).lower() if eval_basis is not None else src
     if src in {"linear", "circular"} and dst in {"linear", "circular"} and src != dst:
-        H = convert_basis(H, src=src, dst=dst, convention=convention)
+        H = convert_basis(H, src=src, dst=dst, convention=convention, circular_order=circular_order)
     return H
 
 

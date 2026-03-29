@@ -59,10 +59,30 @@ def build_phase2_patterns(
     """Build the four Phase 2 antenna families from individual HFSS FFD files."""
     tx_pose_use = _identity_pose() if tx_pose is None else tx_pose
     rx_pose_use = _identity_pose() if rx_pose is None else rx_pose
-    tx_lp_pattern = FFDPattern.from_port_files({"lp_p0": tx_lp_files[0], "lp_p1": tx_lp_files[1]}, port_order=("lp_p0", "lp_p1"), normalization_mode=normalization_mode)
-    rx_lp_pattern = FFDPattern.from_port_files({"lp_p0": rx_lp_files[0], "lp_p1": rx_lp_files[1]}, port_order=("lp_p0", "lp_p1"), normalization_mode=normalization_mode)
-    tx_cp_pattern = FFDPattern.from_port_files({"cp_p0": tx_cp_files[0], "cp_p1": tx_cp_files[1]}, port_order=("cp_p0", "cp_p1"), normalization_mode=normalization_mode)
-    rx_cp_pattern = FFDPattern.from_port_files({"cp_p0": rx_cp_files[0], "cp_p1": rx_cp_files[1]}, port_order=("cp_p0", "cp_p1"), normalization_mode=normalization_mode)
+    tx_lp_pattern = FFDPattern.from_port_files(
+        {"lp_p0": tx_lp_files[0], "lp_p1": tx_lp_files[1]},
+        port_order=("lp_p0", "lp_p1"),
+        normalization_mode=normalization_mode,
+        sweep_order="theta_inner",
+    )
+    rx_lp_pattern = FFDPattern.from_port_files(
+        {"lp_p0": rx_lp_files[0], "lp_p1": rx_lp_files[1]},
+        port_order=("lp_p0", "lp_p1"),
+        normalization_mode=normalization_mode,
+        sweep_order="theta_inner",
+    )
+    tx_cp_pattern = FFDPattern.from_port_files(
+        {"cp_p0": tx_cp_files[0], "cp_p1": tx_cp_files[1]},
+        port_order=("cp_p0", "cp_p1"),
+        normalization_mode=normalization_mode,
+        sweep_order="theta_inner",
+    )
+    rx_cp_pattern = FFDPattern.from_port_files(
+        {"cp_p0": rx_cp_files[0], "cp_p1": rx_cp_files[1]},
+        port_order=("cp_p0", "cp_p1"),
+        normalization_mode=normalization_mode,
+        sweep_order="theta_inner",
+    )
     return {
         "tx_lp": AntennaFamily("dual_linear_slant_tx", tx_lp_pattern, tx_pose_use, ("+45", "-45"), ("+45", "-45"), normalization_mode),
         "rx_lp": AntennaFamily("dual_linear_slant_rx", rx_lp_pattern, rx_pose_use, ("+45", "-45"), ("+45", "-45"), normalization_mode),
@@ -194,6 +214,10 @@ def evaluate_realistic_debug_point(
         rx_cp_link,
         normalization_mode="family_radiated_power",
     )
+    same_family_basis_invariance = {
+        "raw": float(np.max(np.abs(condition_numbers(H_lp_raw) - condition_numbers(convert_basis(H_lp_raw, src="linear", dst="circular"))))),
+        "normalized": float(np.max(np.abs(condition_numbers(H_lp_norm) - condition_numbers(convert_basis(H_lp_norm, src="linear", dst="circular"))))),
+    }
 
     return {
         "rx_pos": rx,
@@ -206,9 +230,9 @@ def evaluate_realistic_debug_point(
         "lp_raw_summary": summarize_channel(H_lp_raw, cfg.snr_db_list),
         "cp_raw_summary": summarize_channel(H_cp_raw, cfg.snr_db_list),
         "raw_delta": compare_channels(H_lp_raw, H_cp_raw, cfg.snr_db_list),
-        "lp_normalized_summary": summarize_channel(H_lp_norm, cfg.snr_db_list),
-        "cp_normalized_summary": summarize_channel(H_cp_norm, cfg.snr_db_list),
-        "normalized_delta": compare_channels(H_lp_norm, H_cp_norm, cfg.snr_db_list),
+        "lp_normalized_summary": summarize_channel(H_lp_norm, cfg.snr_db_list, gain_normalized_mode="channel_equal_power"),
+        "cp_normalized_summary": summarize_channel(H_cp_norm, cfg.snr_db_list, gain_normalized_mode="channel_equal_power"),
+        "normalized_delta": compare_channels(H_lp_norm, H_cp_norm, cfg.snr_db_list, gain_normalized_mode="channel_equal_power"),
         "raw_mean_channel_norms": {
             "lp": float(np.mean(np.linalg.norm(H_lp_raw, axis=(1, 2)))),
             "cp": float(np.mean(np.linalg.norm(H_cp_raw, axis=(1, 2)))),
@@ -217,14 +241,9 @@ def evaluate_realistic_debug_point(
             "lp": float(np.mean(np.linalg.norm(H_lp_norm, axis=(1, 2)))),
             "cp": float(np.mean(np.linalg.norm(H_cp_norm, axis=(1, 2)))),
         },
-        "same_family_basis_invariance_lp": {
-            "raw": float(np.max(np.abs(condition_numbers(H_lp_raw) - condition_numbers(convert_basis(H_lp_raw, src="linear", dst="circular"))))),
-            "normalized": float(np.max(np.abs(condition_numbers(H_lp_norm) - condition_numbers(convert_basis(H_lp_norm, src="linear", dst="circular"))))),
-        },
-        "same_family_basis_invariance_cp": {
-            "raw": float(np.max(np.abs(condition_numbers(H_cp_raw) - condition_numbers(convert_basis(H_cp_raw, src="linear", dst="circular"))))),
-            "normalized": float(np.max(np.abs(condition_numbers(H_cp_norm) - condition_numbers(convert_basis(H_cp_norm, src="linear", dst="circular"))))),
-        },
+        "same_family_basis_invariance_lp": same_family_basis_invariance,
+        "same_family_basis_invariance_cp": same_family_basis_invariance,
+        "same_family_basis_invariance_note": "Representation invariance is evaluated on the LP-family channel only; CP-family channels already live in circular port space.",
     }
 
 
@@ -259,9 +278,9 @@ def evaluate_realistic_rx_grid(
             lp_raw_summary = summarize_channel(H_lp_raw, cfg.snr_db_list)
             cp_raw_summary = summarize_channel(H_cp_raw, cfg.snr_db_list)
             raw_delta = compare_channels(H_lp_raw, H_cp_raw, cfg.snr_db_list)
-            lp_norm_summary = summarize_channel(H_lp_norm, cfg.snr_db_list)
-            cp_norm_summary = summarize_channel(H_cp_norm, cfg.snr_db_list)
-            norm_delta = compare_channels(H_lp_norm, H_cp_norm, cfg.snr_db_list)
+            lp_norm_summary = summarize_channel(H_lp_norm, cfg.snr_db_list, gain_normalized_mode="channel_equal_power")
+            cp_norm_summary = summarize_channel(H_cp_norm, cfg.snr_db_list, gain_normalized_mode="channel_equal_power")
+            norm_delta = compare_channels(H_lp_norm, H_cp_norm, cfg.snr_db_list, gain_normalized_mode="channel_equal_power")
             _write_summary(raw_maps.lp, lp_raw_summary, (iy, ix))
             _write_summary(raw_maps.cp, cp_raw_summary, (iy, ix))
             _write_delta(raw_maps, raw_delta, (iy, ix))

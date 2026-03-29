@@ -2,10 +2,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 from pathlib import Path
+from typing import Literal
 
 import numpy as np
 
 from dualpol_rt.patterns.ideal_pattern import IdealPattern
+
+
+FFDSweepOrder = Literal["theta_inner", "phi_inner"]
 
 
 def _clean_lines(path: str | Path) -> list[str]:
@@ -13,7 +17,11 @@ def _clean_lines(path: str | Path) -> list[str]:
     return [line.strip() for line in text if line.strip() and not line.strip().startswith(("#", "!", "//"))]
 
 
-def _parse_ffd_file(path: str | Path, freq_hz: float | None = None) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+def _parse_ffd_file(
+    path: str | Path,
+    freq_hz: float | None = None,
+    sweep_order: FFDSweepOrder = "theta_inner",
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     lines = _clean_lines(path)
     if len(lines) < 3:
         raise ValueError(f"FFD file is too short: {path}")
@@ -27,6 +35,9 @@ def _parse_ffd_file(path: str | Path, freq_hz: float | None = None) -> tuple[np.
     phi = np.linspace(np.deg2rad(phi_start), np.deg2rad(phi_stop), int(phi_count), dtype=float)
     expected = int(theta_count) * int(phi_count)
     third = lines[2]
+    order = str(sweep_order).lower()
+    if order not in {"theta_inner", "phi_inner"}:
+        raise ValueError(f"unsupported FFD sweep order: {sweep_order}")
 
     def _assign_block(block_lines: list[str], out: np.ndarray, f_idx: int) -> None:
         if len(block_lines) < expected:
@@ -39,8 +50,12 @@ def _parse_ffd_file(path: str | Path, freq_hz: float | None = None) -> tuple[np.
                 re_theta, im_theta, re_phi, im_phi = tokens[-4:]
             else:
                 raise ValueError(f"Unsupported FFD row format in {path}: {block_lines[flat_idx]}")
-            t_idx = flat_idx % len(theta)
-            p_idx = flat_idx // len(theta)
+            if order == "theta_inner":
+                t_idx = flat_idx % len(theta)
+                p_idx = flat_idx // len(theta)
+            else:
+                p_idx = flat_idx % len(phi)
+                t_idx = flat_idx // len(phi)
             out[f_idx, t_idx, p_idx, 0] = re_theta + 1j * im_theta
             out[f_idx, t_idx, p_idx, 1] = re_phi + 1j * im_phi
 
@@ -90,6 +105,7 @@ class FFDPattern(IdealPattern):
     fields_by_port: dict[str, np.ndarray] | None = field(default=None)
     normalization_mode: str = "raw"
     family_scale_f: np.ndarray | None = None
+    sweep_order: FFDSweepOrder = "theta_inner"
 
     @classmethod
     def from_port_files(
@@ -98,6 +114,7 @@ class FFDPattern(IdealPattern):
         port_order: tuple[str, str] | None = None,
         freq_hz: float | None = None,
         normalization_mode: str = "raw",
+        sweep_order: FFDSweepOrder = "theta_inner",
         **kwargs,
     ) -> "FFDPattern":
         names = port_order or tuple(port_files.keys())
@@ -108,7 +125,7 @@ class FFDPattern(IdealPattern):
         phi = None
         fields: dict[str, np.ndarray] = {}
         for name in names:
-            f_grid, t_grid, p_grid, field = _parse_ffd_file(port_files[name], freq_hz=freq_hz)
+            f_grid, t_grid, p_grid, field = _parse_ffd_file(port_files[name], freq_hz=freq_hz, sweep_order=sweep_order)
             if freq_grid is None:
                 freq_grid = f_grid
                 theta = t_grid
@@ -124,6 +141,7 @@ class FFDPattern(IdealPattern):
             phi_grid_rad=phi,
             fields_by_port=fields,
             normalization_mode=normalization_mode,
+            sweep_order=sweep_order,
             **kwargs,
         )
 
@@ -135,18 +153,28 @@ class FFDPattern(IdealPattern):
         port_order: tuple[str, str] | None = None,
         freq_hz: float | None = None,
         normalization_mode: str = "raw",
+        sweep_order: FFDSweepOrder = "theta_inner",
         **kwargs,
     ) -> "FFDPattern":
         base = Path(base_dir) if base_dir is not None else Path(array_file).parent
         entries = _parse_array_map(array_file)
         mapping = {name: str(base / filename) for name, filename in entries}
         names = port_order or tuple(name for name, _filename in entries[:2])
-        return cls.from_port_files(mapping, port_order=names, freq_hz=freq_hz, normalization_mode=normalization_mode, **kwargs)
+        return cls.from_port_files(
+            mapping,
+            port_order=names,
+            freq_hz=freq_hz,
+            normalization_mode=normalization_mode,
+            sweep_order=sweep_order,
+            **kwargs,
+        )
 
     def __post_init__(self) -> None:
         super().__post_init__()
         if self.freq_grid_hz is None or self.theta_grid_rad is None or self.phi_grid_rad is None or self.fields_by_port is None:
             raise ValueError("FFDPattern requires frequency/theta/phi grids and per-port fields")
+        if str(self.sweep_order).lower() not in {"theta_inner", "phi_inner"}:
+            raise ValueError(f"unsupported FFD sweep order: {self.sweep_order}")
         freq = np.asarray(self.freq_grid_hz, dtype=float)
         theta = np.asarray(self.theta_grid_rad, dtype=float)
         phi = np.asarray(self.phi_grid_rad, dtype=float)

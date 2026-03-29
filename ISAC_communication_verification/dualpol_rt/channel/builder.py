@@ -3,11 +3,11 @@ from __future__ import annotations
 import numpy as np
 
 from dualpol_rt.channel.path_record import PathRecord
-from dualpol_rt.em.basis import transverse_basis
+from dualpol_rt.em.basis import canonical_up_hint, transverse_basis
 from dualpol_rt.em.jones import attach_em_response
 
 
-def _circular_basis_matrix(convention: str = "IEEE-RHCP", circular_order: str = "LR") -> np.ndarray:
+def _circular_basis_matrix(convention: str = "IEEE-RHCP", circular_order: str = "RL") -> np.ndarray:
     if convention.upper() != "IEEE-RHCP":
         raise ValueError(f"unsupported circular convention: {convention}")
     left = np.array([1.0, 1j], dtype=np.complex128) / np.sqrt(2.0)
@@ -24,7 +24,7 @@ def convert_basis(
     src: str,
     dst: str,
     convention: str = "IEEE-RHCP",
-    circular_order: str = "LR",
+    circular_order: str = "RL",
 ) -> np.ndarray:
     src_norm = str(src).lower()
     dst_norm = str(dst).lower()
@@ -39,12 +39,12 @@ def convert_basis(
     return np.einsum("ab,kbc,cd->kad", U, H, U.conj().T)
 
 
-def _wave_basis(direction_world: np.ndarray) -> np.ndarray:
-    return np.column_stack(transverse_basis(direction_world)).astype(np.complex128)
+def _wave_basis(direction_world: np.ndarray, up_hint: np.ndarray | None = None) -> np.ndarray:
+    return np.column_stack(transverse_basis(direction_world, up_hint=up_hint)).astype(np.complex128)
 
 
-def _emit_matrix(pattern, freqs_hz: np.ndarray, direction_world: np.ndarray) -> np.ndarray:
-    wave_basis = _wave_basis(direction_world)
+def _emit_matrix(pattern, freqs_hz: np.ndarray, direction_world: np.ndarray, up_hint: np.ndarray | None = None) -> np.ndarray:
+    wave_basis = _wave_basis(direction_world, up_hint=up_hint)
     out = np.zeros((len(freqs_hz), 2, pattern.port_count), dtype=np.complex128)
     for port_id in range(pattern.port_count):
         field_world = pattern.port_vector_world(port_id, freqs_hz, direction_world)
@@ -52,14 +52,21 @@ def _emit_matrix(pattern, freqs_hz: np.ndarray, direction_world: np.ndarray) -> 
     return out
 
 
-def _receive_matrix(pattern, freqs_hz: np.ndarray, propagation_direction_world: np.ndarray) -> np.ndarray:
-    wave_basis = _wave_basis(propagation_direction_world)
+def _receive_matrix(pattern, freqs_hz: np.ndarray, propagation_direction_world: np.ndarray, up_hint: np.ndarray | None = None) -> np.ndarray:
     look_direction_world = -np.asarray(propagation_direction_world, dtype=float)
+    look_basis = _wave_basis(look_direction_world, up_hint=up_hint)
     out = np.zeros((len(freqs_hz), pattern.port_count, 2), dtype=np.complex128)
     for port_id in range(pattern.port_count):
         field_world = pattern.port_vector_world(port_id, freqs_hz, look_direction_world)
-        out[:, port_id, :] = np.einsum("kb,ba->ka", field_world.conj(), wave_basis)
+        # Reciprocity is evaluated in the antenna look-direction basis. This
+        # avoids the artificial phi-axis sign flip between +/-k.
+        out[:, port_id, :] = np.einsum("kb,ba->ka", field_world.conj(), look_basis)
     return out
+
+
+def _matching_up_hint(path: PathRecord, up_hint: np.ndarray) -> bool:
+    path_up_hint = canonical_up_hint(path.basis_up_hint)
+    return bool(np.allclose(path_up_hint, up_hint, atol=1e-12, rtol=0.0))
 
 
 def build_channel(
@@ -69,14 +76,19 @@ def build_channel(
     freqs_hz: np.ndarray,
     eval_basis: str = "linear",
     convention: str = "IEEE-RHCP",
-    circular_order: str = "LR",
+    circular_order: str = "RL",
+    up_hint: np.ndarray | None = None,
 ) -> np.ndarray:
     freqs = np.asarray(freqs_hz, dtype=float)
+    basis_up_hint = canonical_up_hint(up_hint)
     H = np.zeros((len(freqs), rx_pattern.port_count, tx_pattern.port_count), dtype=np.complex128)
     for path in paths:
-        enriched = path if path.jones_f is not None and path.scalar_factor_f is not None else attach_em_response(path, freqs_hz=freqs)
-        g_tx = _emit_matrix(tx_pattern, freqs, path.launch_dir)
-        g_rx = _receive_matrix(rx_pattern, freqs, path.arrival_dir)
+        if path.jones_f is not None and path.scalar_factor_f is not None and _matching_up_hint(path, basis_up_hint):
+            enriched = path
+        else:
+            enriched = attach_em_response(path, freqs_hz=freqs, up_hint=basis_up_hint)
+        g_tx = _emit_matrix(tx_pattern, freqs, path.launch_dir, up_hint=basis_up_hint)
+        g_rx = _receive_matrix(rx_pattern, freqs, path.arrival_dir, up_hint=basis_up_hint)
         core = np.einsum(
             "kab,kbc,kcd->kad",
             g_rx,

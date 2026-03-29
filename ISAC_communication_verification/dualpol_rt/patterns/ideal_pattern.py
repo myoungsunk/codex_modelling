@@ -37,7 +37,7 @@ def spherical_basis(direction_local: np.ndarray) -> tuple[np.ndarray, np.ndarray
 @dataclass(frozen=True)
 class IdealPattern:
     basis: str = "linear"
-    circular_order: str = "LR"
+    circular_order: str = "RL"
     convention: str = "IEEE-RHCP"
     x_axis: np.ndarray = field(default_factory=lambda: np.array([1.0, 0.0, 0.0], dtype=float))
     y_axis: np.ndarray = field(default_factory=lambda: np.array([0.0, 1.0, 0.0], dtype=float))
@@ -83,15 +83,18 @@ class IdealPattern:
 
     def _linear_or_circular_vector(self, port_id: int, direction_local: np.ndarray) -> np.ndarray:
         h, v = self._projected_hv(direction_local)
+        port_idx = int(port_id)
         if self.basis.lower() == "linear":
-            return h if int(port_id) == 0 else v
-        if self.circular_order.upper() == "LR":
-            left = (h + 1j * v) / np.sqrt(2.0)
-            right = (h - 1j * v) / np.sqrt(2.0)
-        else:
-            right = (h - 1j * v) / np.sqrt(2.0)
-            left = (h + 1j * v) / np.sqrt(2.0)
-        return left if int(port_id) == 0 else right
+            return h if port_idx == 0 else v
+
+        left = (h + 1j * v) / np.sqrt(2.0)
+        right = (h - 1j * v) / np.sqrt(2.0)
+        order = self.circular_order.upper()
+        if order == "RL":
+            return right if port_idx == 0 else left
+        if order == "LR":
+            return left if port_idx == 0 else right
+        raise ValueError(f"unsupported circular order: {self.circular_order}")
 
     def port_field(self, port_id: int, f_hz: float | np.ndarray, k_local: np.ndarray) -> np.ndarray:
         freqs = np.atleast_1d(np.asarray(f_hz, dtype=float))
