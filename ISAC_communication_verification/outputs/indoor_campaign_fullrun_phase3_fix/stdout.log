@@ -1,0 +1,4 @@
+[2026-03-26T18:17:04] Using FFD dir: D:\OneDrive - postech.ac.kr\¸í¼±\2026\3.8 Robust CP RSSD DoA\ansys_SBR_results
+[2026-03-26T18:17:18] Starting full indoor campaign with default settings
+[2026-03-27T10:32:57] Completed full run. Selected scenes: ['factory_lite', 'mixed_office', 'straight_corridor']
+[2026-03-27T10:32:57] Artifacts: {'maps': 'D:\\codex\\ISAC_communication_verification\\outputs\\indoor_campaign_fullrun_phase3_fix\\maps.npz', 'summary': 'D:\\codex\\ISAC_communication_verification\\outputs\\indoor_campaign_fullrun_phase3_fix\\summary.json', 'scene_metrics': 'D:\\codex\\ISAC_communication_verification\\outputs\\indoor_campaign_fullrun_phase3_fix\\scene_metrics.csv', 'pose_metrics': 'D:\\codex\\ISAC_communication_verification\\outputs\\indoor_campaign_fullrun_phase3_fix\\pose_metrics.csv'}

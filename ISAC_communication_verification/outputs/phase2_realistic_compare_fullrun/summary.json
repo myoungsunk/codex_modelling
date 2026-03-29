@@ -1,0 +1,138 @@
+{
+  "elapsed_seconds": 1010.119072675705,
+  "grid_shape": [
+    26,
+    46
+  ],
+  "n_points": 1196,
+  "freq_range_hz": [
+    6250000000.0,
+    6750000000.0
+  ],
+  "n_freq": 101,
+  "snr_db_list": [
+    0.0,
+    10.0,
+    20.0
+  ],
+  "files": {
+    "lp_p0": "D:\\OneDrive - postech.ac.kr\\\uba85\uc120\\2026\\3.8 Robust CP RSSD DoA\\ansys_SBR_results\\TEST\\LP_+45_new_6G7G_11pts.ffd",
+    "lp_p1": "D:\\OneDrive - postech.ac.kr\\\uba85\uc120\\2026\\3.8 Robust CP RSSD DoA\\ansys_SBR_results\\TEST\\LP_-45_new_6G7G_11pts.ffd",
+    "cp_p0": "D:\\OneDrive - postech.ac.kr\\\uba85\uc120\\2026\\3.8 Robust CP RSSD DoA\\ansys_SBR_results\\TEST\\RHCP_new_6G7G_11pts.ffd",
+    "cp_p1": "D:\\OneDrive - postech.ac.kr\\\uba85\uc120\\2026\\3.8 Robust CP RSSD DoA\\ansys_SBR_results\\TEST\\LHCP_new_6G7G_11pts.ffd"
+  },
+  "raw": {
+    "0.0": {
+      "delta_rate_min": 5.906225048306791e-05,
+      "delta_rate_max": 0.004008521679342167,
+      "delta_rate_mean": 0.0004965897792898919,
+      "delta_capacity_min": 0.00010725868302798428,
+      "delta_capacity_max": 0.006991341254753489,
+      "delta_capacity_mean": 0.000851813362757898,
+      "delta_gainnorm_rate_min": -1.3289369604763124e-11,
+      "delta_gainnorm_rate_max": 1.886668599127006e-11,
+      "delta_gainnorm_rate_mean": -8.67827363297059e-13,
+      "lp_rate_mean": 0.00016559111646467247,
+      "cp_rate_mean": 0.0006621808957545644,
+      "lp_capacity_mean": 0.0002841713757211295,
+      "cp_capacity_mean": 0.0011359847384790275
+    },
+    "10.0": {
+      "delta_rate_min": 0.0005904574257848163,
+      "delta_rate_max": 0.03935786298798883,
+      "delta_rate_mean": 0.004945452727148513,
+      "delta_capacity_min": 0.0010719356696777958,
+      "delta_capacity_max": 0.06718986859508355,
+      "delta_capacity_mean": 0.008440890903333083,
+      "delta_gainnorm_rate_min": -1.311839525897085e-10,
+      "delta_gainnorm_rate_max": 1.8926460398915879e-10,
+      "delta_gainnorm_rate_mean": -8.177166487596986e-12,
+      "lp_rate_mean": 0.001654536421167182,
+      "cp_rate_mean": 0.006599989148315695,
+      "lp_capacity_mean": 0.002836473904265687,
+      "cp_capacity_mean": 0.011277364807598769
+    },
+    "20.0": {
+      "delta_rate_min": 0.005888131917711114,
+      "delta_rate_max": 0.33591947975965747,
+      "delta_rate_mean": 0.04758848617555549,
+      "delta_capacity_min": 0.0106547613385642,
+      "delta_capacity_max": 0.49274283486516146,
+      "delta_capacity_mean": 0.07790089357504229,
+      "delta_gainnorm_rate_min": -4.3594283738457307e-10,
+      "delta_gainnorm_rate_max": 4.177813650585449e-10,
+      "delta_gainnorm_rate_mean": -1.652764287377049e-11,
+      "lp_rate_mean": 0.01641110811032432,
+      "cp_rate_mean": 0.06399959428587981,
+      "lp_capacity_mean": 0.0278649475802997,
+      "cp_capacity_mean": 0.10576584115534199
+    },
+    "delta_xpr_db": {
+      "min": -8.874927445832276,
+      "max": 13.52092775901855,
+      "mean": 2.3997193226976123
+    },
+    "delta_condition_number": {
+      "min": -2.3371707236208294e-07,
+      "max": 5.566219094532698e-07,
+      "mean": 3.1397732834332136e-10
+    }
+  },
+  "normalized": {
+    "0.0": {
+      "delta_rate_min": -7.612103117239635e-17,
+      "delta_rate_max": 7.612101793750655e-17,
+      "delta_rate_mean": 2.360217199638738e-19,
+      "delta_capacity_min": -4.123218744380005e-17,
+      "delta_capacity_max": 1.5858561120078837e-17,
+      "delta_capacity_mean": 9.812142882377592e-19,
+      "delta_gainnorm_rate_min": -1.3277379196097172e-11,
+      "delta_gainnorm_rate_max": 1.8853585359579483e-11,
+      "delta_gainnorm_rate_mean": -8.639040801939856e-13,
+      "lp_rate_mean": 2.191399444899043e-08,
+      "cp_rate_mean": 2.191399444922645e-08,
+      "lp_capacity_mean": 3.760416471383985e-08,
+      "cp_capacity_mean": 3.7604164714821067e-08
+    },
+    "10.0": {
+      "delta_rate_min": -1.7127196775895085e-16,
+      "delta_rate_max": 9.832294924256874e-17,
+      "delta_rate_mean": 5.5133659789601674e-18,
+      "delta_capacity_min": -3.0448293354950334e-16,
+      "delta_capacity_max": 9.19796253796997e-17,
+      "delta_capacity_mean": 9.57877230290442e-18,
+      "delta_gainnorm_rate_min": -1.3099299422947297e-10,
+      "delta_gainnorm_rate_max": 1.8909851462467486e-10,
+      "delta_gainnorm_rate_mean": -8.136855737689835e-12,
+      "lp_rate_mean": 2.1913992001556771e-07,
+      "cp_rate_mean": 2.1913992002108105e-07,
+      "lp_capacity_mean": 3.7604155342139163e-07,
+      "cp_capacity_mean": 3.7604155343097046e-07
+    },
+    "20.0": {
+      "delta_rate_min": -1.487511828122956e-15,
+      "delta_rate_max": 5.455315696791321e-16,
+      "delta_rate_mean": 4.796268981898151e-17,
+      "delta_capacity_min": -3.2065211488623013e-15,
+      "delta_capacity_max": 9.705362801946081e-16,
+      "delta_capacity_mean": 9.655903592942116e-17,
+      "delta_gainnorm_rate_min": -4.3517189851627336e-10,
+      "delta_gainnorm_rate_max": 4.171702983057912e-10,
+      "delta_gainnorm_rate_mean": -1.642671580327905e-11,
+      "lp_rate_mean": 2.1913967467828424e-06,
+      "cp_rate_mean": 2.1913967468308052e-06,
+      "lp_capacity_mean": 3.7604061624599623e-06,
+      "cp_capacity_mean": 3.7604061625565215e-06
+    },
+    "delta_xpr_db": {
+      "min": -8.703124501353177,
+      "max": 13.936693729955277,
+      "mean": 2.3896866278211637
+    },
+    "delta_condition_number": {
+      "min": -3.373447903243232e-07,
+      "max": 3.505475731913066e-07,
+      "mean": 9.730440440756952e-11
+    }
+  }
+}
