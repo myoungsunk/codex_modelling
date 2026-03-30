@@ -14,7 +14,7 @@ from dualpol_rt import build_phase2_patterns_from_standard_files, canonical_scen
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run the indoor richness and robustness campaign.")
     parser.add_argument("--ffd-dir", required=True, help="Directory containing LP_+45, LP_-45, RHCP, and LHCP FFD files.")
-    parser.add_argument("--output-dir", required=True, help="Directory for maps.npz, summary.json, and CSV artifacts.")
+    parser.add_argument("--output-dir", required=True, help="Directory for maps.npz, summary.json, checkpoint_status.json, and CSV artifacts.")
     parser.add_argument("--scenarios", nargs="*", help="Optional subset of canonical scenario names.")
     parser.add_argument("--screening-n-freq", type=int, default=21)
     parser.add_argument("--screening-grid-step", type=float, default=0.5)

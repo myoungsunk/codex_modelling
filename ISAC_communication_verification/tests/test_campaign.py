@@ -3,6 +3,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 import csv
+import json
 from pathlib import Path
 
 import numpy as np
@@ -82,10 +83,16 @@ class IndoorCampaignTests(unittest.TestCase):
         self.assertTrue((output_dir / "summary.json").exists())
         self.assertTrue((output_dir / "scene_metrics.csv").exists())
         self.assertTrue((output_dir / "pose_metrics.csv").exists())
+        self.assertTrue((output_dir / "checkpoint_status.json").exists())
         self.assertGreaterEqual(len(result.scene_summaries), 5)
         self.assertTrue(all(name not in result.headline_summary["selected_scenes"] for name in ("l_corridor_proxy", "lobby_blocker_proxy")))
         self.assertIn("l_corridor_proxy", result.headline_summary["proxy_scenes"])
         self.assertIn("lobby_blocker_proxy", result.headline_summary["proxy_scenes"])
+        checkpoint = json.loads((output_dir / "checkpoint_status.json").read_text(encoding="utf-8"))
+        self.assertEqual(checkpoint["stage"], "completed")
+        self.assertIn("selected_scenes", checkpoint)
+        self.assertIn("completed_selected_scenes", checkpoint)
+        self.assertIn("completed_proxy_scenes", checkpoint)
 
     def test_campaign_reports_delta_rate_p05_as_percentile_difference(self) -> None:
         result = run_indoor_campaign(

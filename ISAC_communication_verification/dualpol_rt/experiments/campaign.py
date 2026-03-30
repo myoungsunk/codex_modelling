@@ -729,6 +729,106 @@ def _write_maps_npz(
     np.savez(path, **arrays)
 
 
+def _artifact_file_paths(outdir: Path) -> dict[str, Path]:
+    return {
+        "maps": outdir / "maps.npz",
+        "summary": outdir / "summary.json",
+        "scene_metrics": outdir / "scene_metrics.csv",
+        "pose_metrics": outdir / "pose_metrics.csv",
+        "checkpoint_status": outdir / "checkpoint_status.json",
+    }
+
+
+def _checkpoint_payload(
+    *,
+    stage: str,
+    requested_specs: tuple[ScenarioSpec, ...],
+    selected_scene_names: list[str],
+    completed_selected_scenes: list[str],
+    completed_proxy_scenes: list[str],
+    last_completed_scenario: str | None,
+) -> dict[str, Any]:
+    requested_names = [spec.name for spec in requested_specs]
+    requested_proxy_names = [spec.name for spec in requested_specs if spec.proxy]
+    pending_selected = [name for name in selected_scene_names if name not in completed_selected_scenes]
+    pending_proxy = [name for name in requested_proxy_names if name not in completed_proxy_scenes]
+    return {
+        "stage": str(stage),
+        "requested_scenarios": requested_names,
+        "selected_scenes": list(selected_scene_names),
+        "completed_selected_scenes": list(completed_selected_scenes),
+        "pending_selected_scenes": pending_selected,
+        "completed_proxy_scenes": list(completed_proxy_scenes),
+        "pending_proxy_scenes": pending_proxy,
+        "last_completed_scenario": None if last_completed_scenario is None else str(last_completed_scenario),
+    }
+
+
+def _summary_payload(
+    *,
+    scene_summaries: tuple[SceneRichnessSummary, ...],
+    selection: CampaignSelection,
+    headline_summary: dict[str, Any],
+    checkpoint: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "scenarios": [_json_ready(summary.__dict__) for summary in scene_summaries],
+        "selection": {
+            "mrs_low_threshold": float(selection.mrs_low_threshold),
+            "mrs_high_threshold": float(selection.mrs_high_threshold),
+            "representatives": _json_ready(selection.representatives),
+        },
+        "headline_summary": _json_ready(headline_summary),
+        "checkpoint": _json_ready(checkpoint),
+        "notes": {
+            "headline_excludes_proxy": True,
+            "normalized_results_are_primary": True,
+            "raw_results_are_secondary": True,
+            "artifacts_are_checkpointed_after_each_completed_full_or_proxy_scenario": True,
+        },
+    }
+
+
+def _write_campaign_artifacts(
+    outdir: Path,
+    *,
+    screening_grids: dict[str, dict[str, Any]],
+    screening_rows: list[dict[str, Any]],
+    full_results: dict[str, tuple[RealisticCompareResult, np.ndarray]],
+    pose_rows: list[dict[str, Any]],
+    snr_db_list: tuple[float, ...],
+    scene_summaries: tuple[SceneRichnessSummary, ...],
+    selection: CampaignSelection,
+    headline_summary: dict[str, Any],
+    checkpoint: dict[str, Any],
+) -> dict[str, str]:
+    outdir.mkdir(parents=True, exist_ok=True)
+    paths = _artifact_file_paths(outdir)
+    _write_maps_npz(
+        paths["maps"],
+        screening_grids=screening_grids,
+        screening_rows=screening_rows,
+        full_results=full_results,
+        snr_db_list=snr_db_list,
+    )
+    _write_csv(paths["scene_metrics"], screening_rows)
+    _write_csv(paths["pose_metrics"], pose_rows)
+    paths["summary"].write_text(
+        json.dumps(
+            _summary_payload(
+                scene_summaries=scene_summaries,
+                selection=selection,
+                headline_summary=headline_summary,
+                checkpoint=checkpoint,
+            ),
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    paths["checkpoint_status"].write_text(json.dumps(_json_ready(checkpoint), indent=2), encoding="utf-8")
+    return {name: str(path) for name, path in paths.items()}
+
+
 def run_indoor_campaign(
     tx_lp_family: AntennaFamily,
     rx_lp_family: AntennaFamily,
@@ -778,6 +878,8 @@ def run_indoor_campaign(
     full_masks: dict[str, np.ndarray] = {}
     pose_rows: list[dict[str, Any]] = []
     headline_summary: dict[str, Any] = {"selected_scenes": {}, "proxy_scenes": {}}
+    completed_selected_scenes: list[str] = []
+    completed_proxy_scenes: list[str] = []
 
     for scene_index, scene_name in enumerate(selected_scene_names):
         spec = get_scenario_spec(scene_name)
@@ -828,6 +930,29 @@ def run_indoor_campaign(
             "r0_by_snr": {str(int(round(float(snr)))): float(value) for snr, value in r0_by_snr.items()},
             "protocol_rows": [row for row in pose_rows if row["scenario_name"] == scene_name and not row["proxy"]],
         }
+        completed_selected_scenes.append(scene_name)
+        if output_dir is not None:
+            screening_rows = [_flatten_point_record(record, snr_db_list) for record in screening_records]
+            checkpoint = _checkpoint_payload(
+                stage="selected_scene_completed",
+                requested_specs=requested_specs,
+                selected_scene_names=selected_scene_names,
+                completed_selected_scenes=completed_selected_scenes,
+                completed_proxy_scenes=completed_proxy_scenes,
+                last_completed_scenario=scene_name,
+            )
+            artifact_paths = _write_campaign_artifacts(
+                Path(output_dir),
+                screening_grids=screening_grids,
+                screening_rows=screening_rows,
+                full_results={name: (result, full_masks[name]) for name, result in full_results.items()},
+                pose_rows=pose_rows,
+                snr_db_list=snr_db_list,
+                scene_summaries=scene_summaries,
+                selection=selection,
+                headline_summary=headline_summary,
+                checkpoint=checkpoint,
+            )
 
     screening_by_scene = {spec.name: [record for record in screening_records if record.scenario_name == spec.name] for spec in requested_specs}
     proxy_specs = [spec for spec in requested_specs if spec.proxy]
@@ -870,46 +995,53 @@ def run_indoor_campaign(
             "reference_point": reference_point.tolist(),
             "protocol_rows": proxy_rows,
         }
+        completed_proxy_scenes.append(spec.name)
+        if output_dir is not None:
+            screening_rows = [_flatten_point_record(record, snr_db_list) for record in screening_records]
+            checkpoint = _checkpoint_payload(
+                stage="proxy_scene_completed",
+                requested_specs=requested_specs,
+                selected_scene_names=selected_scene_names,
+                completed_selected_scenes=completed_selected_scenes,
+                completed_proxy_scenes=completed_proxy_scenes,
+                last_completed_scenario=spec.name,
+            )
+            artifact_paths = _write_campaign_artifacts(
+                Path(output_dir),
+                screening_grids=screening_grids,
+                screening_rows=screening_rows,
+                full_results={name: (result, full_masks[name]) for name, result in full_results.items()},
+                pose_rows=pose_rows,
+                snr_db_list=snr_db_list,
+                scene_summaries=scene_summaries,
+                selection=selection,
+                headline_summary=headline_summary,
+                checkpoint=checkpoint,
+            )
 
     screening_rows = [_flatten_point_record(record, snr_db_list) for record in screening_records]
     artifact_paths: dict[str, str] = {}
     if output_dir is not None:
-        outdir = Path(output_dir)
-        outdir.mkdir(parents=True, exist_ok=True)
-        maps_path = outdir / "maps.npz"
-        summary_path = outdir / "summary.json"
-        scene_csv_path = outdir / "scene_metrics.csv"
-        pose_csv_path = outdir / "pose_metrics.csv"
-        _write_maps_npz(
-            maps_path,
+        checkpoint = _checkpoint_payload(
+            stage="completed",
+            requested_specs=requested_specs,
+            selected_scene_names=selected_scene_names,
+            completed_selected_scenes=completed_selected_scenes,
+            completed_proxy_scenes=completed_proxy_scenes,
+            last_completed_scenario=(completed_proxy_scenes[-1] if completed_proxy_scenes else completed_selected_scenes[-1] if completed_selected_scenes else None),
+        )
+        artifact_paths = _write_campaign_artifacts(
+            Path(output_dir),
             screening_grids=screening_grids,
             screening_rows=screening_rows,
             full_results={name: (result, full_masks[name]) for name, result in full_results.items()},
+            pose_rows=pose_rows,
             snr_db_list=snr_db_list,
+            scene_summaries=scene_summaries,
+            selection=selection,
+            headline_summary=headline_summary,
+            checkpoint=checkpoint,
         )
-        _write_csv(scene_csv_path, screening_rows)
-        _write_csv(pose_csv_path, pose_rows)
-        summary_payload = {
-            "scenarios": [_json_ready(summary.__dict__) for summary in scene_summaries],
-            "selection": {
-                "mrs_low_threshold": float(selection.mrs_low_threshold),
-                "mrs_high_threshold": float(selection.mrs_high_threshold),
-                "representatives": _json_ready(selection.representatives),
-            },
-            "headline_summary": _json_ready(headline_summary),
-            "notes": {
-                "headline_excludes_proxy": True,
-                "normalized_results_are_primary": True,
-                "raw_results_are_secondary": True,
-            },
-        }
-        summary_path.write_text(json.dumps(summary_payload, indent=2), encoding="utf-8")
-        artifact_paths = {
-            "maps": str(maps_path),
-            "summary": str(summary_path),
-            "scene_metrics": str(scene_csv_path),
-            "pose_metrics": str(pose_csv_path),
-        }
 
     return CampaignResult(
         scene_summaries=scene_summaries,
