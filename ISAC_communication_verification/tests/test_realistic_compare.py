@@ -93,11 +93,10 @@ class RealisticCompareTests(unittest.TestCase):
         )
         self.assertLess(debug["same_family_basis_invariance_lp"]["raw"], 1e-8)
         self.assertLess(debug["same_family_basis_invariance_lp"]["normalized"], 1e-8)
-        self.assertLess(debug["same_family_basis_invariance_cp"]["raw"], 1e-8)
-        self.assertLess(debug["same_family_basis_invariance_cp"]["normalized"], 1e-8)
+        self.assertIsNone(debug["same_family_basis_invariance_cp"])
         self.assertEqual(
             debug["same_family_basis_invariance_note"],
-            "Representation invariance is evaluated on the LP-family channel only; CP-family channels already live in circular port space.",
+            "Representation invariance is evaluated on the LP-family channel only; same_family_basis_invariance_cp is intentionally omitted because CP-family channels already live in circular port space.",
         )
 
     def test_realistic_debug_point_smoke(self) -> None:
@@ -115,6 +114,10 @@ class RealisticCompareTests(unittest.TestCase):
         self.assertEqual(debug["H_cp_raw"].shape, (cfg.n_freq, 2, 2))
         self.assertEqual(set(debug["lp_raw_summary"].equal_power_rate.keys()), {10.0})
         self.assertEqual(set(debug["cp_normalized_summary"].waterfilled_capacity.keys()), {10.0})
+        self.assertGreater(debug["lp_raw_summary"].total_rx_gain, 0.0)
+        self.assertEqual(debug["lp_raw_summary"].per_port_rx_gain.shape, (2,))
+        self.assertEqual(set(debug["lp_raw_summary"].best_port_rate.keys()), {10.0})
+        self.assertEqual(set(debug["lp_raw_summary"].fixed_rank1_rates.keys()), {"single_port", "equal_gain"})
 
     def test_delta_sign_is_cp_minus_lp(self) -> None:
         cfg, families = self._build_fixture()
@@ -172,6 +175,18 @@ class RealisticCompareTests(unittest.TestCase):
         normalized_delta = abs(debug["normalized_delta"].delta_equal_power_rate[10.0])
         self.assertGreater(raw_delta, 1e-6)
         self.assertLess(normalized_delta, raw_delta)
+        self.assertGreater(abs(debug["raw_delta"].delta_best_port_rate[10.0]), 1e-6)
+        self.assertGreater(abs(debug["raw_delta"].delta_fixed_rank1_rates["equal_gain"][10.0]), 1e-6)
+        self.assertAlmostEqual(
+            debug["lp_raw_summary"].gain_normalized_equal_power_rate[10.0],
+            debug["lp_raw_summary"].equal_power_rate[10.0],
+            places=12,
+        )
+        self.assertAlmostEqual(
+            debug["cp_raw_summary"].gain_normalized_equal_power_rate[10.0],
+            debug["cp_raw_summary"].equal_power_rate[10.0],
+            places=12,
+        )
         self.assertAlmostEqual(
             debug["lp_normalized_summary"].gain_normalized_equal_power_rate[10.0],
             debug["lp_normalized_summary"].equal_power_rate[10.0],

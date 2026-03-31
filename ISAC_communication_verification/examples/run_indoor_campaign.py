@@ -25,6 +25,8 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--pose-grid-y", type=int, default=10)
     parser.add_argument("--fc-ghz", type=float, default=6.5)
     parser.add_argument("--bw-mhz", type=float, default=500.0)
+    parser.add_argument("--raw-total-snr-threshold-db", type=float, default=-30.0)
+    parser.add_argument("--best-port-threshold-db", type=float, default=-30.0)
     return parser.parse_args()
 
 
@@ -47,6 +49,8 @@ def main() -> None:
         full_grid_step=args.full_grid_step,
         pose_seed_count=args.pose_seed_count,
         pose_grid_shape=(args.pose_grid_x, args.pose_grid_y),
+        raw_total_snr_threshold_db=args.raw_total_snr_threshold_db,
+        best_port_threshold_db=args.best_port_threshold_db,
     )
     print("Selected scenes:", sorted(result.full_compare_results.keys()))
     print("Artifacts:", result.artifact_paths)

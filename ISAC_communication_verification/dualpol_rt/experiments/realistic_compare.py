@@ -214,7 +214,7 @@ def evaluate_realistic_debug_point(
         rx_cp_link,
         normalization_mode="family_radiated_power",
     )
-    same_family_basis_invariance = {
+    same_family_basis_invariance_lp = {
         "raw": float(np.max(np.abs(condition_numbers(H_lp_raw) - condition_numbers(convert_basis(H_lp_raw, src="linear", dst="circular"))))),
         "normalized": float(np.max(np.abs(condition_numbers(H_lp_norm) - condition_numbers(convert_basis(H_lp_norm, src="linear", dst="circular"))))),
     }
@@ -241,9 +241,9 @@ def evaluate_realistic_debug_point(
             "lp": float(np.mean(np.linalg.norm(H_lp_norm, axis=(1, 2)))),
             "cp": float(np.mean(np.linalg.norm(H_cp_norm, axis=(1, 2)))),
         },
-        "same_family_basis_invariance_lp": same_family_basis_invariance,
-        "same_family_basis_invariance_cp": same_family_basis_invariance,
-        "same_family_basis_invariance_note": "Representation invariance is evaluated on the LP-family channel only; CP-family channels already live in circular port space.",
+        "same_family_basis_invariance_lp": same_family_basis_invariance_lp,
+        "same_family_basis_invariance_cp": None,
+        "same_family_basis_invariance_note": "Representation invariance is evaluated on the LP-family channel only; same_family_basis_invariance_cp is intentionally omitted because CP-family channels already live in circular port space.",
     }
 
 

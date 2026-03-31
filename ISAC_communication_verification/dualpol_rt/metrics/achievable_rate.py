@@ -60,10 +60,6 @@ def waterfilled_capacity(H_f: np.ndarray, snr_db: float) -> float:
 
 
 def gain_normalized_equal_power_rate(H_f: np.ndarray, snr_db: float) -> float:
-    H = np.asarray(H_f, dtype=np.complex128).copy()
-    nt = H.shape[-1]
-    for idx, Hk in enumerate(H):
-        norm = float(np.linalg.norm(Hk, ord="fro"))
-        if norm > 0.0:
-            H[idx] = Hk * (np.sqrt(nt) / norm)
-    return equal_power_rate(H, snr_db)
+    # Family-normalized channels should be compared directly under equal-power
+    # loading; per-frequency Frobenius renormalization changes the channel.
+    return equal_power_rate(np.asarray(H_f, dtype=np.complex128), snr_db)

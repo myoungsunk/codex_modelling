@@ -15,6 +15,7 @@ from dualpol_rt.em.materials import material_named
 from dualpol_rt.experiments.realistic_compare import CompareModeMaps, RealisticCompareResult, SystemMaps
 from dualpol_rt.geometry.image_method import enumerate_paths
 from dualpol_rt.metrics.comparison import ChannelDeltaSummary, ChannelSummary, compare_channels, summarize_channel
+from dualpol_rt.metrics.link_budget import gain_to_snr_db
 from dualpol_rt.metrics.richness import PathRichnessMetrics, compute_mrs_scores, compute_path_richness, label_mrs_scores
 from dualpol_rt.patterns import AntennaFamily, AntennaPose
 from dualpol_rt.scene.scenarios import ScenarioSpec, build_scenario_layout, canonical_scenarios, get_scenario_spec, scenario_grid
@@ -88,6 +89,26 @@ class _PointRecord:
     lp_capacity_norm: dict[float, float]
     cp_capacity_norm: dict[float, float]
     delta_capacity_norm: dict[float, float]
+    lp_total_snr_raw_db: dict[float, float]
+    cp_total_snr_raw_db: dict[float, float]
+    lp_best_port_snr_raw_db: dict[float, float]
+    cp_best_port_snr_raw_db: dict[float, float]
+    lp_best_port_rate_raw: dict[float, float]
+    cp_best_port_rate_raw: dict[float, float]
+    lp_fixed_single_rate_raw: dict[float, float]
+    cp_fixed_single_rate_raw: dict[float, float]
+    lp_fixed_egc_rate_raw: dict[float, float]
+    cp_fixed_egc_rate_raw: dict[float, float]
+    lp_port_power_imbalance_raw_db: float = np.nan
+    cp_port_power_imbalance_raw_db: float = np.nan
+    lp_best_port_rate_norm: dict[float, float] = field(default_factory=dict)
+    cp_best_port_rate_norm: dict[float, float] = field(default_factory=dict)
+    lp_fixed_single_rate_norm: dict[float, float] = field(default_factory=dict)
+    cp_fixed_single_rate_norm: dict[float, float] = field(default_factory=dict)
+    lp_fixed_egc_rate_norm: dict[float, float] = field(default_factory=dict)
+    cp_fixed_egc_rate_norm: dict[float, float] = field(default_factory=dict)
+    lp_port_power_imbalance_norm_db: float = np.nan
+    cp_port_power_imbalance_norm_db: float = np.nan
     mrs_raw: float = np.nan
     mrs_score: float = np.nan
     mrs_label: str = ""
@@ -292,6 +313,32 @@ def _make_point_record(
         lp_capacity_norm={float(snr): float(value) for snr, value in lp_norm_summary.waterfilled_capacity.items()},
         cp_capacity_norm={float(snr): float(value) for snr, value in cp_norm_summary.waterfilled_capacity.items()},
         delta_capacity_norm={float(snr): float(value) for snr, value in norm_delta.delta_waterfilled_capacity.items()},
+        lp_total_snr_raw_db={float(snr): gain_to_snr_db(lp_raw_summary.total_rx_gain, snr) for snr in lp_raw_summary.equal_power_rate},
+        cp_total_snr_raw_db={float(snr): gain_to_snr_db(cp_raw_summary.total_rx_gain, snr) for snr in cp_raw_summary.equal_power_rate},
+        lp_best_port_snr_raw_db={
+            float(snr): gain_to_snr_db(float(np.max(lp_raw_summary.per_port_rx_gain)) if lp_raw_summary.per_port_rx_gain.size else 0.0, snr)
+            for snr in lp_raw_summary.equal_power_rate
+        },
+        cp_best_port_snr_raw_db={
+            float(snr): gain_to_snr_db(float(np.max(cp_raw_summary.per_port_rx_gain)) if cp_raw_summary.per_port_rx_gain.size else 0.0, snr)
+            for snr in cp_raw_summary.equal_power_rate
+        },
+        lp_best_port_rate_raw={float(snr): float(value) for snr, value in lp_raw_summary.best_port_rate.items()},
+        cp_best_port_rate_raw={float(snr): float(value) for snr, value in cp_raw_summary.best_port_rate.items()},
+        lp_fixed_single_rate_raw={float(snr): float(value) for snr, value in lp_raw_summary.fixed_rank1_rates["single_port"].items()},
+        cp_fixed_single_rate_raw={float(snr): float(value) for snr, value in cp_raw_summary.fixed_rank1_rates["single_port"].items()},
+        lp_fixed_egc_rate_raw={float(snr): float(value) for snr, value in lp_raw_summary.fixed_rank1_rates["equal_gain"].items()},
+        cp_fixed_egc_rate_raw={float(snr): float(value) for snr, value in cp_raw_summary.fixed_rank1_rates["equal_gain"].items()},
+        lp_port_power_imbalance_raw_db=float(lp_raw_summary.port_imbalance_db),
+        cp_port_power_imbalance_raw_db=float(cp_raw_summary.port_imbalance_db),
+        lp_best_port_rate_norm={float(snr): float(value) for snr, value in lp_norm_summary.best_port_rate.items()},
+        cp_best_port_rate_norm={float(snr): float(value) for snr, value in cp_norm_summary.best_port_rate.items()},
+        lp_fixed_single_rate_norm={float(snr): float(value) for snr, value in lp_norm_summary.fixed_rank1_rates["single_port"].items()},
+        cp_fixed_single_rate_norm={float(snr): float(value) for snr, value in cp_norm_summary.fixed_rank1_rates["single_port"].items()},
+        lp_fixed_egc_rate_norm={float(snr): float(value) for snr, value in lp_norm_summary.fixed_rank1_rates["equal_gain"].items()},
+        cp_fixed_egc_rate_norm={float(snr): float(value) for snr, value in cp_norm_summary.fixed_rank1_rates["equal_gain"].items()},
+        lp_port_power_imbalance_norm_db=float(lp_norm_summary.port_imbalance_db),
+        cp_port_power_imbalance_norm_db=float(cp_norm_summary.port_imbalance_db),
     )
 
 
@@ -316,6 +363,10 @@ def _flatten_point_record(record: _PointRecord, snr_db_list: tuple[float, ...]) 
         "mrs_score": float(record.mrs_score),
         "mrs_label": record.mrs_label,
         "selected_role": record.selected_role,
+        "lp_port_power_imbalance_raw_db": float(record.lp_port_power_imbalance_raw_db),
+        "cp_port_power_imbalance_raw_db": float(record.cp_port_power_imbalance_raw_db),
+        "lp_port_power_imbalance_norm_db": float(record.lp_port_power_imbalance_norm_db),
+        "cp_port_power_imbalance_norm_db": float(record.cp_port_power_imbalance_norm_db),
     }
     for snr in snr_db_list:
         key = int(round(float(snr)))
@@ -331,6 +382,22 @@ def _flatten_point_record(record: _PointRecord, snr_db_list: tuple[float, ...]) 
         row[f"lp_capacity_norm_snr_{key}"] = float(record.lp_capacity_norm[float(snr)])
         row[f"cp_capacity_norm_snr_{key}"] = float(record.cp_capacity_norm[float(snr)])
         row[f"delta_capacity_norm_snr_{key}"] = float(record.delta_capacity_norm[float(snr)])
+        row[f"lp_total_snr_raw_db_snr_{key}"] = float(record.lp_total_snr_raw_db[float(snr)])
+        row[f"cp_total_snr_raw_db_snr_{key}"] = float(record.cp_total_snr_raw_db[float(snr)])
+        row[f"lp_best_port_snr_raw_db_snr_{key}"] = float(record.lp_best_port_snr_raw_db[float(snr)])
+        row[f"cp_best_port_snr_raw_db_snr_{key}"] = float(record.cp_best_port_snr_raw_db[float(snr)])
+        row[f"lp_best_port_rate_raw_snr_{key}"] = float(record.lp_best_port_rate_raw[float(snr)])
+        row[f"cp_best_port_rate_raw_snr_{key}"] = float(record.cp_best_port_rate_raw[float(snr)])
+        row[f"lp_fixed_single_rate_raw_snr_{key}"] = float(record.lp_fixed_single_rate_raw[float(snr)])
+        row[f"cp_fixed_single_rate_raw_snr_{key}"] = float(record.cp_fixed_single_rate_raw[float(snr)])
+        row[f"lp_fixed_egc_rate_raw_snr_{key}"] = float(record.lp_fixed_egc_rate_raw[float(snr)])
+        row[f"cp_fixed_egc_rate_raw_snr_{key}"] = float(record.cp_fixed_egc_rate_raw[float(snr)])
+        row[f"lp_best_port_rate_norm_snr_{key}"] = float(record.lp_best_port_rate_norm[float(snr)])
+        row[f"cp_best_port_rate_norm_snr_{key}"] = float(record.cp_best_port_rate_norm[float(snr)])
+        row[f"lp_fixed_single_rate_norm_snr_{key}"] = float(record.lp_fixed_single_rate_norm[float(snr)])
+        row[f"cp_fixed_single_rate_norm_snr_{key}"] = float(record.cp_fixed_single_rate_norm[float(snr)])
+        row[f"lp_fixed_egc_rate_norm_snr_{key}"] = float(record.lp_fixed_egc_rate_norm[float(snr)])
+        row[f"cp_fixed_egc_rate_norm_snr_{key}"] = float(record.cp_fixed_egc_rate_norm[float(snr)])
     return row
 
 
@@ -526,12 +593,34 @@ def _aggregate_rate_rows(
     point_records: list[_PointRecord],
     snr_db_list: tuple[float, ...],
     r0_by_snr: dict[float, float],
+    raw_total_snr_threshold_db: float,
+    best_port_threshold_db: float,
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for snr in snr_db_list:
         lp_rates = np.asarray([record.lp_rate_norm[float(snr)] for record in point_records], dtype=float)
         cp_rates = np.asarray([record.cp_rate_norm[float(snr)] for record in point_records], dtype=float)
         delta = cp_rates - lp_rates
+        lp_total_snr_raw_db = np.asarray([record.lp_total_snr_raw_db[float(snr)] for record in point_records], dtype=float)
+        cp_total_snr_raw_db = np.asarray([record.cp_total_snr_raw_db[float(snr)] for record in point_records], dtype=float)
+        lp_best_port_snr_raw_db = np.asarray([record.lp_best_port_snr_raw_db[float(snr)] for record in point_records], dtype=float)
+        cp_best_port_snr_raw_db = np.asarray([record.cp_best_port_snr_raw_db[float(snr)] for record in point_records], dtype=float)
+        lp_best_port_rate_raw = np.asarray([record.lp_best_port_rate_raw[float(snr)] for record in point_records], dtype=float)
+        cp_best_port_rate_raw = np.asarray([record.cp_best_port_rate_raw[float(snr)] for record in point_records], dtype=float)
+        lp_fixed_single_rate_raw = np.asarray([record.lp_fixed_single_rate_raw[float(snr)] for record in point_records], dtype=float)
+        cp_fixed_single_rate_raw = np.asarray([record.cp_fixed_single_rate_raw[float(snr)] for record in point_records], dtype=float)
+        lp_fixed_egc_rate_raw = np.asarray([record.lp_fixed_egc_rate_raw[float(snr)] for record in point_records], dtype=float)
+        cp_fixed_egc_rate_raw = np.asarray([record.cp_fixed_egc_rate_raw[float(snr)] for record in point_records], dtype=float)
+        lp_port_imbalance_raw_db = np.asarray([record.lp_port_power_imbalance_raw_db for record in point_records], dtype=float)
+        cp_port_imbalance_raw_db = np.asarray([record.cp_port_power_imbalance_raw_db for record in point_records], dtype=float)
+        lp_best_port_rate_norm = np.asarray([record.lp_best_port_rate_norm[float(snr)] for record in point_records], dtype=float)
+        cp_best_port_rate_norm = np.asarray([record.cp_best_port_rate_norm[float(snr)] for record in point_records], dtype=float)
+        lp_fixed_single_rate_norm = np.asarray([record.lp_fixed_single_rate_norm[float(snr)] for record in point_records], dtype=float)
+        cp_fixed_single_rate_norm = np.asarray([record.cp_fixed_single_rate_norm[float(snr)] for record in point_records], dtype=float)
+        lp_fixed_egc_rate_norm = np.asarray([record.lp_fixed_egc_rate_norm[float(snr)] for record in point_records], dtype=float)
+        cp_fixed_egc_rate_norm = np.asarray([record.cp_fixed_egc_rate_norm[float(snr)] for record in point_records], dtype=float)
+        lp_port_imbalance_norm_db = np.asarray([record.lp_port_power_imbalance_norm_db for record in point_records], dtype=float)
+        cp_port_imbalance_norm_db = np.asarray([record.cp_port_power_imbalance_norm_db for record in point_records], dtype=float)
         epsilon = 0.01 * float(np.mean(lp_rates)) if lp_rates.size else 0.0
         r0 = float(r0_by_snr[float(snr)])
         lp_p05 = float(np.percentile(lp_rates, 5.0)) if lp_rates.size else 0.0
@@ -557,6 +646,58 @@ def _aggregate_rate_rows(
                 "outage_lp": float(np.mean(lp_rates < r0)) if lp_rates.size else 0.0,
                 "outage_cp": float(np.mean(cp_rates < r0)) if cp_rates.size else 0.0,
                 "delta_outage": float(np.mean(cp_rates < r0) - np.mean(lp_rates < r0)) if lp_rates.size else 0.0,
+                "raw_total_snr_threshold_db": float(raw_total_snr_threshold_db),
+                "lp_raw_total_snr_mean_db": float(np.mean(lp_total_snr_raw_db)) if lp_total_snr_raw_db.size else 0.0,
+                "cp_raw_total_snr_mean_db": float(np.mean(cp_total_snr_raw_db)) if cp_total_snr_raw_db.size else 0.0,
+                "delta_raw_total_snr_mean_db": float(np.mean(cp_total_snr_raw_db - lp_total_snr_raw_db)) if lp_total_snr_raw_db.size else 0.0,
+                "lp_raw_total_snr_p05_db": float(np.percentile(lp_total_snr_raw_db, 5.0)) if lp_total_snr_raw_db.size else 0.0,
+                "cp_raw_total_snr_p05_db": float(np.percentile(cp_total_snr_raw_db, 5.0)) if cp_total_snr_raw_db.size else 0.0,
+                "coverage_lp_raw_total_snr": float(np.mean(lp_total_snr_raw_db >= raw_total_snr_threshold_db)) if lp_total_snr_raw_db.size else 0.0,
+                "coverage_cp_raw_total_snr": float(np.mean(cp_total_snr_raw_db >= raw_total_snr_threshold_db)) if cp_total_snr_raw_db.size else 0.0,
+                "delta_coverage_raw_total_snr": float(np.mean(cp_total_snr_raw_db >= raw_total_snr_threshold_db) - np.mean(lp_total_snr_raw_db >= raw_total_snr_threshold_db)) if lp_total_snr_raw_db.size else 0.0,
+                "best_port_threshold_db": float(best_port_threshold_db),
+                "lp_best_port_snr_mean_db": float(np.mean(lp_best_port_snr_raw_db)) if lp_best_port_snr_raw_db.size else 0.0,
+                "cp_best_port_snr_mean_db": float(np.mean(cp_best_port_snr_raw_db)) if cp_best_port_snr_raw_db.size else 0.0,
+                "delta_best_port_snr_mean_db": float(np.mean(cp_best_port_snr_raw_db - lp_best_port_snr_raw_db)) if lp_best_port_snr_raw_db.size else 0.0,
+                "lp_best_port_outage": float(np.mean(lp_best_port_snr_raw_db < best_port_threshold_db)) if lp_best_port_snr_raw_db.size else 0.0,
+                "cp_best_port_outage": float(np.mean(cp_best_port_snr_raw_db < best_port_threshold_db)) if cp_best_port_snr_raw_db.size else 0.0,
+                "delta_best_port_outage": float(np.mean(cp_best_port_snr_raw_db < best_port_threshold_db) - np.mean(lp_best_port_snr_raw_db < best_port_threshold_db)) if lp_best_port_snr_raw_db.size else 0.0,
+                "lp_best_port_rate_raw_mean": float(np.mean(lp_best_port_rate_raw)) if lp_best_port_rate_raw.size else 0.0,
+                "cp_best_port_rate_raw_mean": float(np.mean(cp_best_port_rate_raw)) if cp_best_port_rate_raw.size else 0.0,
+                "delta_best_port_rate_raw_mean": float(np.mean(cp_best_port_rate_raw - lp_best_port_rate_raw)) if lp_best_port_rate_raw.size else 0.0,
+                "lp_best_port_rate_raw_p05": float(np.percentile(lp_best_port_rate_raw, 5.0)) if lp_best_port_rate_raw.size else 0.0,
+                "cp_best_port_rate_raw_p05": float(np.percentile(cp_best_port_rate_raw, 5.0)) if cp_best_port_rate_raw.size else 0.0,
+                "lp_fixed_single_rate_raw_mean": float(np.mean(lp_fixed_single_rate_raw)) if lp_fixed_single_rate_raw.size else 0.0,
+                "cp_fixed_single_rate_raw_mean": float(np.mean(cp_fixed_single_rate_raw)) if cp_fixed_single_rate_raw.size else 0.0,
+                "delta_fixed_single_rate_raw_mean": float(np.mean(cp_fixed_single_rate_raw - lp_fixed_single_rate_raw)) if lp_fixed_single_rate_raw.size else 0.0,
+                "lp_fixed_single_rate_raw_p05": float(np.percentile(lp_fixed_single_rate_raw, 5.0)) if lp_fixed_single_rate_raw.size else 0.0,
+                "cp_fixed_single_rate_raw_p05": float(np.percentile(cp_fixed_single_rate_raw, 5.0)) if cp_fixed_single_rate_raw.size else 0.0,
+                "lp_fixed_egc_rate_raw_mean": float(np.mean(lp_fixed_egc_rate_raw)) if lp_fixed_egc_rate_raw.size else 0.0,
+                "cp_fixed_egc_rate_raw_mean": float(np.mean(cp_fixed_egc_rate_raw)) if cp_fixed_egc_rate_raw.size else 0.0,
+                "delta_fixed_egc_rate_raw_mean": float(np.mean(cp_fixed_egc_rate_raw - lp_fixed_egc_rate_raw)) if lp_fixed_egc_rate_raw.size else 0.0,
+                "lp_fixed_egc_rate_raw_p05": float(np.percentile(lp_fixed_egc_rate_raw, 5.0)) if lp_fixed_egc_rate_raw.size else 0.0,
+                "cp_fixed_egc_rate_raw_p05": float(np.percentile(cp_fixed_egc_rate_raw, 5.0)) if cp_fixed_egc_rate_raw.size else 0.0,
+                "lp_port_power_imbalance_raw_db_mean": float(np.mean(lp_port_imbalance_raw_db)) if lp_port_imbalance_raw_db.size else 0.0,
+                "cp_port_power_imbalance_raw_db_mean": float(np.mean(cp_port_imbalance_raw_db)) if cp_port_imbalance_raw_db.size else 0.0,
+                "lp_best_port_rate_norm_mean": float(np.mean(lp_best_port_rate_norm)) if lp_best_port_rate_norm.size else 0.0,
+                "cp_best_port_rate_norm_mean": float(np.mean(cp_best_port_rate_norm)) if cp_best_port_rate_norm.size else 0.0,
+                "delta_best_port_rate_norm_mean": float(np.mean(cp_best_port_rate_norm - lp_best_port_rate_norm)) if lp_best_port_rate_norm.size else 0.0,
+                "lp_best_port_rate_norm_p05": float(np.percentile(lp_best_port_rate_norm, 5.0)) if lp_best_port_rate_norm.size else 0.0,
+                "cp_best_port_rate_norm_p05": float(np.percentile(cp_best_port_rate_norm, 5.0)) if cp_best_port_rate_norm.size else 0.0,
+                "noninferiority_prob_best_port_rate_0": float(np.mean(cp_best_port_rate_norm >= lp_best_port_rate_norm)) if lp_best_port_rate_norm.size else 0.0,
+                "lp_fixed_single_rate_norm_mean": float(np.mean(lp_fixed_single_rate_norm)) if lp_fixed_single_rate_norm.size else 0.0,
+                "cp_fixed_single_rate_norm_mean": float(np.mean(cp_fixed_single_rate_norm)) if cp_fixed_single_rate_norm.size else 0.0,
+                "delta_fixed_single_rate_norm_mean": float(np.mean(cp_fixed_single_rate_norm - lp_fixed_single_rate_norm)) if lp_fixed_single_rate_norm.size else 0.0,
+                "lp_fixed_single_rate_norm_p05": float(np.percentile(lp_fixed_single_rate_norm, 5.0)) if lp_fixed_single_rate_norm.size else 0.0,
+                "cp_fixed_single_rate_norm_p05": float(np.percentile(cp_fixed_single_rate_norm, 5.0)) if cp_fixed_single_rate_norm.size else 0.0,
+                "lp_fixed_egc_rate_norm_mean": float(np.mean(lp_fixed_egc_rate_norm)) if lp_fixed_egc_rate_norm.size else 0.0,
+                "cp_fixed_egc_rate_norm_mean": float(np.mean(cp_fixed_egc_rate_norm)) if cp_fixed_egc_rate_norm.size else 0.0,
+                "delta_fixed_egc_rate_norm_mean": float(np.mean(cp_fixed_egc_rate_norm - lp_fixed_egc_rate_norm)) if lp_fixed_egc_rate_norm.size else 0.0,
+                "lp_fixed_egc_rate_norm_p05": float(np.percentile(lp_fixed_egc_rate_norm, 5.0)) if lp_fixed_egc_rate_norm.size else 0.0,
+                "cp_fixed_egc_rate_norm_p05": float(np.percentile(cp_fixed_egc_rate_norm, 5.0)) if cp_fixed_egc_rate_norm.size else 0.0,
+                "lp_port_power_imbalance_norm_db_mean": float(np.mean(lp_port_imbalance_norm_db)) if lp_port_imbalance_norm_db.size else 0.0,
+                "cp_port_power_imbalance_norm_db_mean": float(np.mean(cp_port_imbalance_norm_db)) if cp_port_imbalance_norm_db.size else 0.0,
+                "delta_port_power_imbalance_norm_db_mean": float(np.mean(cp_port_imbalance_norm_db - lp_port_imbalance_norm_db)) if lp_port_imbalance_norm_db.size else 0.0,
             }
         )
     return rows
@@ -782,8 +923,12 @@ def _summary_payload(
         "checkpoint": _json_ready(checkpoint),
         "notes": {
             "headline_excludes_proxy": True,
-            "normalized_results_are_primary": True,
-            "raw_results_are_secondary": True,
+            "practical_metrics_are_primary": True,
+            "normalized_ideal_2x2_results_are_secondary": True,
+            "normalized_2x2_rate_is_unitary_invariant": True,
+            "port_constrained_metrics_are_not_unitary_invariant": True,
+            "raw_power_invariance_is_not_assumed": True,
+            "straight_corridor_is_forced_into_full_compare_when_requested": True,
             "artifacts_are_checkpointed_after_each_completed_full_or_proxy_scenario": True,
         },
     }
@@ -847,6 +992,8 @@ def run_indoor_campaign(
     snr_db_list: tuple[float, ...] = (0.0, 10.0, 20.0),
     max_reflections: int = 2,
     base_seed: int = 20260326,
+    raw_total_snr_threshold_db: float = -30.0,
+    best_port_threshold_db: float = -30.0,
 ) -> CampaignResult:
     requested_specs = tuple(get_scenario_spec(name) for name in scenario_names) if scenario_names is not None else canonical_scenarios(include_proxy=True)
     screening_records, screening_grids = _evaluate_screening(
@@ -873,11 +1020,25 @@ def run_indoor_campaign(
         if bucket in selection.representatives:
             selected_scene_names.append(str(selection.representatives[bucket]["scenario_name"]))
     selected_scene_names = list(dict.fromkeys(selected_scene_names))
+    if any(spec.name == "straight_corridor" and not spec.proxy for spec in requested_specs) and "straight_corridor" not in selected_scene_names:
+        selected_scene_names.append("straight_corridor")
 
     full_results: dict[str, RealisticCompareResult] = {}
     full_masks: dict[str, np.ndarray] = {}
     pose_rows: list[dict[str, Any]] = []
-    headline_summary: dict[str, Any] = {"selected_scenes": {}, "proxy_scenes": {}}
+    headline_summary: dict[str, Any] = {
+        "selected_scenes": {},
+        "proxy_scenes": {},
+        "primary_kpis": [
+            "raw_total_snr",
+            "best_port_outage",
+            "best_port_rate",
+            "fixed_egc_rank1_rate",
+        ],
+        "raw_total_snr_threshold_db": float(raw_total_snr_threshold_db),
+        "best_port_threshold_db": float(best_port_threshold_db),
+        "conclusion": "For the current HFSS families, normalized ideal 2x2 MIMO link performance is invariant up to numerical precision, while raw link-budget and port-/chain-constrained metrics remain sensitive to LP-slant versus CP implementations.",
+    }
     completed_selected_scenes: list[str] = []
     completed_proxy_scenes: list[str] = []
 
@@ -902,7 +1063,18 @@ def run_indoor_campaign(
             float(snr): float(np.percentile([record.lp_rate_norm[float(snr)] for record in point_records], 5.0))
             for snr in snr_db_list
         }
-        pose_rows.extend(_aggregate_rate_rows(scene_name, spec.proxy, "P0", point_records, snr_db_list, r0_by_snr))
+        pose_rows.extend(
+            _aggregate_rate_rows(
+                scene_name,
+                spec.proxy,
+                "P0",
+                point_records,
+                snr_db_list,
+                r0_by_snr,
+                raw_total_snr_threshold_db,
+                best_port_threshold_db,
+            )
+        )
 
         subset_points = _select_subset_points(full_result.rx_x, full_result.rx_y, valid_mask, pose_grid_shape)
         pose_protocols = tuple(standard_pose_protocols()[name] for name in ("P1", "P2"))
@@ -924,7 +1096,18 @@ def run_indoor_campaign(
         )
         for protocol_name in ("P1", "P2"):
             protocol_records = [record for record in pose_samples if record.selected_role == protocol_name]
-            pose_rows.extend(_aggregate_rate_rows(scene_name, spec.proxy, protocol_name, protocol_records, snr_db_list, r0_by_snr))
+            pose_rows.extend(
+                _aggregate_rate_rows(
+                    scene_name,
+                    spec.proxy,
+                    protocol_name,
+                    protocol_records,
+                    snr_db_list,
+                    r0_by_snr,
+                    raw_total_snr_threshold_db,
+                    best_port_threshold_db,
+                )
+            )
         headline_summary["selected_scenes"][scene_name] = {
             "proxy": spec.proxy,
             "r0_by_snr": {str(int(round(float(snr)))): float(value) for snr, value in r0_by_snr.items()},
@@ -988,7 +1171,18 @@ def run_indoor_campaign(
         proxy_rows = []
         for protocol in proxy_protocols:
             protocol_records = [record for record in proxy_samples if record.selected_role == protocol.name]
-            proxy_rows.extend(_aggregate_rate_rows(spec.name, True, protocol.name, protocol_records, snr_db_list, r0_by_snr))
+            proxy_rows.extend(
+                _aggregate_rate_rows(
+                    spec.name,
+                    True,
+                    protocol.name,
+                    protocol_records,
+                    snr_db_list,
+                    r0_by_snr,
+                    raw_total_snr_threshold_db,
+                    best_port_threshold_db,
+                )
+            )
         pose_rows.extend(proxy_rows)
         headline_summary["proxy_scenes"][spec.name] = {
             "proxy": True,

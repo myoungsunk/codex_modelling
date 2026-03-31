@@ -88,11 +88,21 @@ class IndoorCampaignTests(unittest.TestCase):
         self.assertTrue(all(name not in result.headline_summary["selected_scenes"] for name in ("l_corridor_proxy", "lobby_blocker_proxy")))
         self.assertIn("l_corridor_proxy", result.headline_summary["proxy_scenes"])
         self.assertIn("lobby_blocker_proxy", result.headline_summary["proxy_scenes"])
+        self.assertIn("straight_corridor", result.full_compare_results)
+        self.assertEqual(result.headline_summary["primary_kpis"], ["raw_total_snr", "best_port_outage", "best_port_rate", "fixed_egc_rank1_rate"])
+        self.assertEqual(result.headline_summary["raw_total_snr_threshold_db"], -30.0)
+        self.assertEqual(result.headline_summary["best_port_threshold_db"], -30.0)
         checkpoint = json.loads((output_dir / "checkpoint_status.json").read_text(encoding="utf-8"))
         self.assertEqual(checkpoint["stage"], "completed")
         self.assertIn("selected_scenes", checkpoint)
         self.assertIn("completed_selected_scenes", checkpoint)
         self.assertIn("completed_proxy_scenes", checkpoint)
+        summary = json.loads((output_dir / "summary.json").read_text(encoding="utf-8"))
+        self.assertTrue(summary["notes"]["practical_metrics_are_primary"])
+        self.assertTrue(summary["notes"]["normalized_ideal_2x2_results_are_secondary"])
+        self.assertTrue(summary["notes"]["normalized_2x2_rate_is_unitary_invariant"])
+        self.assertTrue(summary["notes"]["port_constrained_metrics_are_not_unitary_invariant"])
+        self.assertTrue(summary["notes"]["raw_power_invariance_is_not_assumed"])
 
     def test_campaign_reports_delta_rate_p05_as_percentile_difference(self) -> None:
         result = run_indoor_campaign(
@@ -112,6 +122,18 @@ class IndoorCampaignTests(unittest.TestCase):
         )
         row = next(r for r in result.pose_rows if r["scenario_name"] == "open_office" and r["protocol"] == "P0")
         self.assertAlmostEqual(row["delta_rate_p05"], row["cp_rate_p05"] - row["lp_rate_p05"], places=12)
+        self.assertIn("lp_raw_total_snr_mean_db", row)
+        self.assertIn("cp_best_port_snr_mean_db", row)
+        self.assertIn("lp_fixed_egc_rate_raw_mean", row)
+        self.assertIn("lp_best_port_rate_norm_mean", row)
+        self.assertIn("lp_fixed_egc_rate_norm_mean", row)
+        self.assertEqual(row["raw_total_snr_threshold_db"], -30.0)
+        self.assertEqual(row["best_port_threshold_db"], -30.0)
+        self.assertGreater(row["cp_raw_total_snr_mean_db"], row["lp_raw_total_snr_mean_db"])
+        self.assertGreater(row["cp_best_port_snr_mean_db"], row["lp_best_port_snr_mean_db"])
+        self.assertGreater(row["cp_best_port_rate_raw_mean"], row["lp_best_port_rate_raw_mean"])
+        self.assertGreater(row["cp_fixed_egc_rate_raw_mean"], row["lp_fixed_egc_rate_raw_mean"])
+        self.assertGreaterEqual(row["cp_best_port_rate_norm_mean"], 0.0)
 
     def test_campaign_exports_capacity_columns_and_maps(self) -> None:
         output_dir = self.root / "campaign_capacity_out"
