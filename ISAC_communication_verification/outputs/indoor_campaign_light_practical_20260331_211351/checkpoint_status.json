@@ -1,0 +1,31 @@
+{
+  "stage": "completed",
+  "requested_scenarios": [
+    "open_office",
+    "mixed_office",
+    "lecture_room",
+    "straight_corridor",
+    "factory_lite",
+    "l_corridor_proxy",
+    "lobby_blocker_proxy"
+  ],
+  "selected_scenes": [
+    "mixed_office",
+    "open_office",
+    "factory_lite",
+    "straight_corridor"
+  ],
+  "completed_selected_scenes": [
+    "mixed_office",
+    "open_office",
+    "factory_lite",
+    "straight_corridor"
+  ],
+  "pending_selected_scenes": [],
+  "completed_proxy_scenes": [
+    "l_corridor_proxy",
+    "lobby_blocker_proxy"
+  ],
+  "pending_proxy_scenes": [],
+  "last_completed_scenario": "lobby_blocker_proxy"
+}
