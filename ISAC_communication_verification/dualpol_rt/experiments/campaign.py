@@ -99,16 +99,40 @@ class _PointRecord:
     cp_fixed_single_rate_raw: dict[float, float]
     lp_fixed_egc_rate_raw: dict[float, float]
     cp_fixed_egc_rate_raw: dict[float, float]
+    lp_xpr_raw_db: float = np.nan
+    cp_xpr_raw_db: float = np.nan
+    delta_xpr_raw_db: float = np.nan
+    lp_condition_number_raw: float = np.nan
+    cp_condition_number_raw: float = np.nan
+    delta_condition_number_raw: float = np.nan
     lp_port_power_imbalance_raw_db: float = np.nan
     cp_port_power_imbalance_raw_db: float = np.nan
+    lp_pdg_raw: dict[float, float] = field(default_factory=dict)
+    cp_pdg_raw: dict[float, float] = field(default_factory=dict)
+    delta_pdg_raw: dict[float, float] = field(default_factory=dict)
+    lp_mimo_efficiency_raw: dict[float, float] = field(default_factory=dict)
+    cp_mimo_efficiency_raw: dict[float, float] = field(default_factory=dict)
+    delta_mimo_efficiency_raw: dict[float, float] = field(default_factory=dict)
     lp_best_port_rate_norm: dict[float, float] = field(default_factory=dict)
     cp_best_port_rate_norm: dict[float, float] = field(default_factory=dict)
     lp_fixed_single_rate_norm: dict[float, float] = field(default_factory=dict)
     cp_fixed_single_rate_norm: dict[float, float] = field(default_factory=dict)
     lp_fixed_egc_rate_norm: dict[float, float] = field(default_factory=dict)
     cp_fixed_egc_rate_norm: dict[float, float] = field(default_factory=dict)
+    lp_xpr_norm_db: float = np.nan
+    cp_xpr_norm_db: float = np.nan
+    delta_xpr_norm_db: float = np.nan
+    lp_condition_number_norm: float = np.nan
+    cp_condition_number_norm: float = np.nan
+    delta_condition_number_norm: float = np.nan
     lp_port_power_imbalance_norm_db: float = np.nan
     cp_port_power_imbalance_norm_db: float = np.nan
+    lp_pdg_norm: dict[float, float] = field(default_factory=dict)
+    cp_pdg_norm: dict[float, float] = field(default_factory=dict)
+    delta_pdg_norm: dict[float, float] = field(default_factory=dict)
+    lp_mimo_efficiency_norm: dict[float, float] = field(default_factory=dict)
+    cp_mimo_efficiency_norm: dict[float, float] = field(default_factory=dict)
+    delta_mimo_efficiency_norm: dict[float, float] = field(default_factory=dict)
     mrs_raw: float = np.nan
     mrs_score: float = np.nan
     mrs_label: str = ""
@@ -329,16 +353,40 @@ def _make_point_record(
         cp_fixed_single_rate_raw={float(snr): float(value) for snr, value in cp_raw_summary.fixed_rank1_rates["single_port"].items()},
         lp_fixed_egc_rate_raw={float(snr): float(value) for snr, value in lp_raw_summary.fixed_rank1_rates["equal_gain"].items()},
         cp_fixed_egc_rate_raw={float(snr): float(value) for snr, value in cp_raw_summary.fixed_rank1_rates["equal_gain"].items()},
+        lp_xpr_raw_db=float(lp_raw_summary.xpr_db),
+        cp_xpr_raw_db=float(cp_raw_summary.xpr_db),
+        delta_xpr_raw_db=float(raw_delta.delta_xpr_db),
+        lp_condition_number_raw=float(lp_raw_summary.mean_condition_number),
+        cp_condition_number_raw=float(cp_raw_summary.mean_condition_number),
+        delta_condition_number_raw=float(raw_delta.delta_condition_number),
         lp_port_power_imbalance_raw_db=float(lp_raw_summary.port_imbalance_db),
         cp_port_power_imbalance_raw_db=float(cp_raw_summary.port_imbalance_db),
+        lp_pdg_raw={float(snr): float(value) for snr, value in lp_raw_summary.polarization_diversity_gain.items()},
+        cp_pdg_raw={float(snr): float(value) for snr, value in cp_raw_summary.polarization_diversity_gain.items()},
+        delta_pdg_raw={float(snr): float(value) for snr, value in raw_delta.delta_polarization_diversity_gain.items()},
+        lp_mimo_efficiency_raw={float(snr): float(value) for snr, value in lp_raw_summary.mimo_multiplexing_efficiency.items()},
+        cp_mimo_efficiency_raw={float(snr): float(value) for snr, value in cp_raw_summary.mimo_multiplexing_efficiency.items()},
+        delta_mimo_efficiency_raw={float(snr): float(value) for snr, value in raw_delta.delta_mimo_multiplexing_efficiency.items()},
         lp_best_port_rate_norm={float(snr): float(value) for snr, value in lp_norm_summary.best_port_rate.items()},
         cp_best_port_rate_norm={float(snr): float(value) for snr, value in cp_norm_summary.best_port_rate.items()},
         lp_fixed_single_rate_norm={float(snr): float(value) for snr, value in lp_norm_summary.fixed_rank1_rates["single_port"].items()},
         cp_fixed_single_rate_norm={float(snr): float(value) for snr, value in cp_norm_summary.fixed_rank1_rates["single_port"].items()},
         lp_fixed_egc_rate_norm={float(snr): float(value) for snr, value in lp_norm_summary.fixed_rank1_rates["equal_gain"].items()},
         cp_fixed_egc_rate_norm={float(snr): float(value) for snr, value in cp_norm_summary.fixed_rank1_rates["equal_gain"].items()},
+        lp_xpr_norm_db=float(lp_norm_summary.xpr_db),
+        cp_xpr_norm_db=float(cp_norm_summary.xpr_db),
+        delta_xpr_norm_db=float(norm_delta.delta_xpr_db),
+        lp_condition_number_norm=float(lp_norm_summary.mean_condition_number),
+        cp_condition_number_norm=float(cp_norm_summary.mean_condition_number),
+        delta_condition_number_norm=float(norm_delta.delta_condition_number),
         lp_port_power_imbalance_norm_db=float(lp_norm_summary.port_imbalance_db),
         cp_port_power_imbalance_norm_db=float(cp_norm_summary.port_imbalance_db),
+        lp_pdg_norm={float(snr): float(value) for snr, value in lp_norm_summary.polarization_diversity_gain.items()},
+        cp_pdg_norm={float(snr): float(value) for snr, value in cp_norm_summary.polarization_diversity_gain.items()},
+        delta_pdg_norm={float(snr): float(value) for snr, value in norm_delta.delta_polarization_diversity_gain.items()},
+        lp_mimo_efficiency_norm={float(snr): float(value) for snr, value in lp_norm_summary.mimo_multiplexing_efficiency.items()},
+        cp_mimo_efficiency_norm={float(snr): float(value) for snr, value in cp_norm_summary.mimo_multiplexing_efficiency.items()},
+        delta_mimo_efficiency_norm={float(snr): float(value) for snr, value in norm_delta.delta_mimo_multiplexing_efficiency.items()},
     )
 
 
@@ -363,8 +411,20 @@ def _flatten_point_record(record: _PointRecord, snr_db_list: tuple[float, ...]) 
         "mrs_score": float(record.mrs_score),
         "mrs_label": record.mrs_label,
         "selected_role": record.selected_role,
+        "lp_xpr_raw_db": float(record.lp_xpr_raw_db),
+        "cp_xpr_raw_db": float(record.cp_xpr_raw_db),
+        "delta_xpr_raw_db": float(record.delta_xpr_raw_db),
+        "lp_condition_number_raw": float(record.lp_condition_number_raw),
+        "cp_condition_number_raw": float(record.cp_condition_number_raw),
+        "delta_condition_number_raw": float(record.delta_condition_number_raw),
         "lp_port_power_imbalance_raw_db": float(record.lp_port_power_imbalance_raw_db),
         "cp_port_power_imbalance_raw_db": float(record.cp_port_power_imbalance_raw_db),
+        "lp_xpr_norm_db": float(record.lp_xpr_norm_db),
+        "cp_xpr_norm_db": float(record.cp_xpr_norm_db),
+        "delta_xpr_norm_db": float(record.delta_xpr_norm_db),
+        "lp_condition_number_norm": float(record.lp_condition_number_norm),
+        "cp_condition_number_norm": float(record.cp_condition_number_norm),
+        "delta_condition_number_norm": float(record.delta_condition_number_norm),
         "lp_port_power_imbalance_norm_db": float(record.lp_port_power_imbalance_norm_db),
         "cp_port_power_imbalance_norm_db": float(record.cp_port_power_imbalance_norm_db),
     }
@@ -392,12 +452,24 @@ def _flatten_point_record(record: _PointRecord, snr_db_list: tuple[float, ...]) 
         row[f"cp_fixed_single_rate_raw_snr_{key}"] = float(record.cp_fixed_single_rate_raw[float(snr)])
         row[f"lp_fixed_egc_rate_raw_snr_{key}"] = float(record.lp_fixed_egc_rate_raw[float(snr)])
         row[f"cp_fixed_egc_rate_raw_snr_{key}"] = float(record.cp_fixed_egc_rate_raw[float(snr)])
+        row[f"lp_pdg_raw_snr_{key}"] = float(record.lp_pdg_raw[float(snr)])
+        row[f"cp_pdg_raw_snr_{key}"] = float(record.cp_pdg_raw[float(snr)])
+        row[f"delta_pdg_raw_snr_{key}"] = float(record.delta_pdg_raw[float(snr)])
+        row[f"lp_mimo_efficiency_raw_snr_{key}"] = float(record.lp_mimo_efficiency_raw[float(snr)])
+        row[f"cp_mimo_efficiency_raw_snr_{key}"] = float(record.cp_mimo_efficiency_raw[float(snr)])
+        row[f"delta_mimo_efficiency_raw_snr_{key}"] = float(record.delta_mimo_efficiency_raw[float(snr)])
         row[f"lp_best_port_rate_norm_snr_{key}"] = float(record.lp_best_port_rate_norm[float(snr)])
         row[f"cp_best_port_rate_norm_snr_{key}"] = float(record.cp_best_port_rate_norm[float(snr)])
         row[f"lp_fixed_single_rate_norm_snr_{key}"] = float(record.lp_fixed_single_rate_norm[float(snr)])
         row[f"cp_fixed_single_rate_norm_snr_{key}"] = float(record.cp_fixed_single_rate_norm[float(snr)])
         row[f"lp_fixed_egc_rate_norm_snr_{key}"] = float(record.lp_fixed_egc_rate_norm[float(snr)])
         row[f"cp_fixed_egc_rate_norm_snr_{key}"] = float(record.cp_fixed_egc_rate_norm[float(snr)])
+        row[f"lp_pdg_norm_snr_{key}"] = float(record.lp_pdg_norm[float(snr)])
+        row[f"cp_pdg_norm_snr_{key}"] = float(record.cp_pdg_norm[float(snr)])
+        row[f"delta_pdg_norm_snr_{key}"] = float(record.delta_pdg_norm[float(snr)])
+        row[f"lp_mimo_efficiency_norm_snr_{key}"] = float(record.lp_mimo_efficiency_norm[float(snr)])
+        row[f"cp_mimo_efficiency_norm_snr_{key}"] = float(record.cp_mimo_efficiency_norm[float(snr)])
+        row[f"delta_mimo_efficiency_norm_snr_{key}"] = float(record.delta_mimo_efficiency_norm[float(snr)])
     return row
 
 
@@ -611,6 +683,14 @@ def _aggregate_rate_rows(
         cp_fixed_single_rate_raw = np.asarray([record.cp_fixed_single_rate_raw[float(snr)] for record in point_records], dtype=float)
         lp_fixed_egc_rate_raw = np.asarray([record.lp_fixed_egc_rate_raw[float(snr)] for record in point_records], dtype=float)
         cp_fixed_egc_rate_raw = np.asarray([record.cp_fixed_egc_rate_raw[float(snr)] for record in point_records], dtype=float)
+        lp_pdg_raw = np.asarray([record.lp_pdg_raw[float(snr)] for record in point_records], dtype=float)
+        cp_pdg_raw = np.asarray([record.cp_pdg_raw[float(snr)] for record in point_records], dtype=float)
+        lp_mimo_efficiency_raw = np.asarray([record.lp_mimo_efficiency_raw[float(snr)] for record in point_records], dtype=float)
+        cp_mimo_efficiency_raw = np.asarray([record.cp_mimo_efficiency_raw[float(snr)] for record in point_records], dtype=float)
+        lp_xpr_raw_db = np.asarray([record.lp_xpr_raw_db for record in point_records], dtype=float)
+        cp_xpr_raw_db = np.asarray([record.cp_xpr_raw_db for record in point_records], dtype=float)
+        lp_condition_number_raw = np.asarray([record.lp_condition_number_raw for record in point_records], dtype=float)
+        cp_condition_number_raw = np.asarray([record.cp_condition_number_raw for record in point_records], dtype=float)
         lp_port_imbalance_raw_db = np.asarray([record.lp_port_power_imbalance_raw_db for record in point_records], dtype=float)
         cp_port_imbalance_raw_db = np.asarray([record.cp_port_power_imbalance_raw_db for record in point_records], dtype=float)
         lp_best_port_rate_norm = np.asarray([record.lp_best_port_rate_norm[float(snr)] for record in point_records], dtype=float)
@@ -619,6 +699,14 @@ def _aggregate_rate_rows(
         cp_fixed_single_rate_norm = np.asarray([record.cp_fixed_single_rate_norm[float(snr)] for record in point_records], dtype=float)
         lp_fixed_egc_rate_norm = np.asarray([record.lp_fixed_egc_rate_norm[float(snr)] for record in point_records], dtype=float)
         cp_fixed_egc_rate_norm = np.asarray([record.cp_fixed_egc_rate_norm[float(snr)] for record in point_records], dtype=float)
+        lp_pdg_norm = np.asarray([record.lp_pdg_norm[float(snr)] for record in point_records], dtype=float)
+        cp_pdg_norm = np.asarray([record.cp_pdg_norm[float(snr)] for record in point_records], dtype=float)
+        lp_mimo_efficiency_norm = np.asarray([record.lp_mimo_efficiency_norm[float(snr)] for record in point_records], dtype=float)
+        cp_mimo_efficiency_norm = np.asarray([record.cp_mimo_efficiency_norm[float(snr)] for record in point_records], dtype=float)
+        lp_xpr_norm_db = np.asarray([record.lp_xpr_norm_db for record in point_records], dtype=float)
+        cp_xpr_norm_db = np.asarray([record.cp_xpr_norm_db for record in point_records], dtype=float)
+        lp_condition_number_norm = np.asarray([record.lp_condition_number_norm for record in point_records], dtype=float)
+        cp_condition_number_norm = np.asarray([record.cp_condition_number_norm for record in point_records], dtype=float)
         lp_port_imbalance_norm_db = np.asarray([record.lp_port_power_imbalance_norm_db for record in point_records], dtype=float)
         cp_port_imbalance_norm_db = np.asarray([record.cp_port_power_imbalance_norm_db for record in point_records], dtype=float)
         epsilon = 0.01 * float(np.mean(lp_rates)) if lp_rates.size else 0.0
@@ -677,6 +765,18 @@ def _aggregate_rate_rows(
                 "delta_fixed_egc_rate_raw_mean": float(np.mean(cp_fixed_egc_rate_raw - lp_fixed_egc_rate_raw)) if lp_fixed_egc_rate_raw.size else 0.0,
                 "lp_fixed_egc_rate_raw_p05": float(np.percentile(lp_fixed_egc_rate_raw, 5.0)) if lp_fixed_egc_rate_raw.size else 0.0,
                 "cp_fixed_egc_rate_raw_p05": float(np.percentile(cp_fixed_egc_rate_raw, 5.0)) if cp_fixed_egc_rate_raw.size else 0.0,
+                "lp_pdg_raw_mean": float(np.mean(lp_pdg_raw)) if lp_pdg_raw.size else 0.0,
+                "cp_pdg_raw_mean": float(np.mean(cp_pdg_raw)) if cp_pdg_raw.size else 0.0,
+                "delta_pdg_raw_mean": float(np.mean(cp_pdg_raw - lp_pdg_raw)) if lp_pdg_raw.size else 0.0,
+                "lp_mimo_efficiency_raw_mean": float(np.mean(lp_mimo_efficiency_raw)) if lp_mimo_efficiency_raw.size else 0.0,
+                "cp_mimo_efficiency_raw_mean": float(np.mean(cp_mimo_efficiency_raw)) if cp_mimo_efficiency_raw.size else 0.0,
+                "delta_mimo_efficiency_raw_mean": float(np.mean(cp_mimo_efficiency_raw - lp_mimo_efficiency_raw)) if lp_mimo_efficiency_raw.size else 0.0,
+                "lp_xpr_raw_db_mean": float(np.mean(lp_xpr_raw_db)) if lp_xpr_raw_db.size else 0.0,
+                "cp_xpr_raw_db_mean": float(np.mean(cp_xpr_raw_db)) if cp_xpr_raw_db.size else 0.0,
+                "delta_xpr_raw_db_mean": float(np.mean(cp_xpr_raw_db - lp_xpr_raw_db)) if lp_xpr_raw_db.size else 0.0,
+                "lp_condition_number_raw_mean": float(np.mean(lp_condition_number_raw)) if lp_condition_number_raw.size else 0.0,
+                "cp_condition_number_raw_mean": float(np.mean(cp_condition_number_raw)) if cp_condition_number_raw.size else 0.0,
+                "delta_condition_number_raw_mean": float(np.mean(cp_condition_number_raw - lp_condition_number_raw)) if lp_condition_number_raw.size else 0.0,
                 "lp_port_power_imbalance_raw_db_mean": float(np.mean(lp_port_imbalance_raw_db)) if lp_port_imbalance_raw_db.size else 0.0,
                 "cp_port_power_imbalance_raw_db_mean": float(np.mean(cp_port_imbalance_raw_db)) if cp_port_imbalance_raw_db.size else 0.0,
                 "lp_best_port_rate_norm_mean": float(np.mean(lp_best_port_rate_norm)) if lp_best_port_rate_norm.size else 0.0,
@@ -695,6 +795,18 @@ def _aggregate_rate_rows(
                 "delta_fixed_egc_rate_norm_mean": float(np.mean(cp_fixed_egc_rate_norm - lp_fixed_egc_rate_norm)) if lp_fixed_egc_rate_norm.size else 0.0,
                 "lp_fixed_egc_rate_norm_p05": float(np.percentile(lp_fixed_egc_rate_norm, 5.0)) if lp_fixed_egc_rate_norm.size else 0.0,
                 "cp_fixed_egc_rate_norm_p05": float(np.percentile(cp_fixed_egc_rate_norm, 5.0)) if cp_fixed_egc_rate_norm.size else 0.0,
+                "lp_pdg_norm_mean": float(np.mean(lp_pdg_norm)) if lp_pdg_norm.size else 0.0,
+                "cp_pdg_norm_mean": float(np.mean(cp_pdg_norm)) if cp_pdg_norm.size else 0.0,
+                "delta_pdg_norm_mean": float(np.mean(cp_pdg_norm - lp_pdg_norm)) if lp_pdg_norm.size else 0.0,
+                "lp_mimo_efficiency_norm_mean": float(np.mean(lp_mimo_efficiency_norm)) if lp_mimo_efficiency_norm.size else 0.0,
+                "cp_mimo_efficiency_norm_mean": float(np.mean(cp_mimo_efficiency_norm)) if cp_mimo_efficiency_norm.size else 0.0,
+                "delta_mimo_efficiency_norm_mean": float(np.mean(cp_mimo_efficiency_norm - lp_mimo_efficiency_norm)) if lp_mimo_efficiency_norm.size else 0.0,
+                "lp_xpr_norm_db_mean": float(np.mean(lp_xpr_norm_db)) if lp_xpr_norm_db.size else 0.0,
+                "cp_xpr_norm_db_mean": float(np.mean(cp_xpr_norm_db)) if cp_xpr_norm_db.size else 0.0,
+                "delta_xpr_norm_db_mean": float(np.mean(cp_xpr_norm_db - lp_xpr_norm_db)) if lp_xpr_norm_db.size else 0.0,
+                "lp_condition_number_norm_mean": float(np.mean(lp_condition_number_norm)) if lp_condition_number_norm.size else 0.0,
+                "cp_condition_number_norm_mean": float(np.mean(cp_condition_number_norm)) if cp_condition_number_norm.size else 0.0,
+                "delta_condition_number_norm_mean": float(np.mean(cp_condition_number_norm - lp_condition_number_norm)) if lp_condition_number_norm.size else 0.0,
                 "lp_port_power_imbalance_norm_db_mean": float(np.mean(lp_port_imbalance_norm_db)) if lp_port_imbalance_norm_db.size else 0.0,
                 "cp_port_power_imbalance_norm_db_mean": float(np.mean(cp_port_imbalance_norm_db)) if cp_port_imbalance_norm_db.size else 0.0,
                 "delta_port_power_imbalance_norm_db_mean": float(np.mean(cp_port_imbalance_norm_db - lp_port_imbalance_norm_db)) if lp_port_imbalance_norm_db.size else 0.0,

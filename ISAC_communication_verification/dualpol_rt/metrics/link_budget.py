@@ -58,6 +58,18 @@ def best_port_rate(H_f: np.ndarray, snr_db: float) -> float:
     return float(equal_power_rate(H[:, port_index : port_index + 1, :], snr_db))
 
 
+def polarization_diversity_gain(single_port_rate: float, equal_gain_rate: float) -> float:
+    """Fixed-combiner diversity gain relative to the single-port fallback."""
+    baseline = max(float(single_port_rate), 1.0e-30)
+    return float(float(equal_gain_rate) / baseline)
+
+
+def mimo_multiplexing_efficiency(capacity: float, best_port_rate_value: float, n_streams: int) -> float:
+    """Waterfilled-capacity efficiency relative to repeated best-port operation."""
+    baseline = max(float(n_streams), 1) * max(float(best_port_rate_value), 1.0e-30)
+    return float(float(capacity) / baseline)
+
+
 def fixed_combiner_rate(
     H_f: np.ndarray,
     snr_db: float,
@@ -102,7 +114,9 @@ __all__ = [
     "best_port_snr_db",
     "fixed_combiner_rate",
     "gain_to_snr_db",
+    "mimo_multiplexing_efficiency",
     "per_port_rx_gain",
+    "polarization_diversity_gain",
     "port_imbalance_db",
     "standard_fixed_rates",
     "total_rx_gain",

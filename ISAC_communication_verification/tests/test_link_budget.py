@@ -5,7 +5,15 @@ import unittest
 import numpy as np
 
 from dualpol_rt import convert_basis
-from dualpol_rt.metrics.link_budget import best_port_rate, per_port_rx_gain, port_imbalance_db, standard_fixed_rates, total_rx_gain
+from dualpol_rt.metrics.link_budget import (
+    best_port_rate,
+    mimo_multiplexing_efficiency,
+    per_port_rx_gain,
+    polarization_diversity_gain,
+    port_imbalance_db,
+    standard_fixed_rates,
+    total_rx_gain,
+)
 
 
 class LinkBudgetTests(unittest.TestCase):
@@ -25,6 +33,13 @@ class LinkBudgetTests(unittest.TestCase):
         rates_cp = standard_fixed_rates(self.H_cp, (10.0,))
         self.assertNotAlmostEqual(rates_lp["single_port"][10.0], rates_cp["single_port"][10.0], places=8)
         self.assertNotAlmostEqual(rates_lp["equal_gain"][10.0], rates_cp["equal_gain"][10.0], places=8)
+        pdg_lp = polarization_diversity_gain(rates_lp["single_port"][10.0], rates_lp["equal_gain"][10.0])
+        pdg_cp = polarization_diversity_gain(rates_cp["single_port"][10.0], rates_cp["equal_gain"][10.0])
+        self.assertNotAlmostEqual(pdg_lp, pdg_cp, places=8)
+
+    def test_multiplexing_efficiency_helper_is_positive(self) -> None:
+        eff = mimo_multiplexing_efficiency(capacity=2.5, best_port_rate_value=0.7, n_streams=2)
+        self.assertGreater(eff, 0.0)
 
 
 if __name__ == "__main__":

@@ -5,7 +5,15 @@ from dataclasses import dataclass
 import numpy as np
 
 from dualpol_rt.metrics.achievable_rate import equal_power_rate, gain_normalized_equal_power_rate, waterfilled_capacity
-from dualpol_rt.metrics.link_budget import best_port_rate, per_port_rx_gain, port_imbalance_db, standard_fixed_rates, total_rx_gain
+from dualpol_rt.metrics.link_budget import (
+    best_port_rate,
+    mimo_multiplexing_efficiency,
+    per_port_rx_gain,
+    polarization_diversity_gain,
+    port_imbalance_db,
+    standard_fixed_rates,
+    total_rx_gain,
+)
 from dualpol_rt.metrics.xpr import condition_numbers, singular_values, xpr_db
 
 
@@ -22,6 +30,8 @@ class ChannelSummary:
     port_imbalance_db: float
     best_port_rate: dict[float, float]
     fixed_rank1_rates: dict[str, dict[float, float]]
+    polarization_diversity_gain: dict[float, float]
+    mimo_multiplexing_efficiency: dict[float, float]
 
 
 @dataclass(frozen=True)
@@ -36,6 +46,8 @@ class ChannelDeltaSummary:
     delta_port_imbalance_db: float
     delta_best_port_rate: dict[float, float]
     delta_fixed_rank1_rates: dict[str, dict[float, float]]
+    delta_polarization_diversity_gain: dict[float, float]
+    delta_mimo_multiplexing_efficiency: dict[float, float]
 
 
 def _resolve_gain_normalized_rate(
@@ -61,9 +73,12 @@ def summarize_channel(
     cond = condition_numbers(H)
     per_port = per_port_rx_gain(H)
     fixed_rates = standard_fixed_rates(H, snr_db_list)
+    n_streams = max(min(int(H.shape[-2]), int(H.shape[-1])), 1)
+    best_rates = {float(snr): float(best_port_rate(H, snr)) for snr in snr_db_list}
+    capacities = {float(snr): waterfilled_capacity(H, snr) for snr in snr_db_list}
     return ChannelSummary(
         equal_power_rate={float(snr): equal_power_rate(H, snr) for snr in snr_db_list},
-        waterfilled_capacity={float(snr): waterfilled_capacity(H, snr) for snr in snr_db_list},
+        waterfilled_capacity=capacities,
         gain_normalized_equal_power_rate={
             float(snr): _resolve_gain_normalized_rate(H, snr, gain_normalized_mode=gain_normalized_mode) for snr in snr_db_list
         },
@@ -73,8 +88,16 @@ def summarize_channel(
         total_rx_gain=float(total_rx_gain(H)),
         per_port_rx_gain=per_port,
         port_imbalance_db=float(port_imbalance_db(H)),
-        best_port_rate={float(snr): float(best_port_rate(H, snr)) for snr in snr_db_list},
+        best_port_rate=best_rates,
         fixed_rank1_rates=fixed_rates,
+        polarization_diversity_gain={
+            float(snr): polarization_diversity_gain(fixed_rates["single_port"][float(snr)], fixed_rates["equal_gain"][float(snr)])
+            for snr in snr_db_list
+        },
+        mimo_multiplexing_efficiency={
+            float(snr): mimo_multiplexing_efficiency(capacities[float(snr)], best_rates[float(snr)], n_streams)
+            for snr in snr_db_list
+        },
     )
 
 
@@ -106,5 +129,13 @@ def compare_channels(
                 for snr in lp.fixed_rank1_rates[name]
             }
             for name in lp.fixed_rank1_rates
+        },
+        delta_polarization_diversity_gain={
+            snr: float(cp.polarization_diversity_gain[snr] - lp.polarization_diversity_gain[snr])
+            for snr in lp.polarization_diversity_gain
+        },
+        delta_mimo_multiplexing_efficiency={
+            snr: float(cp.mimo_multiplexing_efficiency[snr] - lp.mimo_multiplexing_efficiency[snr])
+            for snr in lp.mimo_multiplexing_efficiency
         },
     )
