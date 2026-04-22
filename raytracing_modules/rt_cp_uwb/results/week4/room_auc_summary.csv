@@ -1,0 +1,4 @@
+room_type,n,n_los,n_nlos,auc_cir,auc_cp,auc_joint,delta_auc
+A,75,5,70,1,0.72,1,0
+B,75,6,69,1,0.731884057971015,1,0
+C,75,5,70,1,0.96,1,0

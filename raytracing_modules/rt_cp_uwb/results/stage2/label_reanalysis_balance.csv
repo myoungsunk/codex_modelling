@@ -1,0 +1,17 @@
+label_name,label_display,room_type,n,n_neg,n_pos
+current_0p20,"Current ratio >= 0.20",ALL,900,79,821
+current_0p20,"Current ratio >= 0.20",A,300,28,272
+current_0p20,"Current ratio >= 0.20",B,300,25,275
+current_0p20,"Current ratio >= 0.20",C,300,26,274
+geo_only,"Geo only (has_los_path == 0)",ALL,900,833,67
+geo_only,"Geo only (has_los_path == 0)",A,300,300,0
+geo_only,"Geo only (has_los_path == 0)",B,300,293,7
+geo_only,"Geo only (has_los_path == 0)",C,300,240,60
+bounce_0p33_visible,"Bounce only (visible LoS, ratio >= 0.33)",ALL,833,463,370
+bounce_0p33_visible,"Bounce only (visible LoS, ratio >= 0.33)",A,300,165,135
+bounce_0p33_visible,"Bounce only (visible LoS, ratio >= 0.33)",B,293,162,131
+bounce_0p33_visible,"Bounce only (visible LoS, ratio >= 0.33)",C,240,136,104
+mixed_0p33,"Mixed geo OR bounce@0.33",ALL,900,463,437
+mixed_0p33,"Mixed geo OR bounce@0.33",A,300,165,135
+mixed_0p33,"Mixed geo OR bounce@0.33",B,300,162,138
+mixed_0p33,"Mixed geo OR bounce@0.33",C,300,136,164

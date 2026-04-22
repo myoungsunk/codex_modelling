@@ -1,0 +1,17 @@
+feature,AUC,n_valid
+gamma_cp_3_fp_only,0.9273,200
+kurtosis_total,0.8701,200
+peak_to_avg_ratio,0.7974,200
+gamma_cp_4_total_energy,0.6431,200
+gamma_cp_2_freq_db,0.6424,200
+gamma_cp_5_post_fp,0.6413,200
+gamma_cp_1_freq_avg,0.6344,200
+a_fp_1_norm_energy,0.5649,200
+k_factor_estimate,0.5649,200
+a_fp_4_kurt_local,0.5404,200
+a_fp_2_peak_to_total,0.5396,200
+a_fp_5_rise_time,0.5391,200
+a_fp_3_peak_to_max,0.4952,200
+a_fp_6_fp_to_2nd_peak,0.4952,200
+rms_delay_spread,0.4315,200
+gamma_cp_6_phase_circvar,0.1167,200

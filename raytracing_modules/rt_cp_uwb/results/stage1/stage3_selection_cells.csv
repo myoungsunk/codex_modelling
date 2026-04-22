@@ -1,0 +1,7 @@
+group,x_var,y_var,x_label,y_label,regime_desc,n,auc_cir,auc_joint,delta_auc
+G1,los_angle_from_anchor_bore_deg_results_tbl,slab_placement_cases_tbl,"[38.69, 45.86]","floor","los angle from anchor bore=[38.69, 45.86], slab placement=floor",67,0.759649122807018,0.959649122807018,0.2
+G1,los_angle_from_anchor_bore_deg_results_tbl,xpol_coupling_db,"[38.69, 45.86]","[31.80, 35.90]","los angle from anchor bore=[38.69, 45.86], xpol coupling db=[31.80, 35.90]",73,0.824046920821114,1,0.175953079178886
+G1,los_angle_from_anchor_bore_deg_results_tbl,xpol_coupling_db,"[1.27, 29.65]","[23.97, 27.71]","los angle from anchor bore=[1.27, 29.65], xpol coupling db=[23.97, 27.71]",67,0.817829457364341,0.951550387596899,0.133720930232558
+G2,slab_placement_cases_tbl,snr_db,"ceiling","[34.34, 39.99]","slab placement=ceiling, snr db=[34.34, 39.99]",72,0.93359375,0.8046875,-0.12890625
+G2,los_angle_from_anchor_bore_deg_results_tbl,slab_placement_cases_tbl,"[38.69, 45.86]","ceiling","los angle from anchor bore=[38.69, 45.86], slab placement=ceiling",82,1,1,0
+G2,slab_placement_cases_tbl,snr_db,"wall_y","[28.54, 34.34]","slab placement=wall_y, snr db=[28.54, 34.34]",79,0.872727272727273,0.887012987012987,0.0142857142857142

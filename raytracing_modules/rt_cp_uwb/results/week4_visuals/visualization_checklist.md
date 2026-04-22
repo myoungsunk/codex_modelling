@@ -1,0 +1,15 @@
+# Visualization Checklist Outputs
+
+- [F1a_room_wireframe_normals.png](F1a_room_wireframe_normals.png)
+- [F1b_room_grid_overlay.png](F1b_room_grid_overlay.png)
+- [F1c_room_material_eps_colorbar.png](F1c_room_material_eps_colorbar.png)
+- [F2a_los_angle_distance_scatter.png](F2a_los_angle_distance_scatter.png)
+- [F2b_eps_xpol_coverage_facets.png](F2b_eps_xpol_coverage_facets.png)
+- [F2c_label_balance_grid.png](F2c_label_balance_grid.png)
+- [F3a_room_label_auc_grid.png](F3a_room_label_auc_grid.png)
+- [F3b_delta_auc_heatmap.png](F3b_delta_auc_heatmap.png)
+- [F3c_stage1_vs_stage2_mixed_dotplot.png](F3c_stage1_vs_stage2_mixed_dotplot.png)
+- [F4a_gamma_vs_ar_gain_gated.png](F4a_gamma_vs_ar_gain_gated.png)
+- [F4b_disagreement_venn.png](F4b_disagreement_venn.png)
+- [F4c_rise_time_auc_by_label.png](F4c_rise_time_auc_by_label.png)
+- [F5_stage3_candidate_overlay.png](F5_stage3_candidate_overlay.png)

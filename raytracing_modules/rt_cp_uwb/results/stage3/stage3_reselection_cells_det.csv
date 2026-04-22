@@ -1,0 +1,7 @@
+x_var,y_var,x_index,y_index,x_label,y_label,n,auc_cir,auc_joint,delta_auc,n_pos,n_neg,regime_desc,group
+room_type_cases,los_angle_from_anchor_bore_deg_cases,3,3,C,"[40.56, 46.12]",63,0.815277777777778,1,0.184722222222222,15,44,"room type=C, los angle from anchor bore=[40.56, 46.12]",GEO
+room_type_cases,los_angle_from_anchor_bore_deg_cases,3,2,C,"[33.29, 40.56]",58,0.823529411764706,0.96987087517934,0.146341463414634,15,43,"room type=C, los angle from anchor bore=[33.29, 40.56]",GEO
+room_type_cases,xpol_coupling_db,3,1,C,"[20.04, 24.00]",60,0.87,1,0.13,10,49,"room type=C, xpol coupling db=[20.04, 24.00]",GEO
+room_type_cases,los_angle_from_anchor_bore_deg_cases,3,1,C,"[11.63, 33.29]",49,0.746666666666667,0.93,0.183333333333333,26,21,"room type=C, los angle from anchor bore=[11.63, 33.29]",BOUNCE
+room_type_cases,dominant_wall_material_cases,2,4,A,"wood",60,0.753761969904241,0.93296853625171,0.179206566347469,17,43,"room type=A, dominant wall material=wood",BOUNCE
+room_type_cases,dominant_wall_material_cases,1,1,B,"brick",60,0.740082079343365,0.896032831737346,0.155950752393981,17,43,"room type=B, dominant wall material=brick",BOUNCE

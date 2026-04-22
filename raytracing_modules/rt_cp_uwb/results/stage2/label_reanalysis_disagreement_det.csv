@@ -1,0 +1,5 @@
+label_name,room_type,cir_fail_cp_save,cp_fail_cir_save
+current_0p20,ALL,1,1
+geo_only,ALL,0,0
+bounce_0p33_visible,ALL,132,179
+mixed_0p33,ALL,151,211

@@ -1,0 +1,21 @@
+=== Week 2 Day 1: gamma_CP convention test ===
+Timestamp: 2026-04-21 16:25:38
+
+Convention: gamma_CP = |cross-pol| / |co-pol| = reversed-hand / same-hand
+Expectation: LoS -> low gamma_CP, odd-bounce NLoS -> high gamma_CP
+
+[LoS] gamma_cp_1_freq_avg = 0
+[LoS] gamma_cp_2_freq_db  = -Inf dB
+[1-bounce PEC] gamma_cp_1_freq_avg = 56.2341
+[1-bounce PEC] gamma_cp_2_freq_db  = 35.000 dB
+
+[B1] min gamma_cp over angle sweep = 35.000 dB
+[B2] same/reversed preservation ratio = 28.982 dB
+[B2] gamma_cp = reversed/same = -28.982 dB
+
+Artifacts:
+  D:\codex\raytracing_modules\rt_cp_uwb\results\sanity\plot_b1_handedness_reversal.png
+  D:\codex\raytracing_modules\rt_cp_uwb\results\sanity\plot_b2_even_bounce_handedness.png
+  D:\codex\raytracing_modules\rt_cp_uwb\results\week2_day1_convention_test.log
+
+Week 2 Day 1 convention test passed.
