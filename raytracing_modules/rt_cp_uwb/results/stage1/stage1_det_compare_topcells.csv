@@ -1,0 +1,11 @@
+rank,orig_cell,det_cell
+1,"eps_r |[2.00, 3.60] |xpol_coupling_db |[20.01, 24.00]","los_angle_from_anchor_bore_deg |[53.49, 77.65] |xpol_coupling_db |[24.00, 28.00]"
+2,"antenna_type |ideal |los_angle_from_anchor_bore_deg |[38.57, 45.77]","los_angle_from_anchor_bore_deg |[38.57, 45.77] |eps_r |[5.20, 6.80]"
+3,"antenna_type |ideal |slab_placement |wall_x","antenna_type |ideal |slab_placement |wall_x"
+4,"los_angle_from_anchor_bore_deg |[53.49, 77.65] |xpol_coupling_db |[24.00, 28.00]","antenna_type |ideal |los_angle_from_anchor_bore_deg |[45.77, 53.49]"
+5,"antenna_type |ideal |slab_placement |ceiling","antenna_type |ideal |los_angle_from_anchor_bore_deg |[38.57, 45.77]"
+6,"antenna_type |ideal |los_angle_from_anchor_bore_deg |[53.49, 77.65]","antenna_type |ideal |slab_placement |wall_y"
+7,"antenna_type |ideal |los_angle_from_anchor_bore_deg |[45.77, 53.49]","los_angle_from_anchor_bore_deg |[38.57, 45.77] |slab_placement |wall_x"
+8,"los_angle_from_anchor_bore_deg |[38.57, 45.77] |xpol_coupling_db |[28.00, 32.00]","antenna_type |ideal |slab_placement |ceiling"
+9,"los_angle_from_anchor_bore_deg |[38.57, 45.77] |slab_placement |wall_x","antenna_type |ideal |los_angle_from_anchor_bore_deg |[53.49, 77.65]"
+10,"antenna_type |ideal |slab_placement |wall_y","eps_r |[2.00, 3.60] |snr_db |[10.00, 16.00]"

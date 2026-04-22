@@ -14,9 +14,6 @@ function results_tbl = runSweepBatch(cases_tbl, cfg, verbose)
 
     for i = 1:n
         try
-            if ismember('case_id', cases_tbl.Properties.VariableNames)
-                rng(normalizeCaseSeed(cases_tbl.case_id(i)), 'twister');
-            end
             all_feats{i} = sweep.runOneCase(cases_tbl(i, :), cfg);
         catch ME
             all_feats{i} = struct( ...
@@ -34,14 +31,4 @@ function results_tbl = runSweepBatch(cases_tbl, cfg, verbose)
 
     results_tbl = sweep.structArrayToTable(all_feats);
     results_tbl = outerjoin(cases_tbl, results_tbl, 'Keys', 'case_id', 'MergeKeys', true, 'Type', 'left');
-end
-
-function seed = normalizeCaseSeed(case_id)
-    seed = mod(round(double(case_id)), 2^32 - 1);
-    if seed < 0
-        seed = seed + (2^32 - 1);
-    end
-    if seed == 0
-        seed = 1;
-    end
 end

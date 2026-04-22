@@ -1,0 +1,2 @@
+delta_auc_orig,delta_auc_det,delta_auc_shift,auc_cir_orig,auc_cir_det,auc_cir_shift,auc_cp_orig,auc_cp_det,auc_cp_shift,auc_joint_orig,auc_joint_det,auc_joint_shift,top3_overlap_count,top10_overlap_count,delta_stability_pass
+0.040992710120068,0.0462580403087469,0.00526533018867892,0.679536878216124,0.674522941680961,-0.00501393653516291,0.648484133790737,0.651881968267582,0.00339783447684505,0.720529588336192,0.720780981989708,0.000251393653516008,1,8,1

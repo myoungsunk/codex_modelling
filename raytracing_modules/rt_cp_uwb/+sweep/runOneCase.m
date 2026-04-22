@@ -6,6 +6,7 @@ function features_out = runOneCase(case_row, cfg)
     end
     cfg = ensureCfg(cfg);
     row = normalizeCaseRow(case_row);
+    seedCaseRng(row);
 
     mat = buildCaseMaterial(row);
     if isStage2RoomRow(row)
@@ -37,7 +38,7 @@ function features_out = runOneCase(case_row, cfg)
         features_out = failureStruct(row.case_id, 'zero_channel');
         return;
     end
-    H_noisy = sweep.injectSnr(H, row.snr_db, row.case_id);
+    H_noisy = sweep.injectSnr(H, row.snr_db);
     feats = features.extractAllFeatures(H_noisy, cfg.freqs, ...
         'window_type', cfg.window_type, ...
         'feature_schema', 'canonical18', ...
@@ -79,6 +80,22 @@ function features_out = runOneCase(case_row, cfg)
         features_out.los_angle_from_anchor_bore_deg = geom.los_angle_from_anchor_bore_deg;
         features_out.los_angle_from_tag_bore_deg = geom.los_angle_from_tag_bore_deg;
         features_out.slab_placement = row.slab_placement;
+    end
+end
+
+function seedCaseRng(row)
+    if isfield(row, 'case_id') && ~isempty(row.case_id) && isfinite(double(row.case_id))
+        rng(normalizeCaseSeed(row.case_id), 'twister');
+    end
+end
+
+function seed = normalizeCaseSeed(case_id)
+    seed = mod(round(double(case_id)), 2^32 - 1);
+    if seed < 0
+        seed = seed + (2^32 - 1);
+    end
+    if seed == 0
+        seed = 1;
     end
 end
 
