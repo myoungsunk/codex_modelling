@@ -4,6 +4,8 @@ addpath(repo_root);
 addpath(genpath(repo_root));
 
 cfg = config.defaultConfig();
+cfg.seed_base = 20260422;
+cfg.seed_stage_id = 'stage1_full_det';
 out_dir = fullfile(repo_root, 'results', 'stage1');
 if exist(out_dir, 'dir') ~= 7
     mkdir(out_dir);
@@ -96,7 +98,9 @@ fprintf(fid, '- failed: %d\n', sum(logical(results.failed)));
 fprintf(fid, '- valid_los: %d\n', sum(logical(results.is_los) & valid));
 fprintf(fid, '- valid_nlos: %d\n', sum(logical(results.is_nlos) & valid));
 fprintf(fid, '- checkpoint_every: %d\n', checkpoint_every);
-fprintf(fid, '- deterministic_seed_rule: case_id -> runOneCase local rng + injectSnr global randn\n');
+fprintf(fid, '- deterministic_seed_rule: composeCaseSeed(case_id, stage_id, base_seed, component)\n');
+fprintf(fid, '- seed_stage_id: %s\n', cfg.seed_stage_id);
+fprintf(fid, '- seed_base: %.0f\n', cfg.seed_base);
 
 fprintf('Stage 1 deterministic full: %.2f min, %.3f ms/case\n', elapsed / 60.0, elapsed / height(cases) * 1000.0);
 fprintf('Saved:\n  %s\n  %s\n  %s\n', mat_path, csv_path, summary_path);

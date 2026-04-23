@@ -8,12 +8,31 @@ if exist(out_dir, 'dir') ~= 7
     mkdir(out_dir);
 end
 
-stage2 = readtable(fullfile(repo_root, 'results', 'stage2', 'stage2_900_ffd_relabel.csv'), 'TextType', 'string');
-stage1 = readtable(fullfile(repo_root, 'results', 'stage1', 'stage1_3000_ffd.csv'), 'TextType', 'string');
-label_auc_tbl = readtable(fullfile(repo_root, 'results', 'stage2', 'label_reanalysis_auc.csv'), 'TextType', 'string');
-label_room_auc_tbl = readtable(fullfile(repo_root, 'results', 'stage2', 'label_reanalysis_room_auc.csv'), 'TextType', 'string');
-mechanism_tbl = readtable(fullfile(repo_root, 'results', 'stage2', 'mechanism_stage2.csv'), 'TextType', 'string');
-hfss_tbl = readtable(fullfile(repo_root, 'results', 'stage3', 'hfss_case_list.csv'), 'TextType', 'string');
+stage2_path = resolvePreferredPath( ...
+    fullfile(repo_root, 'results', 'stage2', 'stage2_900_ffd_relabel_det.csv'), ...
+    fullfile(repo_root, 'results', 'stage2', 'stage2_900_ffd_relabel.csv'));
+stage1_path = resolvePreferredPath( ...
+    fullfile(repo_root, 'results', 'stage1', 'stage1_3000_ffd_det.csv'), ...
+    fullfile(repo_root, 'results', 'stage1', 'stage1_3000_ffd.csv'));
+label_auc_path = resolvePreferredPath( ...
+    fullfile(repo_root, 'results', 'stage2', 'label_reanalysis_auc_det.csv'), ...
+    fullfile(repo_root, 'results', 'stage2', 'label_reanalysis_auc.csv'));
+label_room_auc_path = resolvePreferredPath( ...
+    fullfile(repo_root, 'results', 'stage2', 'label_reanalysis_room_auc_det.csv'), ...
+    fullfile(repo_root, 'results', 'stage2', 'label_reanalysis_room_auc.csv'));
+mechanism_path = resolvePreferredPath( ...
+    fullfile(repo_root, 'results', 'stage2', 'mechanism_stage2_det.csv'), ...
+    fullfile(repo_root, 'results', 'stage2', 'mechanism_stage2.csv'));
+hfss_path = resolvePreferredPath( ...
+    fullfile(repo_root, 'results', 'stage3', 'hfss_case_list_det.csv'), ...
+    fullfile(repo_root, 'results', 'stage3', 'hfss_case_list.csv'));
+
+stage2 = readtable(stage2_path, 'TextType', 'string');
+stage1 = readtable(stage1_path, 'TextType', 'string');
+label_auc_tbl = readtable(label_auc_path, 'TextType', 'string');
+label_room_auc_tbl = readtable(label_room_auc_path, 'TextType', 'string');
+mechanism_tbl = readtable(mechanism_path, 'TextType', 'string');
+hfss_tbl = readtable(hfss_path, 'TextType', 'string');
 
 stage2.effective_eps_r = computeEffectiveEps(stage2.dominant_wall_material_cases, stage2.eps_r_multiplier_cases);
 stage1.effective_eps_r = stage1.eps_r;
@@ -514,27 +533,17 @@ end
 
 function [auc, pred] = fitAndPredict(tbl, feature_names, y)
     X = table2array(tbl(:, feature_names));
-    valid = all(isfinite(X), 2) & isfinite(y);
-    X = X(valid, :);
-    y = y(valid);
-    pred = NaN(sum(valid), 1);
-    if size(X, 1) < 10 || numel(unique(y)) < 2
-        auc = NaN;
-        pred = NaN(size(y));
-        return;
-    end
-    mu = mean(X, 1);
-    sigma = std(X, 0, 1);
-    sigma(sigma < 1e-9) = 1.0;
-    X = (X - mu) ./ sigma;
-    warn_state = warning;
-    cleanup = onCleanup(@() warning(warn_state)); %#ok<NASGU>
-    warning('off', 'all');
-    mdl = fitglm(X, y, 'Distribution', 'binomial', 'Link', 'logit');
-    pred = predict(mdl, X);
-    [~, ~, ~, auc] = perfcurve(y, pred, 1);
+    [auc, pred] = analysis.cvLogisticAuc(X, double(y));
 end
 
 function auc = fitOnly(tbl, feature_names, y)
     [auc, ~] = fitAndPredict(tbl, feature_names, y);
+end
+
+function path_out = resolvePreferredPath(primary_path, fallback_path)
+    if exist(primary_path, 'file') == 2
+        path_out = primary_path;
+    else
+        path_out = fallback_path;
+    end
 end

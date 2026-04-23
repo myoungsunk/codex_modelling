@@ -37,6 +37,7 @@ groups = { ...
 
 cell_tables = cell(numel(groups), 1);
 candidate_tables = cell(numel(groups), 1);
+selected_case_ids = [];
 
 for g = 1:numel(groups)
     spec = groups{g};
@@ -62,8 +63,9 @@ for g = 1:numel(groups)
         mask = cellMask(subset, selected_cells.x_var{idx}, selected_cells.x_label{idx}) & ...
             cellMask(subset, selected_cells.y_var{idx}, selected_cells.y_label{idx});
         regime_tbl = subset(mask, :);
-        chosen = selectRepresentativeCases(regime_tbl, spec.group, spec.reason, selected_cells.regime_desc{idx}, 5, spec.label_name);
+        chosen = selectRepresentativeCases(regime_tbl, spec.group, spec.reason, selected_cells.regime_desc{idx}, 5, spec.label_name, selected_case_ids);
         regime_cases = [regime_cases; chosen]; %#ok<AGROW>
+        selected_case_ids = [selected_case_ids; double(chosen.case_id)]; %#ok<AGROW>
     end
     candidate_tables{g} = regime_cases;
 end
@@ -129,7 +131,13 @@ function bounds = parseBounds(label)
     bounds = double(tokens(:)).';
 end
 
-function case_tbl = selectRepresentativeCases(tbl, group_name, reason, regime_desc, rep_count, label_name)
+function case_tbl = selectRepresentativeCases(tbl, group_name, reason, regime_desc, rep_count, label_name, exclude_case_ids)
+    if nargin < 7
+        exclude_case_ids = [];
+    end
+    if ~isempty(exclude_case_ids)
+        tbl = tbl(~ismember(double(tbl.case_id), double(exclude_case_ids(:))), :);
+    end
     rep_count = min(rep_count, height(tbl));
     pos_tbl = tbl(logical(tbl.(label_name)), :);
     neg_tbl = tbl(~logical(tbl.(label_name)), :);
@@ -169,7 +177,7 @@ function case_tbl = selectRepresentativeCases(tbl, group_name, reason, regime_de
     case_tbl.tag_y = selected.tag_y;
     case_tbl.tag_z = selected.tag_z;
     case_tbl.los_angle_deg = los_angle;
-    case_tbl.xpol_coupling_db = selected.xpol_coupling_db;
+    case_tbl.xpol_coupling_db_expected = selected.xpol_coupling_db;
     case_tbl.snr_db = selected.snr_db;
     case_tbl.gamma_cp_3_fp_only = selected.gamma_cp_3_fp_only;
     case_tbl.has_los_path = logical(selected.has_los_path);
@@ -181,7 +189,7 @@ function selected = selectNearest(tbl, k)
         selected = tbl([]);
         return;
     end
-    cont_names = {'tag_x', 'tag_y', 'tag_z', 'los_angle_from_anchor_bore_deg_cases', 'xpol_coupling_db', 'snr_db', 'gamma_cp_3_fp_only', 'bounce_to_los_ratio_mid'};
+    cont_names = {'tag_x', 'tag_y', 'tag_z', 'los_angle_from_anchor_bore_deg_cases', 'xpol_coupling_db', 'snr_db', 'gamma_cp_3_fp_only'};
     cont_names = cont_names(ismember(cont_names, tbl.Properties.VariableNames));
     X = table2array(tbl(:, cont_names));
     mu = median(X, 1, 'omitnan');

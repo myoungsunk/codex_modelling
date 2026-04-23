@@ -103,25 +103,7 @@ end
 
 function [auc, pred] = fitAndPredict(tbl, feature_names, y)
     X = table2array(tbl(:, feature_names));
-    valid = all(isfinite(X), 2) & isfinite(y);
-    X = X(valid, :);
-    y = y(valid);
-    pred = NaN(size(valid));
-    if size(X, 1) < 10 || numel(unique(y)) < 2
-        auc = NaN;
-        return;
-    end
-    mu = mean(X, 1);
-    sigma = std(X, 0, 1);
-    sigma(sigma < 1e-9) = 1.0;
-    X = (X - mu) ./ sigma;
-    warn_state = warning;
-    cleanup = onCleanup(@() warning(warn_state)); %#ok<NASGU>
-    warning('off', 'all');
-    mdl = fitglm(X, y, 'Distribution', 'binomial', 'Link', 'logit');
-    p = predict(mdl, X);
-    [~, ~, ~, auc] = perfcurve(y, p, 1);
-    pred(valid) = p;
+    [auc, pred] = analysis.cvLogisticAuc(X, y);
 end
 
 function auc = fitOnly(tbl, feature_names, y)

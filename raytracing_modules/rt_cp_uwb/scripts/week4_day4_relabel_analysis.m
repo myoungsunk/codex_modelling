@@ -58,9 +58,11 @@ for idx = 1:numel(label_defs)
         room_mask = strcmp(room_values, rooms{room_idx});
         y_room = y(room_mask);
         tbl_room = tbl(room_mask, :);
+        auc_cir_room = fitOnly(tbl_room, cir_features, y_room);
+        auc_cp_room = fitOnly(tbl_room, cp_features, y_room);
+        auc_joint_room = fitOnly(tbl_room, joint_features, y_room);
         room_rows(end + 1, :) = {spec.name, rooms{room_idx}, height(tbl_room), sum(y_room == 0), sum(y_room == 1), ...
-            fitOnly(tbl_room, cir_features, y_room), fitOnly(tbl_room, cp_features, y_room), fitOnly(tbl_room, joint_features, y_room), ...
-            fitOnly(tbl_room, joint_features, y_room) - fitOnly(tbl_room, cir_features, y_room)}; %#ok<AGROW>
+            auc_cir_room, auc_cp_room, auc_joint_room, auc_joint_room - auc_cir_room}; %#ok<AGROW>
         label_rows(end + 1, :) = {spec.name, spec.display, rooms{room_idx}, height(tbl_room), sum(y_room == 0), sum(y_room == 1)}; %#ok<AGROW>
     end
 end
@@ -143,26 +145,7 @@ fprintf('  %s\n', md_path);
 
 function [auc, pred] = fitAndPredict(tbl, feature_names, y)
     X = table2array(tbl(:, feature_names));
-    valid = all(isfinite(X), 2) & isfinite(y);
-    X = X(valid, :);
-    y = y(valid);
-    pred = NaN(size(valid));
-    if size(X, 1) < 10 || numel(unique(y)) < 2
-        auc = NaN;
-        return;
-    end
-
-    mu = mean(X, 1);
-    sigma = std(X, 0, 1);
-    sigma(sigma < 1e-9) = 1.0;
-    X = (X - mu) ./ sigma;
-    warn_state = warning;
-    cleanup = onCleanup(@() warning(warn_state)); %#ok<NASGU>
-    warning('off', 'all');
-    mdl = fitglm(X, y, 'Distribution', 'binomial', 'Link', 'logit');
-    p = predict(mdl, X);
-    [~, ~, ~, auc] = perfcurve(y, p, 1);
-    pred(valid) = p;
+    [auc, pred] = analysis.cvLogisticAuc(X, y);
 end
 
 function auc = fitOnly(tbl, feature_names, y)

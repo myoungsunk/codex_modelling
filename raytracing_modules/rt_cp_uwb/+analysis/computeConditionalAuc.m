@@ -67,34 +67,7 @@ function [delta_auc, bin_info] = computeConditionalAuc(results, condition_var, f
 end
 
 function auc = fitAndAuc(X, y)
-    if isempty(X)
-        auc = NaN;
-        return;
-    end
-
-    valid = all(isfinite(X), 2) & isfinite(y);
-    X = X(valid, :);
-    y = y(valid);
-    if size(X, 1) < 10 || numel(unique(y)) < 2
-        auc = NaN;
-        return;
-    end
-
-    mu = mean(X, 1);
-    sigma = std(X, 0, 1);
-    sigma(sigma < 1e-9) = 1.0;
-    Xs = (X - mu) ./ sigma;
-
-    try
-        warn_state = warning;
-        cleanup = onCleanup(@() warning(warn_state)); %#ok<NASGU>
-        warning('off', 'all');
-        mdl = fitglm(Xs, y, 'Distribution', 'binomial', 'Link', 'logit');
-        pred = predict(mdl, Xs);
-        [~, ~, ~, auc] = perfcurve(y, pred, 1);
-    catch
-        auc = NaN;
-    end
+    auc = analysis.cvLogisticAuc(X, y);
 end
 
 function validateFeatureSet(results, feature_set, arg_name)

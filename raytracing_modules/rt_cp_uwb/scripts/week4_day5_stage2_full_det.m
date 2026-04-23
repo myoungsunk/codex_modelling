@@ -4,6 +4,8 @@ addpath(repo_root);
 addpath(genpath(repo_root));
 
 cfg = config.defaultConfig();
+cfg.seed_base = 20260422;
+cfg.seed_stage_id = 'stage2_full_det';
 out_dir = fullfile(repo_root, 'results', 'stage2');
 if exist(out_dir, 'dir') ~= 7
     mkdir(out_dir);
@@ -41,7 +43,6 @@ end
 
 for i = start_idx:n
     try
-        rng(normalizeCaseSeed(cases.case_id(i)), 'twister');
         all_feats{i} = sweep.runOneCase(cases(i, :), cfg);
     catch ME
         all_feats{i} = struct( ...
@@ -97,7 +98,9 @@ fprintf(fid, '- elapsed_min: %.6f\n', elapsed / 60.0);
 fprintf(fid, '- per_case_ms: %.6f\n', elapsed / height(cases) * 1000.0);
 fprintf(fid, '- failed: %d\n', sum(logical(results.failed)));
 fprintf(fid, '- checkpoint_every: %d\n', checkpoint_every);
-fprintf(fid, '- deterministic_seed_rule: case_id -> rng + injectSnr local stream\n\n');
+fprintf(fid, '- deterministic_seed_rule: composeCaseSeed(case_id, stage_id, base_seed, component)\n');
+fprintf(fid, '- seed_stage_id: %s\n', cfg.seed_stage_id);
+fprintf(fid, '- seed_base: %.0f\n\n', cfg.seed_base);
 fprintf(fid, '| room | n_total | n_valid | n_failed | n_los | n_nlos |\n');
 fprintf(fid, '|---|---:|---:|---:|---:|---:|\n');
 for idx = 1:numel(rooms)
@@ -131,14 +134,4 @@ function names = resolveColumnNames(tbl, base_name)
         return;
     end
     error('Column %s not found', base_name);
-end
-
-function seed = normalizeCaseSeed(case_id)
-    seed = mod(round(double(case_id)), 2^32 - 1);
-    if seed < 0
-        seed = seed + (2^32 - 1);
-    end
-    if seed == 0
-        seed = 1;
-    end
 end

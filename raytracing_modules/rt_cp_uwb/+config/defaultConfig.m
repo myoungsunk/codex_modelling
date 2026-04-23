@@ -15,4 +15,7 @@ function cfg = defaultConfig()
     cfg.results_dir = fullfile(project_root, 'results');
     cfg.sanity_dir = fullfile(cfg.results_dir, 'sanity');
     cfg.sweep_dir = fullfile(cfg.results_dir, 'sweep');
+    cfg.seed_base = 0;
+    cfg.seed_stage_id = '';
+    cfg.seed_replicate_id = 0;
 end

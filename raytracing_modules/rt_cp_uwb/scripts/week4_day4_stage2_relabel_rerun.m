@@ -118,31 +118,17 @@ fprintf('  %s\n', room_csv);
 
 function row = metricRow(tbl, label_name, cir_features, cp_features, joint_features, y_raw)
     y = double(logical(y_raw));
+    auc_cir = fitAndAuc(tbl, cir_features, y);
+    auc_cp = fitAndAuc(tbl, cp_features, y);
+    auc_joint = fitAndAuc(tbl, joint_features, y);
     row = table({label_name}, height(tbl), sum(~y), sum(y), ...
-        fitAndAuc(tbl, cir_features, y), fitAndAuc(tbl, cp_features, y), fitAndAuc(tbl, joint_features, y), ...
-        fitAndAuc(tbl, joint_features, y) - fitAndAuc(tbl, cir_features, y), ...
+        auc_cir, auc_cp, auc_joint, auc_joint - auc_cir, ...
         'VariableNames', {'label_name', 'n', 'n_los', 'n_nlos', 'auc_cir', 'auc_cp', 'auc_joint', 'delta_auc'});
 end
 
 function auc = fitAndAuc(tbl, feature_names, y)
     X = table2array(tbl(:, feature_names));
-    valid = all(isfinite(X), 2) & isfinite(y);
-    X = X(valid, :);
-    y = y(valid);
-    if size(X, 1) < 10 || numel(unique(y)) < 2
-        auc = NaN;
-        return;
-    end
-    mu = mean(X, 1);
-    sigma = std(X, 0, 1);
-    sigma(sigma < 1e-9) = 1.0;
-    X = (X - mu) ./ sigma;
-    warn_state = warning;
-    cleanup = onCleanup(@() warning(warn_state)); %#ok<NASGU>
-    warning('off', 'all');
-    mdl = fitglm(X, y, 'Distribution', 'binomial', 'Link', 'logit');
-    pred = predict(mdl, X);
-    [~, ~, ~, auc] = perfcurve(y, pred, 1);
+    auc = analysis.cvLogisticAuc(X, y);
 end
 
 function values = columnText(tbl, base_name)

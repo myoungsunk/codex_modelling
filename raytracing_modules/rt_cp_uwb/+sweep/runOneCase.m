@@ -6,7 +6,7 @@ function features_out = runOneCase(case_row, cfg)
     end
     cfg = ensureCfg(cfg);
     row = normalizeCaseRow(case_row);
-    seedCaseRng(row);
+    seedCaseRng(row, cfg);
 
     mat = buildCaseMaterial(row);
     if isStage2RoomRow(row)
@@ -38,7 +38,8 @@ function features_out = runOneCase(case_row, cfg)
         features_out = failureStruct(row.case_id, 'zero_channel');
         return;
     end
-    H_noisy = sweep.injectSnr(H, row.snr_db);
+    noise_seed = caseSeed(row, cfg, 'noise_awgn');
+    H_noisy = sweep.injectSnr(H, row.snr_db, noise_seed);
     feats = features.extractAllFeatures(H_noisy, cfg.freqs, ...
         'window_type', cfg.window_type, ...
         'feature_schema', 'canonical18', ...
@@ -83,20 +84,42 @@ function features_out = runOneCase(case_row, cfg)
     end
 end
 
-function seedCaseRng(row)
+function seedCaseRng(row, cfg)
     if isfield(row, 'case_id') && ~isempty(row.case_id) && isfinite(double(row.case_id))
-        rng(normalizeCaseSeed(row.case_id), 'twister');
+        rng(double(caseSeed(row, cfg, 'case_rng')), 'twister');
     end
 end
 
-function seed = normalizeCaseSeed(case_id)
-    seed = mod(round(double(case_id)), 2^32 - 1);
-    if seed < 0
-        seed = seed + (2^32 - 1);
+function seed = caseSeed(row, cfg, component_name)
+    replicate_id = 0;
+    if isfield(cfg, 'seed_replicate_id') && ~isempty(cfg.seed_replicate_id)
+        replicate_id = cfg.seed_replicate_id;
     end
-    if seed == 0
-        seed = 1;
+    if isfield(row, 'replicate_id') && ~isempty(row.replicate_id) && isfinite(double(row.replicate_id))
+        replicate_id = row.replicate_id;
     end
+
+    stage_id = '';
+    if isfield(cfg, 'seed_stage_id') && ~isempty(cfg.seed_stage_id)
+        stage_id = cfg.seed_stage_id;
+    end
+    if isfield(row, 'stage_id') && ~isempty(row.stage_id)
+        stage_id = row.stage_id;
+    end
+
+    base_seed = 0;
+    if isfield(cfg, 'seed_base') && ~isempty(cfg.seed_base)
+        base_seed = cfg.seed_base;
+    end
+    if isfield(row, 'base_seed') && ~isempty(row.base_seed) && isfinite(double(row.base_seed))
+        base_seed = row.base_seed;
+    end
+
+    seed = sweep.composeCaseSeed(row.case_id, ...
+        'stage_id', stage_id, ...
+        'base_seed', base_seed, ...
+        'replicate_id', replicate_id, ...
+        'component', component_name);
 end
 
 function cfg = ensureCfg(cfg)
