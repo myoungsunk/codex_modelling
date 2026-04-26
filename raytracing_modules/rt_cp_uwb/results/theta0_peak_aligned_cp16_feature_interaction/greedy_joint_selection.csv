@@ -1,0 +1,15 @@
+stage,cv_scheme,step,added_feature,selected_cp_features,n_cp,AUC,PR_AUC,delta_vs_cir
+stage1,stratified5,0,,,0,0.6786170668953688,0.8262822499091473,0.0
+stage1,stratified5,1,delta_tau_l_given_r_s,delta_tau_l_given_r_s,1,0.6941766723842195,0.8286156480756208,0.015559605488850714
+stage1,stratified5,2,s3_fp,delta_tau_l_given_r_s;s3_fp,2,0.7169655874785591,0.8353528684934974,0.03834852058319027
+stage1,stratified5,3,s3_all,delta_tau_l_given_r_s;s3_fp;s3_all,3,0.7475889794168096,0.8593598189349761,0.06897191252144075
+stage1,stratified5,4,delta_f_l_minus_r_fp,delta_tau_l_given_r_s;s3_fp;s3_all;delta_f_l_minus_r_fp,4,0.7539633361921099,0.8653926304423258,0.07534626929674104
+stage1,stratified5,5,cp_phase_slope_delay_s,delta_tau_l_given_r_s;s3_fp;s3_all;delta_f_l_minus_r_fp;cp_phase_slope_delay_s,5,0.7554625857632933,0.8658438714356291,0.07684551886792446
+stage1,stratified5,6,s3_late,delta_tau_l_given_r_s;s3_fp;s3_all;delta_f_l_minus_r_fp;cp_phase_slope_delay_s;s3_late,6,0.7564928173241853,0.8665366231330704,0.07787575042881645
+stage2,room_label_stratified5,0,,,0,0.6396399958483869,0.6156630642711122,0.0
+stage2,room_label_stratified5,1,lambda_l_late_fraction,lambda_l_late_fraction,1,0.7210659760491471,0.7000443786854614,0.0814259802007602
+stage2,room_label_stratified5,2,gamma_delay_linear,lambda_l_late_fraction;gamma_delay_linear,2,0.7241450889878467,0.7001464208902668,0.08450509313945975
+stage2,room_label_stratified5,3,delta_f_l_minus_r_fp,lambda_l_late_fraction;gamma_delay_linear;delta_f_l_minus_r_fp,3,0.7245108263192491,0.7113591687849861,0.08487083047086219
+stage2,room_label_stratified5,4,f_r_fp,lambda_l_late_fraction;gamma_delay_linear;delta_f_l_minus_r_fp;f_r_fp,4,0.7243922088063619,0.711140210136852,0.08475221295797497
+stage2,room_label_stratified5,5,f_l_fp,lambda_l_late_fraction;gamma_delay_linear;delta_f_l_minus_r_fp;f_r_fp;f_l_fp,5,0.7243032456716965,0.7112657588525918,0.08466324982330953
+stage2,room_label_stratified5,6,gamma_anchor_linear,lambda_l_late_fraction;gamma_delay_linear;delta_f_l_minus_r_fp;f_r_fp;f_l_fp;gamma_anchor_linear,6,0.7230528193900094,0.7084496584985076,0.0834128235416225

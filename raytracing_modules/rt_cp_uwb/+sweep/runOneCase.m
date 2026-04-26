@@ -1,4 +1,4 @@
-function features_out = runOneCase(case_row, cfg)
+function [features_out, aux_out] = runOneCase(case_row, cfg)
 % runOneCase - execute the single-case RT pipeline for one sweep sample.
 
     if nargin < 2 || isempty(cfg)
@@ -6,6 +6,9 @@ function features_out = runOneCase(case_row, cfg)
     end
     cfg = ensureCfg(cfg);
     row = normalizeCaseRow(case_row);
+    if nargout > 1
+        aux_out = failureAux(row.case_id, 'not_computed');
+    end
     seedCaseRng(row, cfg);
 
     mat = buildCaseMaterial(row);
@@ -14,13 +17,13 @@ function features_out = runOneCase(case_row, cfg)
         tx_pos = geom.tx_pos;
         rx_pos = geom.rx_pos;
         scene = geom.scene;
-        [tx_ant, rx_ant] = buildStage2Antennas(row, geom);
+        [tx_ant, rx_ant] = buildStage2Antennas(row, geom, cfg);
     elseif isSymmetricStage1Row(row)
         geom = scenes.generateSymmetricBoresightGeometry(row, mat, row.slab_size_m);
         tx_pos = geom.tx_pos;
         rx_pos = geom.rx_pos;
         scene = geom.scene;
-        [tx_ant, rx_ant] = buildSymmetricAntennas(row, geom);
+        [tx_ant, rx_ant] = buildSymmetricAntennas(row, geom, cfg);
     else
         [tx_pos, rx_pos, slab_center] = buildGeometry(row);
         scene = buildScene(row, mat, tx_pos, rx_pos, slab_center);
@@ -30,12 +33,18 @@ function features_out = runOneCase(case_row, cfg)
     paths = trace.enumeratePaths(scene, tx_pos, rx_pos, 2);
     if isempty(paths)
         features_out = failureStruct(row.case_id, 'no_paths');
+        if nargout > 1
+            aux_out = failureAux(row.case_id, 'no_paths');
+        end
         return;
     end
 
     H = channel.buildChannel(paths, tx_ant, rx_ant, cfg.freqs);
     if ~any(isfinite(H(:))) || max(abs(H(:))) <= 1e-14
         features_out = failureStruct(row.case_id, 'zero_channel');
+        if nargout > 1
+            aux_out = failureAux(row.case_id, 'zero_channel');
+        end
         return;
     end
     noise_seed = caseSeed(row, cfg, 'noise_awgn');
@@ -46,8 +55,21 @@ function features_out = runOneCase(case_row, cfg)
         'tx_ant', tx_ant, ...
         'rx_ant', rx_ant, ...
         'tx_handedness', 'R');
+    if enableCp16Features(cfg)
+        cp16 = features.computeRhLhCp16(H_noisy, cfg.freqs, ...
+            'window_type', cfg.window_type, ...
+            'fp_method', 'leading_edge');
+        feats = mergeFeatureStructs(feats, cp16);
+    end
+    if nargout > 1
+        aux_out = buildCirAux(row, cfg, H_noisy, feats, tx_pos, rx_pos, paths);
+    end
     if hasNonFiniteCanonical(feats)
         features_out = failureStruct(row.case_id, 'nonfinite_features');
+        if nargout > 1
+            aux_out.failed = true;
+            aux_out.error_msg = 'nonfinite_features';
+        end
         return;
     end
 
@@ -305,15 +327,21 @@ function [tx_ant, rx_ant] = buildAntennas(row, tx_pos, rx_pos, slab_center)
     end
 end
 
-function [tx_ant, rx_ant] = buildSymmetricAntennas(row, geom)
+function [tx_ant, rx_ant] = buildSymmetricAntennas(row, geom, cfg)
     switch lower(row.antenna_type)
         case 'ideal'
             tx_ant = antennas.makeIdealCpAntenna('right', geom.tx_pos, geom.tx_bore, geom.tx_h, geom.tx_v);
             rx_ant = antennas.makeIdealCpAntenna('right', geom.rx_pos, geom.rx_bore, geom.rx_h, geom.rx_v);
         case {'patch', 'patch_ffd'}
             [ffd_rhcp_path, ffd_lhcp_path] = stage1PatchFfdPaths();
-            tx_ant = antennas.makeRealisticPatchAntennaFFD(ffd_rhcp_path, ffd_lhcp_path, geom.tx_pos, geom.tx_bore, geom.tx_h, geom.tx_v);
-            rx_ant = antennas.makeRealisticPatchAntennaFFD(ffd_rhcp_path, ffd_lhcp_path, geom.rx_pos, geom.rx_bore, geom.rx_h, geom.rx_v);
+            if useStage1PeakAlignedFfdPosZ(cfg)
+                [tx_ant, rx_ant] = buildStage1Theta0PeakAlignedFfdAntennas(ffd_rhcp_path, ffd_lhcp_path, geom);
+            elseif useStage1PeakAlignedFfd(cfg)
+                [tx_ant, rx_ant] = buildStage1PeakAlignedFfdAntennas(ffd_rhcp_path, ffd_lhcp_path, geom);
+            else
+                tx_ant = antennas.makeRealisticPatchAntennaFFD(ffd_rhcp_path, ffd_lhcp_path, geom.tx_pos, geom.tx_bore, geom.tx_h, geom.tx_v);
+                rx_ant = antennas.makeRealisticPatchAntennaFFD(ffd_rhcp_path, ffd_lhcp_path, geom.rx_pos, geom.rx_bore, geom.rx_h, geom.rx_v);
+            end
         case 'patch_synthetic'
             patch = stage1SyntheticPatchPattern(row);
             tx_ant = antennas.makeRealisticPatchAntenna(patch, geom.tx_pos, geom.tx_bore, geom.tx_h, geom.tx_v);
@@ -323,21 +351,193 @@ function [tx_ant, rx_ant] = buildSymmetricAntennas(row, geom)
     end
 end
 
-function [tx_ant, rx_ant] = buildStage2Antennas(row, geom)
+function tf = useStage1PeakAlignedFfdPosZ(cfg)
+    tf = cfgFlag(cfg, 'stage1_ffd_peak_align_local_posz');
+end
+
+function tf = useStage1PeakAlignedFfd(cfg)
+    tf = cfgFlag(cfg, 'stage1_ffd_peak_align_local_negx');
+end
+
+function [tx_ant, rx_ant] = buildStage1PeakAlignedFfdAntennas(ffd_rhcp_path, ffd_lhcp_path, geom)
+    [ffd_r, ffd_l, pattern_summary] = loadStage1FfdPair(ffd_rhcp_path, ffd_lhcp_path);
+    tx_ffd_local_to_world = ffdFrameLocalNegXPeakToTarget([0; 0; -1]);
+    rx_ffd_local_to_world = ffdFrameLocalNegXPeakToTarget([0; 0; 1]);
+
+    tx_ant = makeFfdAntennaWithFrame( ...
+        geom.tx_pos, geom.tx_bore, geom.tx_h, geom.tx_v, tx_ffd_local_to_world, ffd_r, ffd_l, pattern_summary);
+    rx_ant = makeFfdAntennaWithFrame( ...
+        geom.rx_pos, geom.rx_bore, geom.rx_h, geom.rx_v, rx_ffd_local_to_world, ffd_r, ffd_l, pattern_summary);
+end
+
+function [tx_ant, rx_ant] = buildStage1Theta0PeakAlignedFfdAntennas(ffd_rhcp_path, ffd_lhcp_path, geom)
+    [ffd_r, ffd_l, pattern_summary] = loadStage1FfdPair(ffd_rhcp_path, ffd_lhcp_path);
+    tx_ffd_local_to_world = ffdFrameLocalPosZPeakToTarget([0; 0; -1]);
+    rx_ffd_local_to_world = ffdFrameLocalPosZPeakToTarget([0; 0; 1]);
+
+    tx_ant = makeFfdAntennaWithFrame( ...
+        geom.tx_pos, geom.tx_bore, geom.tx_h, geom.tx_v, tx_ffd_local_to_world, ffd_r, ffd_l, pattern_summary);
+    rx_ant = makeFfdAntennaWithFrame( ...
+        geom.rx_pos, geom.rx_bore, geom.rx_h, geom.rx_v, rx_ffd_local_to_world, ffd_r, ffd_l, pattern_summary);
+end
+
+function ant = makeFfdAntennaWithFrame(position, boresight, h_axis, v_axis, ffd_local_to_world, ffd_r, ffd_l, pattern_summary)
+    ant = core.Antenna( ...
+        'position', position(:), ...
+        'boresight', boresight(:), ...
+        'h_axis', h_axis(:), ...
+        'v_axis', v_axis(:), ...
+        'basis', 'circular', ...
+        'convention', 'IEEE-RHCP', ...
+        'cross_pol_leakage_db', pattern_summary.xpd_db_boresight, ...
+        'axial_ratio_db', pattern_summary.ar_db_boresight, ...
+        'ar_edge_db', 10.0, ...
+        'xpd_edge_db', 8.0, ...
+        'enable_coupling', false, ...
+        'tx_peak_gain_dbi', pattern_summary.peak_gain_dbi, ...
+        'rx_peak_gain_dbi', pattern_summary.peak_gain_dbi, ...
+        'tx_pattern_cos_exp', 0.0, ...
+        'rx_pattern_cos_exp', 0.0, ...
+        'patternData', pattern_summary, ...
+        'use_ffd', true, ...
+        'ffd_port_r', ffd_r, ...
+        'ffd_port_l', ffd_l, ...
+        'ffd_local_to_world', ffd_local_to_world);
+end
+
+function R = ffdFrameLocalNegXPeakToTarget(target_world)
+    target_world = normalizeLocalVec(target_world);
+    x_world = -target_world;
+    ref = [0; 1; 0];
+    if abs(dot(x_world, ref)) > 0.95
+        ref = [1; 0; 0];
+    end
+    y_world = ref - dot(ref, x_world) * x_world;
+    y_world = normalizeLocalVec(y_world);
+    z_world = normalizeLocalVec(cross(x_world, y_world));
+    R = [x_world, y_world, z_world];
+end
+
+function R = ffdFrameLocalPosZPeakToTarget(target_world)
+    z_world = normalizeLocalVec(target_world);
+    ref = [1; 0; 0];
+    if abs(dot(z_world, ref)) > 0.95
+        ref = [0; 1; 0];
+    end
+    x_world = ref - dot(ref, z_world) * z_world;
+    x_world = normalizeLocalVec(x_world);
+    y_world = normalizeLocalVec(cross(z_world, x_world));
+    R = [x_world, y_world, z_world];
+end
+
+function [ffd_r, ffd_l, pattern_summary] = loadStage1FfdPair(ffd_rhcp_path, ffd_lhcp_path)
+    persistent cache
+    key = string(ffd_rhcp_path) + "|" + string(ffd_lhcp_path);
+    if ~isempty(cache) && isfield(cache, 'key') && strcmp(cache.key, key)
+        ffd_r = cache.ffd_r;
+        ffd_l = cache.ffd_l;
+        pattern_summary = cache.pattern_summary;
+        return;
+    end
+
+    ffd_a = antennas.loadFfdPattern(ffd_rhcp_path, 'notes', 'stage1_peak_aligned_input');
+    ffd_b = antennas.loadFfdPattern(ffd_lhcp_path, 'notes', 'stage1_peak_aligned_input');
+    validateStage1FfdPair(ffd_a, ffd_b);
+    [ffd_r, ffd_l] = assignStage1FfdHands(ffd_a, ffd_b);
+    pattern_summary = antennas.loadPatchPattern({ffd_rhcp_path, ffd_lhcp_path});
+
+    cache = struct('key', char(key), 'ffd_r', ffd_r, 'ffd_l', ffd_l, 'pattern_summary', pattern_summary);
+end
+
+function validateStage1FfdPair(ffd_a, ffd_b)
+    assert(isequal(size(ffd_a.E_theta), size(ffd_b.E_theta)), 'E field size mismatch between Stage 1 FFD ports');
+    assert(isequal(ffd_a.theta_rad, ffd_b.theta_rad), 'Theta grid mismatch between Stage 1 FFD ports');
+    assert(isequal(ffd_a.phi_rad, ffd_b.phi_rad), 'Phi grid mismatch between Stage 1 FFD ports');
+    assert(isequal(ffd_a.freqs_hz, ffd_b.freqs_hz), 'Frequency grid mismatch between Stage 1 FFD ports');
+end
+
+function [ffd_r, ffd_l] = assignStage1FfdHands(ffd_a, ffd_b)
+    hand_a = dominantStage1FfdHand(ffd_a);
+    hand_b = dominantStage1FfdHand(ffd_b);
+    if strcmp(hand_a, 'R') && strcmp(hand_b, 'L')
+        ffd_r = ffd_a;
+        ffd_l = ffd_b;
+        return;
+    end
+    if strcmp(hand_a, 'L') && strcmp(hand_b, 'R')
+        ffd_r = ffd_b;
+        ffd_l = ffd_a;
+        return;
+    end
+    error('sweep:runOneCase:Stage1FfdHandedness', 'Could not uniquely assign RHCP/LHCP FFD ports');
+end
+
+function hand = dominantStage1FfdHand(ffd)
+    metrics_r = antennas.computeFfdMetrics(ffd, 'handedness', 'RHCP');
+    metrics_l = antennas.computeFfdMetrics(ffd, 'handedness', 'LHCP');
+    [~, fmid] = min(abs(ffd.freqs_hz - mean(ffd.freqs_hz)));
+    if metrics_r.boresight_xpd_db(fmid) >= metrics_l.boresight_xpd_db(fmid)
+        hand = 'R';
+    else
+        hand = 'L';
+    end
+end
+
+function v = normalizeLocalVec(x)
+    v = double(x(:));
+    n = norm(v);
+    if n <= 1e-12
+        error('sweep:runOneCase:ZeroVector', 'zero-length vector');
+    end
+    v = v / n;
+end
+
+function [tx_ant, rx_ant] = buildStage2Antennas(row, geom, cfg)
     switch lower(row.antenna_type)
         case 'ideal'
             tx_ant = antennas.makeIdealCpAntenna('right', geom.tx_pos, geom.tx_bore, geom.tx_h, geom.tx_v);
             rx_ant = antennas.makeIdealCpAntenna('right', geom.rx_pos, geom.rx_bore, geom.rx_h, geom.rx_v);
         case {'patch', 'patch_ffd'}
             [ffd_rhcp_path, ffd_lhcp_path] = stage1PatchFfdPaths();
-            tx_ant = antennas.makeRealisticPatchAntennaFFD(ffd_rhcp_path, ffd_lhcp_path, geom.tx_pos, geom.tx_bore, geom.tx_h, geom.tx_v);
-            rx_ant = antennas.makeRealisticPatchAntennaFFD(ffd_rhcp_path, ffd_lhcp_path, geom.rx_pos, geom.rx_bore, geom.rx_h, geom.rx_v);
+            if useStage2PeakAlignedFfdPosZ(cfg)
+                [tx_ant, rx_ant] = buildStage1Theta0PeakAlignedFfdAntennas(ffd_rhcp_path, ffd_lhcp_path, geom);
+            elseif useStage2PeakAlignedFfd(cfg)
+                [tx_ant, rx_ant] = buildStage1PeakAlignedFfdAntennas(ffd_rhcp_path, ffd_lhcp_path, geom);
+            else
+                tx_ant = antennas.makeRealisticPatchAntennaFFD(ffd_rhcp_path, ffd_lhcp_path, geom.tx_pos, geom.tx_bore, geom.tx_h, geom.tx_v);
+                rx_ant = antennas.makeRealisticPatchAntennaFFD(ffd_rhcp_path, ffd_lhcp_path, geom.rx_pos, geom.rx_bore, geom.rx_h, geom.rx_v);
+            end
         case 'patch_synthetic'
             patch = stage1SyntheticPatchPattern(row);
             tx_ant = antennas.makeRealisticPatchAntenna(patch, geom.tx_pos, geom.tx_bore, geom.tx_h, geom.tx_v);
             rx_ant = antennas.makeRealisticPatchAntenna(patch, geom.rx_pos, geom.rx_bore, geom.rx_h, geom.rx_v);
         otherwise
             error('sweep:runOneCase:AntennaType', 'Unknown antenna_type: %s', row.antenna_type);
+    end
+end
+
+function tf = useStage2PeakAlignedFfdPosZ(cfg)
+    tf = cfgFlag(cfg, 'stage2_ffd_peak_align_local_posz');
+end
+
+function tf = useStage2PeakAlignedFfd(cfg)
+    tf = cfgFlag(cfg, 'stage2_ffd_peak_align_local_negx');
+end
+
+function tf = enableCp16Features(cfg)
+    tf = cfgFlag(cfg, 'enable_cp16_features');
+end
+
+function tf = cfgFlag(cfg, name)
+    tf = false;
+    if ~isfield(cfg, name) || isempty(cfg.(name))
+        return;
+    end
+    raw = cfg.(name);
+    if ischar(raw) || isstring(raw)
+        tf = any(strcmpi(char(string(raw)), {'1', 'true', 'yes', 'on'}));
+    else
+        tf = logical(raw);
     end
 end
 
@@ -387,6 +587,43 @@ function out = failureStruct(case_id, error_msg)
     out.case_id = case_id;
     out.failed = true;
     out.error_msg = char(string(error_msg));
+end
+
+function out = failureAux(case_id, error_msg)
+    out = struct();
+    out.case_id = case_id;
+    out.failed = true;
+    out.error_msg = char(string(error_msg));
+    out.freqs = [];
+    out.H_primary = [];
+    out.h_primary = [];
+    out.t_axis_s = [];
+    out.primary_tx_port = NaN;
+    out.primary_rx_port = NaN;
+end
+
+function out = buildCirAux(row, cfg, H_noisy, feats, tx_pos, rx_pos, paths)
+    primary_tx_port = max(1, min(size(H_noisy, 2), round(feats.primary_tx_port)));
+    primary_rx_port = max(1, min(size(H_noisy, 1), round(feats.primary_rx_port)));
+    H_primary = squeeze(H_noisy(primary_rx_port, primary_tx_port, :));
+    [h_primary, t_axis_s] = channel.ifftToCir(H_primary, cfg.freqs, cfg.window_type);
+
+    bounce_counts = [paths.bounce_count];
+    out = struct();
+    out.case_id = row.case_id;
+    out.failed = false;
+    out.error_msg = '';
+    out.freqs = cfg.freqs(:);
+    out.H_primary = H_primary(:);
+    out.h_primary = h_primary(:);
+    out.t_axis_s = t_axis_s(:);
+    out.primary_tx_port = primary_tx_port;
+    out.primary_rx_port = primary_rx_port;
+    out.tx_pos = tx_pos(:);
+    out.rx_pos = rx_pos(:);
+    out.num_paths = numel(paths);
+    out.bounce_count_min = min(bounce_counts);
+    out.bounce_count_max = max(bounce_counts);
 end
 
 function tf = hasNonFiniteCanonical(feats)
@@ -483,6 +720,17 @@ end
 
 function value = clamp(x)
     value = min(max(double(x), -1.0), 1.0);
+end
+
+function out = mergeFeatureStructs(varargin)
+    out = struct();
+    for idx = 1:nargin
+        current = varargin{idx};
+        fields = fieldnames(current);
+        for fidx = 1:numel(fields)
+            out.(fields{fidx}) = current.(fields{fidx});
+        end
+    end
 end
 
 function [rhcp_path, lhcp_path] = stage1PatchFfdPaths()

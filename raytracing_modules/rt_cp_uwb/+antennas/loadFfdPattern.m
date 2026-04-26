@@ -15,10 +15,12 @@ function ffd = loadFfdPattern(filepath, varargin)
     p.addParameter('notes', '', @(x) ischar(x) || isstring(x));
     p.addParameter('phi_convention', 'hfss', @(x) ischar(x) || isstring(x));
     p.addParameter('flip_ephi', [], @(x) isempty(x) || islogical(x) || isnumeric(x));
+    p.addParameter('sample_order', 'auto', @(x) ischar(x) || isstring(x));
     p.parse(varargin{:});
     notes = char(string(p.Results.notes));
     phi_convention = lower(char(string(p.Results.phi_convention)));
     flip_ephi = resolveFlipEphi(phi_convention, p.Results.flip_ephi);
+    sample_order = lower(char(string(p.Results.sample_order)));
 
     filepath = char(string(filepath));
     assert(exist(filepath, 'file') == 2, 'antennas:loadFfdPattern:Missing', 'FFD file not found: %s', filepath);
@@ -59,6 +61,7 @@ function ffd = loadFfdPattern(filepath, varargin)
     freqs_hz = zeros(n_freq, 1);
     E_theta_raw = complex(zeros(n_theta, n_phi, n_freq));
     E_phi_raw = complex(zeros(n_theta, n_phi, n_freq));
+    block_values_all = zeros(n_samples_per_freq, 4, n_freq);
 
     for fidx = 1:n_freq
         if cursor <= numel(lines) && startsWith(lower(strtrim(lines{cursor})), 'frequency')
@@ -78,16 +81,21 @@ function ffd = loadFfdPattern(filepath, varargin)
 
         block = lines(cursor:(cursor + n_samples_per_freq - 1));
         cursor = cursor + n_samples_per_freq;
+        block_values = zeros(n_samples_per_freq, 4);
         for flat_idx = 1:n_samples_per_freq
             values = sscanf(block{flat_idx}, '%f');
             if numel(values) < 4
                 error('antennas:loadFfdPattern:Row', 'Malformed FFD sample row in %s', filepath);
             end
-            theta_idx = mod(flat_idx - 1, n_theta) + 1;
-            phi_idx = floor((flat_idx - 1) / n_theta) + 1;
-            E_theta_raw(theta_idx, phi_idx, fidx) = complex(values(end - 3), values(end - 2));
-            E_phi_raw(theta_idx, phi_idx, fidx) = complex(values(end - 1), values(end));
+            block_values(flat_idx, :) = values(end - 3:end).';
         end
+        block_values_all(:, :, fidx) = block_values;
+    end
+
+    resolved_sample_order = resolveSampleOrderForFile(block_values_all, n_theta, n_phi, sample_order, filepath);
+    for fidx = 1:n_freq
+        [E_theta_raw(:, :, fidx), E_phi_raw(:, :, fidx)] = ...
+            reshapeFfdSamples(block_values_all(:, :, fidx), n_theta, n_phi, resolved_sample_order, filepath);
     end
 
     [phi_deg, phi_keep_idx, phi_sort_idx] = canonicalizePhiGrid(phi_deg_raw);
@@ -123,6 +131,7 @@ function ffd = loadFfdPattern(filepath, varargin)
     metadata.format = 'HFSS_FFD';
     metadata.phi_convention = phi_convention;
     metadata.ephi_sign_flipped = logical(flip_ephi);
+    metadata.sample_order = resolved_sample_order;
     metadata.header_preview = string(raw_lines(1:min(numel(raw_lines), 10)));
     metadata.n_theta_raw = n_theta;
     metadata.n_phi_raw = n_phi;
@@ -143,6 +152,72 @@ function ffd = loadFfdPattern(filepath, varargin)
     ffd.port_id = port_id;
     ffd.port_label = port_label;
     ffd.metadata = metadata;
+end
+
+function resolved_sample_order = resolveSampleOrderForFile(block_values_all, n_theta, n_phi, sample_order, filepath)
+    switch sample_order
+        case {'theta_fastest', 'theta-major', 'theta_major'}
+            resolved_sample_order = 'theta_fastest';
+        case {'phi_fastest', 'phi-major', 'phi_major'}
+            resolved_sample_order = 'phi_fastest';
+        case 'auto'
+            score_theta = 0.0;
+            score_phi = 0.0;
+            for fidx = 1:size(block_values_all, 3)
+                [theta_fast_theta, theta_fast_phi, phi_fast_theta, phi_fast_phi] = reshapeCandidateFfdSamples(block_values_all(:, :, fidx), n_theta, n_phi);
+                score_theta = score_theta + poleSpreadScore(theta_fast_theta, theta_fast_phi);
+                score_phi = score_phi + poleSpreadScore(phi_fast_theta, phi_fast_phi);
+            end
+            if score_phi < score_theta
+                resolved_sample_order = 'phi_fastest';
+            else
+                resolved_sample_order = 'theta_fastest';
+            end
+        otherwise
+            error('antennas:loadFfdPattern:SampleOrder', ...
+                'Unsupported sample_order=%s in %s', sample_order, filepath);
+    end
+end
+
+function [E_theta, E_phi] = reshapeFfdSamples(block_values, n_theta, n_phi, resolved_sample_order, filepath)
+    [theta_fast_theta, theta_fast_phi, phi_fast_theta, phi_fast_phi] = reshapeCandidateFfdSamples(block_values, n_theta, n_phi);
+
+    switch resolved_sample_order
+        case 'theta_fastest'
+            E_theta = theta_fast_theta;
+            E_phi = theta_fast_phi;
+        case 'phi_fastest'
+            E_theta = phi_fast_theta;
+            E_phi = phi_fast_phi;
+        otherwise
+            error('antennas:loadFfdPattern:SampleOrder', ...
+                'Unsupported resolved_sample_order=%s in %s', resolved_sample_order, filepath);
+    end
+end
+
+function [theta_fast_theta, theta_fast_phi, phi_fast_theta, phi_fast_phi] = reshapeCandidateFfdSamples(block_values, n_theta, n_phi)
+    e_theta_values = complex(block_values(:, 1), block_values(:, 2));
+    e_phi_values = complex(block_values(:, 3), block_values(:, 4));
+
+    theta_fast_theta = reshape(e_theta_values, [n_theta, n_phi]);
+    theta_fast_phi = reshape(e_phi_values, [n_theta, n_phi]);
+    phi_fast_theta = reshape(e_theta_values, [n_phi, n_theta]).';
+    phi_fast_phi = reshape(e_phi_values, [n_phi, n_theta]).';
+end
+
+function score = poleSpreadScore(E_theta, E_phi)
+    power = abs(E_theta).^2 + abs(E_phi).^2;
+    score = spreadDb(power(1, :)) + spreadDb(power(end, :));
+end
+
+function value = spreadDb(x)
+    x = double(x(:));
+    x = x(isfinite(x) & x > 0);
+    if isempty(x)
+        value = Inf;
+        return;
+    end
+    value = 10 * log10(max(x) / max(min(x), 1e-30));
 end
 
 function flip_ephi = resolveFlipEphi(phi_convention, explicit_value)

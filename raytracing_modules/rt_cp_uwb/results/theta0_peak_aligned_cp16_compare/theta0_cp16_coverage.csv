@@ -1,0 +1,5 @@
+stage,variant,source,status,n_valid,n_pos,cp16_present,cp16_nan_count,cp16_inf_count
+stage1,old_local_negx,D:\codex\raytracing_modules\rt_cp_uwb\results\stage1_peak_aligned_ffd_phi_fastest\stage1_3000_ffd_peak_aligned_phi_fastest_det.csv,loaded,3000,2120,0,,
+stage1,new_theta0_posz_cp16,D:\codex\raytracing_modules\rt_cp_uwb\results\stage1_theta0_peak_aligned_cp16_phi_fastest\stage1_3000_theta0_peak_aligned_cp16_phi_fastest_det.csv,loaded,3000,2120,1,0.0,0.0
+stage2,old_local_negx,D:\codex\raytracing_modules\rt_cp_uwb\results\stage2_peak_aligned_phi_fastest\stage2_900_ffd_peak_aligned_phi_fastest_det.csv,loaded,900,437,0,,
+stage2,new_theta0_posz_cp16,D:\codex\raytracing_modules\rt_cp_uwb\results\stage2_theta0_peak_aligned_cp16_phi_fastest\stage2_900_theta0_peak_aligned_cp16_phi_fastest_det.csv,loaded,900,437,1,0.0,0.0
